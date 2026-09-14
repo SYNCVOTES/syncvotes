@@ -7,6 +7,8 @@ name: deploy
 on:
   push:
     branches: [main]
+    # Prose does not need a rebuild.
+    paths-ignore: ['**.md']
   workflow_dispatch:
 
 concurrency:
