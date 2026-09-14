@@ -11,7 +11,7 @@ services:
     restart: unless-stopped
     environment:
       # SvelteKit refuses cross-origin POSTs without this.
-      ORIGIN: https://dev.syncvotes.com
+      ORIGIN: https://${APP_DOMAIN:?set in .env}
       # The participant sits behind the validator's nginx, which routes by Host.
       LEDGER_API_URL: http://json-ledger-api.localhost
       PROVIDER_PARTY: ${PROVIDER_PARTY:?set in .env}
@@ -22,15 +22,18 @@ services:
       default: {}
 
   caddy:
-    image: caddy:2-alpine
+    build:
+      context: .
+      dockerfile: caddy.Dockerfile
     restart: unless-stopped
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN}
     # Bound to the public address on purpose: the validator's nginx already holds :80 on
     # loopback, and two processes cannot share a port on the same address.
     ports:
       - '${PUBLIC_IP:?set in .env}:80:80'
       - '${PUBLIC_IP}:443:443'
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - caddy-config:/config
     networks:

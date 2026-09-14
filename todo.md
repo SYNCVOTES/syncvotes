@@ -18,8 +18,8 @@
       every transaction signed client-side; passkey (PRF) or password lock; API as remote functions
 - [x] server side on @canton-network/wallet-sdk (topology, allocate, ACS, prepare, executeAndWait)
 - [x] browser verifies what it signs (hash recomputed, choice/template/actAs checked) — tamper test passes
-- [x] GitHub self-hosted runner on <server> (systemd service, label `syncvotes`); a push to
-      main deploys. Secrets live in ~/syncvotes-deploy.env on the server, outside the checkout
+- [x] deploy = `pnpm deploy`: compose over `DOCKER_HOST=ssh://`, build on the server's daemon from
+      the local tree; the app uploads its own DAR at startup. GitHub Actions + runner removed
 - [ ] token standard + treasury — users fund their app party from any wallet (CC transfers work
       across validators), payments to the treasury are party-to-party on our validator.
       Treasury party needs a transfer pre-approval (`sdk.amulet.preapproval`) or every incoming

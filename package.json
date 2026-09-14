@@ -6,6 +6,7 @@
 	"scripts": {
 		"dev": "concurrently -n ledger,app -c blue,green -k \"pnpm ledger:start\" \"pnpm app:dev\"",
 		"build": "pnpm daml:codegen && pnpm i && vite build",
+		"deploy": "docker --context syncvotes compose --project-directory deploy build && docker --context syncvotes compose --project-directory deploy up -d",
 		"preview": "concurrently -n ledger,app -c blue,green -k \"pnpm ledger:start\" \"pnpm app:preview\"",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",

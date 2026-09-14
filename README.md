@@ -122,17 +122,36 @@ write carries a signature it cannot forge.
 
 ## Deployment
 
+```sh
+pnpm deploy
+```
+
+That is `docker compose build && up -d` against a Docker context named `syncvotes`: the commands
+run here, the server's Docker daemon executes them, and the build context — this working tree,
+minus `.dockerignore` — travels over SSH. Nothing lives on the server but Docker and the validator:
+no checkout, no runner, no CI. Compose reads `deploy/.env` (see `deploy/.env.example`) locally and
+bakes the values into the container's environment; the file itself never leaves this machine.
+
+The server's address is not in the repository. Once per machine:
+
+```sh
+docker context create syncvotes --docker host=ssh://<user>@<server>
+```
+
+Caddy's config is baked into its image (`deploy/caddy.Dockerfile`) rather than bind-mounted — a
+host path would be resolved on the server, where this tree does not exist.
+
+Building on the server is deliberate: it is amd64, the laptop is not, and the layer cache is there.
+What gets deployed is the working tree, not a commit — mind what is on disk when running it.
+
 `deploy/` is a separate compose project that joins the Splice validator's network — the validator
 has its own `start.sh`, which does more than `compose up`, so a deploy must never recreate its
 containers. Caddy binds the public IP because the validator's nginx already holds `:80` on
 loopback, and answers to `json-ledger-api.localhost` internally so the participant can be reached
 by Host header.
 
-Pushing to `main` deploys: the runner lives on the same server, so the image it builds is already
-where it needs to be and no registry is involved. Secrets sit in `deploy/.env` on the server.
-
-The DAR is built inside the image and uploaded on every deploy; uploading a package twice is a
-no-op, so the code and the package it needs always land together.
+The DAR is built inside the image, and the app uploads it on startup (`src/hooks.server.ts`) —
+idempotent by package id — so the code and the package it needs always land together.
 
 ## Notes
 

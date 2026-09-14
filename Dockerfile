@@ -52,7 +52,7 @@ ENV NODE_ENV=production
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/daml.js ./daml.js
 COPY --from=builder /app/build ./build
-# The DAR rides along so deployment can upload exactly the package this image was built from.
+# The DAR rides along: on startup the app uploads exactly the package this image was built from.
 COPY --from=builder /app/daml/.daml/dist ./dar
 COPY package.json ./
 

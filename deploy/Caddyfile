@@ -1,6 +1,6 @@
 # One public domain. The ledger API and the validator's admin UIs stay off the internet — the
 # bundle already binds them to loopback, so nothing here exposes them.
-dev.syncvotes.com {
+{$APP_DOMAIN} {
 	reverse_proxy app:3000
 }
 
