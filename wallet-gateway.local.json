@@ -1,4 +1,7 @@
 {
+	"hashingScheme": {
+		"version": "HASHING_SCHEME_VERSION_V2"
+	},
 	"kernel": {
 		"id": "remote-da",
 		"clientType": "remote"

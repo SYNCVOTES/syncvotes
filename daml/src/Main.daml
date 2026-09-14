@@ -2,6 +2,39 @@ module Main where
 
 type AssetId = ContractId Asset
 
+-- The app provider is a signatory here, and that is the whole point: under CIP-0104 traffic is
+-- credited to parties that act as confirmers of a transaction, and signatories are confirmers.
+-- A party that is merely an observer earns nothing.
+--
+-- The provider signs this once, at creation. From then on the user exercises choices on it and
+-- signs only for themselves — the provider's authorisation is already baked into the contract,
+-- so its key never takes part in user transactions.
+template AppProxy
+  with
+    provider : Party
+    user : Party
+    name : Text
+  where
+    signatory provider
+    observer user
+
+    -- The provider is the only signatory, which makes the set of proxies the app's directory:
+    -- listing them gives a display name for every party. Contract keys would enforce uniqueness
+    -- on-ledger, but they need Daml-LF 2.3 and this package targets 2.2, so the backend checks.
+
+    nonconsuming choice AppProxy_Issue : AssetId
+      with
+        name : Text
+      controller user
+      do create Asset with issuer = user, owner = user, name
+
+    nonconsuming choice AppProxy_Give : AssetId
+      with
+        assetId : AssetId
+        newOwner : Party
+      controller user
+      do exercise assetId Give with newOwner
+
 template Asset
   with
     issuer : Party

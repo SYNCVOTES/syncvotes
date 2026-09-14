@@ -1,7 +1,6 @@
-sdk-version: 3.4.11
-name: daml
+sdk-version: 3.5.7
+name: syncvotes
 source: src
-init-script: Main:setup
 version: 0.0.1
 dependencies:
   - daml-prim

@@ -9,4 +9,9 @@ verifyDepsBeforeRun: false
 
 allowBuilds:
   better-sqlite3: true
+  cbor-extract: true
   esbuild: true
+  secp256k1: true
+
+minimumReleaseAgeExclude:
+  - '@canton-network/dapp-sdk@1.6.0'

@@ -1,0 +1,57 @@
+# The runner lives on the same server as the validator, so an image built here is already where
+# it needs to be — a registry would be a pointless hop. Nothing is stored in GitHub either: the
+# secrets sit in deploy/.env on the server, which the runner can read.
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, syncvotes]
+    environment: testnet
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start services
+        working-directory: deploy
+        run: |
+          docker compose build
+          docker compose up -d
+
+      - name: Wait for the participant
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf -H 'Host: json-ledger-api.localhost' \
+                 http://127.0.0.1:8888/v2/state/ledger-end >/dev/null; then
+              echo "participant is up"; exit 0
+            fi
+            sleep 5
+          done
+          echo "participant did not come up"; exit 1
+
+      # Uploading the same package twice is a no-op, so this is safe to run on every deploy and
+      # the DAR always lands together with the code that uses it.
+      # The DAR is built inside the image, so it is copied back out to be uploaded.
+      - name: Extract DAR from the image
+        working-directory: deploy
+        run: |
+          rm -rf ../dar && mkdir -p ../dar
+          cid=$(docker create $(docker compose images -q app))
+          docker cp "$cid:/app/dar/." ../dar/
+          docker rm "$cid" >/dev/null
+
+      - name: Upload DAR
+        run: |
+          curl -sf -X POST \
+            -H 'Host: json-ledger-api.localhost' \
+            -H 'content-type: application/octet-stream' \
+            --data-binary @dar/$(ls dar) \
+            http://127.0.0.1:8888/v2/dars

@@ -1,0 +1,52 @@
+# Our services only. The Splice validator is a separate compose project managed by its own
+# start.sh/stop.sh — those do more than `compose up` (they generate config and onboard), so a
+# deploy here must never be able to recreate its containers. We only join its network.
+name: syncvotes
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      # SvelteKit refuses cross-origin POSTs without this.
+      ORIGIN: https://dev.syncvotes.com
+      # The participant sits behind the validator's nginx, which routes by Host.
+      LEDGER_API_URL: http://json-ledger-api.localhost
+      PROVIDER_PARTY: ${PROVIDER_PARTY:?set in .env}
+      LEDGER_USER_ID: ${LEDGER_USER_ID:-administrator}
+      LEDGER_AUTH_AUDIENCE: ${LEDGER_AUTH_AUDIENCE:-https://ledger_api.example.com}
+      LEDGER_AUTH_SECRET: ${LEDGER_AUTH_SECRET:-unsafe}
+    networks:
+      default: {}
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    # Bound to the public address on purpose: the validator's nginx already holds :80 on
+    # loopback, and two processes cannot share a port on the same address.
+    ports:
+      - '${PUBLIC_IP:?set in .env}:80:80'
+      - '${PUBLIC_IP}:443:443'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      default:
+        aliases:
+          # The validator's nginx routes by Host, and a gateway config can only carry a URL —
+          # so Caddy answers to this name internally and rewrites the header on the way through.
+          - json-ledger-api.localhost
+    depends_on:
+      - app
+
+volumes:
+  caddy-data:
+  caddy-config:
+
+networks:
+  default:
+    name: ${VALIDATOR_NETWORK:-splice-validator_default}
+    external: true

@@ -4,9 +4,9 @@
 	"version": "0.0.1",
 	"type": "module",
 	"scripts": {
-		"dev": "concurrently -n ledger,wallet,app -c blue,magenta,green -k \"pnpm ledger:start\" \"pnpm wallet:start\" \"pnpm app:dev\"",
+		"dev": "concurrently -n ledger,app -c blue,green -k \"pnpm ledger:start\" \"pnpm app:dev\"",
 		"build": "pnpm daml:codegen && pnpm i && vite build",
-		"preview": "concurrently -n ledger,wallet,app -c blue,magenta,green -k \"pnpm ledger:start\" \"pnpm wallet:start\" \"pnpm app:preview\"",
+		"preview": "concurrently -n ledger,app -c blue,green -k \"pnpm ledger:start\" \"pnpm app:preview\"",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"lint": "prettier --check . && eslint .",
@@ -15,14 +15,20 @@
 		"app:preview": "vite preview",
 		"daml:build": "cd daml && rm -rf .daml/dist && dpm build",
 		"daml:codegen": "pnpm daml:build && rm -rf daml.js && dpm codegen-js daml/.daml/dist/*.dar -o daml.js",
-		"ledger:start": "dpm sandbox --log-file-appender off -c canton.local.conf --dar daml/.daml/dist/*.dar",
+		"ledger:start": "dpm sandbox --log-file-appender off --dar daml/.daml/dist/*.dar",
 		"wallet:start": "mkdir -p .wallet && wallet-gateway-remote -c wallet-gateway.local.json"
 	},
+	"dependencies": {
+		"@canton-network/core-tx-visualizer": "^1.11.0",
+		"@canton-network/wallet-sdk": "^1.5.0",
+		"@daml.js/model": "workspace:@daml.js/syncvotes-0.0.1@*",
+		"@daml/types": "3.5.2",
+		"@noble/curves": "^2.4.0",
+		"@noble/hashes": "^2.4.0",
+		"@scure/bip39": "^2.4.0"
+	},
 	"devDependencies": {
-		"@canton-network/dapp-sdk": "^1.5.1",
-		"@canton-network/wallet-gateway-remote": "1.8.1",
-		"@daml.js/model": "workspace:@daml.js/daml-0.0.1@*",
-		"@daml/types": "3.4.11",
+		"@canton-network/wallet-gateway-remote": "1.10.0",
 		"@eslint/js": "^10.0.1",
 		"@sveltejs/adapter-node": "^5.5.4",
 		"@sveltejs/kit": "^2.63.0",
@@ -44,6 +50,7 @@
 		"tailwindcss": "^4.3.0",
 		"typescript": "^6.0.3",
 		"typescript-eslint": "^8.60.1",
+		"valibot": "^1.4.2",
 		"vite": "^8.0.16"
 	}
 }
