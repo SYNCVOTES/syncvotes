@@ -46,39 +46,17 @@ app's directory: each carries a name, and listing them is how one user finds ano
 
 ## Setup
 
-`daml.js/` is generated and gitignored, so a fresh clone has to produce it before pnpm can resolve
-`@daml.js/model`. Codegen first, install second:
+There is no local run: the only ledger this app talks to is its validator on TestNet, and the only
+way to run it is `pnpm deploy`. What runs locally is the type-checker and the linter, and for that
+`daml.js/` has to exist — it is generated and gitignored, so a fresh clone produces it before pnpm
+can resolve `@daml.js/model`. Codegen first, install second:
 
 ```sh
 pnpm daml:codegen   # builds the DAR and writes daml.js/
 pnpm i
+pnpm check          # svelte-check over the whole app
+pnpm lint
 ```
-
-## Running it
-
-```sh
-pnpm dev            # sandbox + app, output prefixed per service; Ctrl-C stops both
-```
-
-Or separately:
-
-```sh
-pnpm ledger:start   # Canton sandbox — gRPC on 6865, JSON Ledger API on 6864
-pnpm app:dev        # the app on http://localhost:5173
-```
-
-The app needs five variables, declared in `src/env.ts` and read at startup so one image can run
-against different participants. For the local sandbox:
-
-```sh
-LEDGER_API_URL=http://localhost:6864
-PROVIDER_PARTY=<a party on the sandbox>
-LEDGER_USER_ID=participant_admin
-LEDGER_AUTH_AUDIENCE=
-LEDGER_AUTH_SECRET=
-```
-
-The sandbox does not check tokens, so the audience and secret can be anything.
 
 ## How the two languages meet
 
@@ -86,7 +64,7 @@ The sandbox does not check tokens, so the audience and secret can be anything.
 `dpm codegen-js`, which writes TypeScript packages into `daml.js/` — wired in as a pnpm workspace so
 `@daml.js/model` resolves like any dependency. Re-run it after every change to the Daml side,
 followed by `pnpm i`: codegen wipes `daml.js/` so a stale package can never linger, and that takes
-the generated packages' own links with it until pnpm relinks them. `pnpm build` does both for you.
+the generated packages' own links with it until pnpm relinks them.
 
 Codegen names its output `@daml.js/<name>-<version>` from `daml/daml.yaml` — neither `-s` nor the
 `codegen:` stanza can drop the version from that name. So package.json aliases it once, under
@@ -123,26 +101,32 @@ write carries a signature it cannot forge.
 ## Deployment
 
 ```sh
-pnpm deploy
+pnpm deploy:testnet   # either refuses an uncommitted tree: what runs is always a commit
+pnpm deploy:mainnet
+pnpm status:testnet   # which commit is running there, and since when
 ```
 
-That is `docker compose build && up -d` against a Docker context named `syncvotes`: the commands
-run here, the server's Docker daemon executes them, and the build context — this working tree,
-minus `.dockerignore` — travels over SSH. Nothing lives on the server but Docker and the validator:
-no checkout, no runner, no CI. Compose reads `deploy/.env` (see `deploy/.env.example`) locally and
-bakes the values into the container's environment; the file itself never leaves this machine.
+Each is `docker compose build && up -d` against a Docker context named `syncvotes-<network>`: the
+commands run here, that server's Docker daemon executes them, and the build context — this
+working tree, minus `.dockerignore` — travels over SSH. Nothing lives on a server but Docker and
+the validator: no checkout, no runner, no CI. Compose reads `deploy/<network>.env` (template in
+`deploy/.env.example`) locally and bakes the values into the container's environment; the file
+itself never leaves this machine.
 
-The server's address is not in the repository. Once per machine:
+The servers' addresses are not in the repository. Once per machine and network:
 
 ```sh
-docker context create syncvotes --docker host=ssh://<user>@<server>
+docker context create syncvotes-testnet --docker host=ssh://<user>@<server>
 ```
+
+The commit is baked into the image (`GIT_SHA` build arg → env and OCI label) and answered at
+`/version`. The runtime image holds only `build/` and the DAR — every dependency is
+a devDependency, bundled by adapter-node, so there is no `node_modules` on a server.
 
 Caddy's config is baked into its image (`deploy/caddy.Dockerfile`) rather than bind-mounted — a
 host path would be resolved on the server, where this tree does not exist.
 
 Building on the server is deliberate: it is amd64, the laptop is not, and the layer cache is there.
-What gets deployed is the working tree, not a commit — mind what is on disk when running it.
 
 `deploy/` is a separate compose project that joins the Splice validator's network — the validator
 has its own `start.sh`, which does more than `compose up`, so a deploy must never recreate its
@@ -176,13 +160,3 @@ idempotent by package id — so the code and the package it needs always land to
   they need Daml-LF 2.3 and the SDK targets 2.2.
 - `dpm codegen-js` emits CommonJS. Vite does not pre-bundle workspace-linked packages by default, so
   `optimizeDeps.include` in `vite.config.ts` is what stops the browser receiving raw CJS.
-- Canton's bootstrap script is not idempotent from 3.5 on: restarting a sandbox with persisted state
-  fails with `TOPOLOGY_MAPPING_ALREADY_EXISTS`, and the script is baked into `dpm sandbox`. So the
-  local sandbox is a scratch ledger, and the TestNet stand is the environment that matters.
-
-## Building
-
-```sh
-pnpm build
-node build
-```

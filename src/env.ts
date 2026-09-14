@@ -33,5 +33,9 @@ export const variables = defineEnvVars({
 	LEDGER_AUTH_SECRET: {
 		description: 'Token signing secret; `unsafe` on a validator running dev-mode auth',
 		schema: required
+	},
+	GIT_SHA: {
+		description: 'The commit this image was built from, baked in by the Dockerfile',
+		schema: v.optional(v.string(), 'unknown')
 	}
 });

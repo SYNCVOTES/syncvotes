@@ -12,18 +12,15 @@ import { sdk } from '$lib/server/participant';
  * restarts into another attempt.
  */
 
-/** In the image the DAR is at `dar/`; in development it is where `dpm build` left it. */
-const DAR_DIRS = ['dar', 'daml/.daml/dist'];
+/** The Dockerfile puts the DAR it built at `dar/`. */
+const DAR_DIR = 'dar';
 
 async function findDar(): Promise<string> {
-	for (const dir of DAR_DIRS) {
-		const dar = (await readdir(dir).catch(() => []))
-			.filter((f) => f.endsWith('.dar'))
-			.map((f) => join(dir, f));
-		if (dar.length === 1) return dar[0];
-		if (dar.length > 1) throw new Error(`Several DARs in ${dir}: ${dar.join(', ')}`);
-	}
-	throw new Error(`No DAR found in ${DAR_DIRS.join(' or ')} — run pnpm daml:build`);
+	const dar = (await readdir(DAR_DIR).catch(() => []))
+		.filter((f) => f.endsWith('.dar'))
+		.map((f) => join(DAR_DIR, f));
+	if (dar.length !== 1) throw new Error(`Expected one DAR in ${DAR_DIR}, found ${dar.length}`);
+	return dar[0];
 }
 
 export const init: ServerInit = async () => {

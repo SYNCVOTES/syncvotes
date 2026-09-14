@@ -8,6 +8,9 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile
+      args:
+        # Which commit this is — `pnpm deploy:*` sets it from git, and refuses an uncommitted tree.
+        GIT_SHA: ${GIT_SHA:-unknown}
     restart: unless-stopped
     environment:
       # SvelteKit refuses cross-origin POSTs without this.

@@ -14,7 +14,8 @@ Thumbs.db
 
 # Env
 .env
-deploy/.env
+deploy/*.env
+!deploy/.env.example
 .env.*
 !.env.example
 !.env.test
@@ -25,8 +26,4 @@ vite.config.ts.timestamp-*
 
 # Daml
 daml/.daml
-/.canton
-daml/log
 daml.js
-/log
-/.wallet

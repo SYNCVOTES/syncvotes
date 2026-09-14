@@ -3,8 +3,5 @@ daml.js
 build
 .svelte-kit
 daml/.daml
-daml/log
-.canton
-.wallet
 .git
-deploy/.env
+deploy/*.env
