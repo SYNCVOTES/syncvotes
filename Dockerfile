@@ -34,8 +34,9 @@ RUN dpm codegen-js daml/.daml/dist/*.dar -o daml.js \
 COPY . .
 RUN pnpm exec vite build
 
-# The generated Daml bindings are the one runtime dependency (they are workspace packages, so
-# they have to be present for pnpm to link them); everything else is bundled into build/.
+# Runtime dependencies only: the generated Daml bindings (workspace packages, so they have to be
+# present for pnpm to link them) and the wallet SDK, which ships CommonJS that does not survive
+# being bundled into an ES module. Everything else is bundled into build/.
 FROM node:22-slim AS deps
 
 WORKDIR /app

@@ -120,8 +120,9 @@ docker context create syncvotes-testnet --docker host=ssh://<user>@<server>
 ```
 
 The commit is baked into the image (`GIT_SHA` build arg → env and OCI label) and answered at
-`/version`. The generated Daml bindings are the only runtime dependency — adapter-node
-bundles everything else into `build/`, so the runtime image carries them, the bundle and the DAR.
+`/version`. Runtime dependencies are the generated Daml bindings and the wallet SDK (it
+ships CommonJS that breaks when bundled into an ES module); adapter-node bundles everything else
+into `build/`.
 
 Caddy's config is baked into its image (`deploy/caddy.Dockerfile`) rather than bind-mounted — a
 host path would be resolved on the server, where this tree does not exist.
