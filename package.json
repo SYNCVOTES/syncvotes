@@ -15,11 +15,13 @@
 		"daml:build": "cd daml && rm -rf .daml/dist && dpm build",
 		"daml:codegen": "pnpm daml:build && rm -rf daml.js && dpm codegen-js daml/.daml/dist/*.dar -o daml.js"
 	},
+	"dependencies": {
+		"@daml.js/model": "workspace:@daml.js/syncvotes-0.0.1@*",
+		"@daml/types": "3.5.2"
+	},
 	"devDependencies": {
 		"@canton-network/core-tx-visualizer": "^1.11.0",
 		"@canton-network/wallet-sdk": "^1.5.0",
-		"@daml.js/model": "workspace:@daml.js/syncvotes-0.0.1@*",
-		"@daml/types": "3.5.2",
 		"@eslint/js": "^10.0.1",
 		"@noble/curves": "^2.4.0",
 		"@noble/hashes": "^2.4.0",
