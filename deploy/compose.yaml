@@ -18,6 +18,7 @@ services:
       # The participant sits behind the validator's nginx, which routes by Host.
       LEDGER_API_URL: http://json-ledger-api.localhost
       PROVIDER_PARTY: ${PROVIDER_PARTY:?set in .env}
+      OPERATOR_PARTY: ${OPERATOR_PARTY:?set in .env}
       LEDGER_USER_ID: ${LEDGER_USER_ID:-administrator}
       LEDGER_AUTH_AUDIENCE: ${LEDGER_AUTH_AUDIENCE:-https://ledger_api.example.com}
       LEDGER_AUTH_SECRET: ${LEDGER_AUTH_SECRET:-unsafe}

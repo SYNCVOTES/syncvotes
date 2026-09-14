@@ -1,5 +1,7 @@
 module Main where
 
+import DA.Optional (optionalToList)
+
 type AssetId = ContractId Asset
 
 -- The app provider is a signatory here, and that is the whole point: under CIP-0104 traffic is
@@ -9,14 +11,20 @@ type AssetId = ContractId Asset
 -- The provider signs this once, at creation. From then on the user exercises choices on it and
 -- signs only for themselves — the provider's authorisation is already baked into the contract,
 -- so its key never takes part in user transactions.
+--
+-- Two provider-side parties, per the Featured App Coupon Guidance on separating concerns: the
+-- provider holds the FeaturedAppRight and only ever signs; the operator is the backend's own
+-- party, an observer that reads the directory and never earns. Optional and last so 0.0.1
+-- contracts stay valid under smart contract upgrades.
 template AppProxy
   with
     provider : Party
     user : Party
     name : Text
+    operator : Optional Party
   where
     signatory provider
-    observer user
+    observer user, optionalToList operator
 
     -- The provider is the only signatory, which makes the set of proxies the app's directory:
     -- listing them gives a display name for every party. Contract keys would enforce uniqueness

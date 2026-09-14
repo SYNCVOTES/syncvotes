@@ -3,6 +3,7 @@ import { SDK } from '@canton-network/wallet-sdk';
 import {
 	LEDGER_API_URL,
 	PROVIDER_PARTY,
+	OPERATOR_PARTY,
 	LEDGER_USER_ID,
 	LEDGER_AUTH_AUDIENCE,
 	LEDGER_AUTH_SECRET
@@ -24,6 +25,7 @@ function required(name: string, value: string | undefined): string {
 }
 
 export const providerParty = () => required('PROVIDER_PARTY', PROVIDER_PARTY);
+export const operatorParty = () => required('OPERATOR_PARTY', OPERATOR_PARTY);
 
 type Sdk = Awaited<ReturnType<typeof SDK.create>>;
 let instance: Promise<Sdk> | undefined;

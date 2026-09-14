@@ -1,13 +1,13 @@
 import { error } from '@sveltejs/kit';
 import { Main } from '@daml.js/model';
-import { activeContracts, providerParty, submitAsProvider } from './participant';
+import { activeContracts, operatorParty, providerParty, submitAsProvider } from './participant';
 
 /**
  * The app's own state on the ledger: one `AppProxy` per user, created by the provider.
  *
  * The proxy is what makes the provider a confirmer of every user transaction — see Main.daml —
- * and, since the provider sees all of them, together they are the directory that lets one user
- * name another.
+ * and, since the operator observes all of them, together they are the directory that lets one
+ * user name another. Reads go through the operator; the provider only ever signs.
  */
 
 /** Every party id this app allocates carries this hint; the key's fingerprint tells them apart. */
@@ -17,7 +17,7 @@ export type Entry = { contractId: string; party: string; name: string };
 
 export async function directory(): Promise<Entry[]> {
 	const proxies = await activeContracts<{ user: string; name: string }>(
-		providerParty(),
+		operatorParty(),
 		Main.AppProxy.templateId
 	);
 	return proxies.map((p) => ({
@@ -61,7 +61,12 @@ export async function register(party: string, name: string): Promise<Entry> {
 			{
 				CreateCommand: {
 					templateId: Main.AppProxy.templateId,
-					createArguments: { provider: providerParty(), user: party, name }
+					createArguments: {
+						provider: providerParty(),
+						user: party,
+						name,
+						operator: operatorParty()
+					}
 				}
 			}
 		],

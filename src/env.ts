@@ -19,7 +19,12 @@ export const variables = defineEnvVars({
 		schema: required
 	},
 	PROVIDER_PARTY: {
-		description: 'The app provider party: signatory of the proxy and who traffic rewards go to',
+		description: 'The app provider party: holds the FeaturedAppRight, signs the proxy, earns',
+		schema: required
+	},
+	OPERATOR_PARTY: {
+		description:
+			"The backend's own party: observer on every proxy, reads the directory, never earns",
 		schema: required
 	},
 	LEDGER_USER_ID: {

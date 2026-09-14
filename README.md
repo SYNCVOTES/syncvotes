@@ -44,6 +44,13 @@ traffic-based rewards go to confirmers; an observer earns nothing. The provider 
 once, at creation, and takes no part in the user's later transactions. The proxies double as the
 app's directory: each carries a name, and listing them is how one user finds another.
 
+Two provider-side parties, as the Featured App Coupon Guidance asks (separate party concerns):
+`PROVIDER_PARTY` holds the FeaturedAppRight, signs every proxy and is the one that earns;
+`OPERATOR_PARTY` is the backend's own party, an observer on every proxy that reads the directory
+and never earns. TestNet's DSO mints app rewards as `RewardVersion_TrafficBasedAppRewards`
+(checked against round 114321), so no activity markers are involved; confirm the same on any
+other network before counting on rewards there.
+
 ## Setup
 
 There is no local run: the only ledger this app talks to is its validator on TestNet, and the only
