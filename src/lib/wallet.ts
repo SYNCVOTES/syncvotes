@@ -178,21 +178,14 @@ export const passkeysAvailable = () =>
 	typeof PublicKeyCredential !== 'undefined' &&
 	typeof PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === 'function';
 
-async function prfKey(credentialId: Bytes, salt: Bytes): Promise<CryptoKey> {
-	const assertion = (await navigator.credentials.get({
-		publicKey: {
-			challenge: crypto.getRandomValues(new Uint8Array(32)),
-			allowCredentials: [{ id: credentialId, type: 'public-key' }],
-			userVerification: 'required',
-			extensions: {
-				prf: { eval: { first: salt } }
-			} as AuthenticationExtensionsClientInputs
-		}
-	})) as PublicKeyCredential | null;
+const PRF_INPUTS = (salt: Bytes) =>
+	({ prf: { eval: { first: salt } } }) as AuthenticationExtensionsClientInputs;
 
-	const secret = (assertion?.getClientExtensionResults() as PrfResults).prf?.results?.first;
-	if (!secret) throw new Error('This passkey cannot derive a secret (no PRF support)');
+const prfResult = (credential: PublicKeyCredential | null) =>
+	(credential?.getClientExtensionResults() as PrfResults).prf?.results?.first;
 
+/** The PRF secret becomes the AES key that guards the signing key. */
+async function keyFromSecret(secret: ArrayBuffer, salt: Bytes): Promise<CryptoKey> {
 	const material = await crypto.subtle.importKey('raw', secret, 'HKDF', false, ['deriveKey']);
 	return crypto.subtle.deriveKey(
 		{ name: 'HKDF', hash: 'SHA-256', salt, info: new TextEncoder().encode('syncvotes key') },
@@ -203,7 +196,28 @@ async function prfKey(credentialId: Bytes, salt: Bytes): Promise<CryptoKey> {
 	);
 }
 
+/** One biometric prompt: asserts the passkey and evaluates the PRF in the same step. */
+async function assertSecret(credentialId: Bytes, salt: Bytes): Promise<ArrayBuffer> {
+	const assertion = (await navigator.credentials.get({
+		publicKey: {
+			challenge: crypto.getRandomValues(new Uint8Array(32)),
+			allowCredentials: [{ id: credentialId, type: 'public-key' }],
+			userVerification: 'required',
+			extensions: PRF_INPUTS(salt)
+		}
+	})) as PublicKeyCredential | null;
+
+	const secret = prfResult(assertion);
+	if (!secret) throw new Error('This passkey cannot derive a secret (no PRF support)');
+	return secret;
+}
+
 export async function lockWithPasskey(s: Signer, label: string): Promise<void> {
+	// The salt goes into the creation request so the PRF is evaluated there and then — one
+	// prompt. Authenticators that only evaluate on assertion return nothing here, and get asked
+	// once more; that is the second prompt some devices show, not the norm.
+	const salt = crypto.getRandomValues(new Uint8Array(32));
+
 	const credential = (await navigator.credentials.create({
 		publicKey: {
 			challenge: crypto.getRandomValues(new Uint8Array(32)),
@@ -218,7 +232,7 @@ export async function lockWithPasskey(s: Signer, label: string): Promise<void> {
 				residentKey: 'required',
 				userVerification: 'required'
 			},
-			extensions: { prf: {} } as AuthenticationExtensionsClientInputs
+			extensions: PRF_INPUTS(salt)
 		}
 	})) as PublicKeyCredential | null;
 
@@ -228,21 +242,21 @@ export async function lockWithPasskey(s: Signer, label: string): Promise<void> {
 	}
 
 	const credentialId = new Uint8Array(credential.rawId);
-	const salt = crypto.getRandomValues(new Uint8Array(32));
+	const secret = prfResult(credential) ?? (await assertSecret(credentialId, salt));
+
 	await store(
 		s,
 		{ kind: 'passkey', credentialId: toBase64(credentialId), salt: toBase64(salt) },
-		await prfKey(credentialId, salt)
+		await keyFromSecret(secret, salt)
 	);
 }
 
 export async function unlockWithPasskey(): Promise<Signer> {
 	const stored = load();
 	if (!stored || stored.lock.kind !== 'passkey') throw new Error('No passkey-locked key here');
-	return open(
-		stored,
-		await prfKey(fromBase64(stored.lock.credentialId), fromBase64(stored.lock.salt))
-	);
+	const salt = fromBase64(stored.lock.salt);
+	const secret = await assertSecret(fromBase64(stored.lock.credentialId), salt);
+	return open(stored, await keyFromSecret(secret, salt));
 }
 
 // ---- bytes ------------------------------------------------------------------------------
