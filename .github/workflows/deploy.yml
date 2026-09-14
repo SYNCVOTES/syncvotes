@@ -1,6 +1,7 @@
 # The runner lives on the same server as the validator, so an image built here is already where
 # it needs to be — a registry would be a pointless hop. Nothing is stored in GitHub either: the
-# secrets sit in deploy/.env on the server, which the runner can read.
+# secrets sit in ~/syncvotes-deploy.env on the server, outside the checkout — actions/checkout
+# wipes ignored files, so a .env inside the tree would not survive a run.
 name: deploy
 
 on:
@@ -23,8 +24,8 @@ jobs:
       - name: Start services
         working-directory: deploy
         run: |
-          docker compose build
-          docker compose up -d
+          docker compose --env-file "$HOME/syncvotes-deploy.env" build
+          docker compose --env-file "$HOME/syncvotes-deploy.env" up -d
 
       - name: Wait for the participant
         run: |
@@ -44,7 +45,7 @@ jobs:
         working-directory: deploy
         run: |
           rm -rf ../dar && mkdir -p ../dar
-          cid=$(docker create $(docker compose images -q app))
+          cid=$(docker create $(docker compose --env-file "$HOME/syncvotes-deploy.env" images -q app))
           docker cp "$cid:/app/dar/." ../dar/
           docker rm "$cid" >/dev/null
 
