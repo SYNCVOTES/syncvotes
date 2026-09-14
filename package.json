@@ -6,8 +6,6 @@
 	"scripts": {
 		"deploy:testnet": "git diff --quiet && git diff --cached --quiet && GIT_SHA=$(git rev-parse --short=12 HEAD) docker --context syncvotes-testnet compose --project-directory deploy --env-file deploy/testnet.env build && docker --context syncvotes-testnet compose --project-directory deploy --env-file deploy/testnet.env up -d",
 		"deploy:mainnet": "git diff --quiet && git diff --cached --quiet && GIT_SHA=$(git rev-parse --short=12 HEAD) docker --context syncvotes-mainnet compose --project-directory deploy --env-file deploy/mainnet.env build && docker --context syncvotes-mainnet compose --project-directory deploy --env-file deploy/mainnet.env up -d",
-		"status:testnet": "docker --context syncvotes-testnet inspect syncvotes-app-1 --format '{{index .Config.Labels \"org.opencontainers.image.revision\"}} started {{.State.StartedAt}}'",
-		"status:mainnet": "docker --context syncvotes-mainnet inspect syncvotes-app-1 --format '{{index .Config.Labels \"org.opencontainers.image.revision\"}} started {{.State.StartedAt}}'",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"lint": "prettier --check . && eslint .",

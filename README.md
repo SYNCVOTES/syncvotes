@@ -103,7 +103,6 @@ write carries a signature it cannot forge.
 ```sh
 pnpm deploy:testnet   # either refuses an uncommitted tree: what runs is always a commit
 pnpm deploy:mainnet
-pnpm status:testnet   # which commit is running there, and since when
 ```
 
 Each is `docker compose build && up -d` against a Docker context named `syncvotes-<network>`: the
@@ -119,8 +118,8 @@ The servers' addresses are not in the repository. Once per machine and network:
 docker context create syncvotes-testnet --docker host=ssh://<user>@<server>
 ```
 
-The commit is baked into the image (`GIT_SHA` build arg → env and OCI label) and answered at
-`/version`. Runtime dependencies are the generated Daml bindings and the wallet SDK (it
+The commit is baked into the image as `GIT_SHA`, and `/version` answers with it — that is how to
+see what is running where. Runtime dependencies are the generated Daml bindings and the wallet SDK (it
 ships CommonJS that breaks when bundled into an ES module); adapter-node bundles everything else
 into `build/`.
 
