@@ -5,6 +5,7 @@ import * as v from 'valibot';
 import { Main } from '@daml.js/model';
 import * as participant from './server/participant';
 import * as app from './server/app';
+import { nextChange } from './server/feed';
 
 /**
  * The server's API, as remote functions: the page calls these like local functions, SvelteKit
@@ -14,7 +15,29 @@ import * as app from './server/app';
  * Reads are open: a DAO is private to the network — only its members, the provider and the
  * operator hold it — and this app is the operator. Writes are transactions the ledger accepts
  * only with the acting party's own signature.
+ *
+ * Reads are live: each is a stream that sends its value, then sends it again whenever the ledger
+ * feed reports a change and the value differs. Nothing on the client polls or refreshes.
  */
+
+/** Runs `load` now and after every ledger change, yielding only when the result changed. */
+async function* live<T>(load: () => Promise<T>): AsyncGenerator<T> {
+	let last = '';
+	for (;;) {
+		try {
+			const value = await load();
+			const key = JSON.stringify(value);
+			if (key !== last) {
+				last = key;
+				yield value;
+			}
+		} catch (e) {
+			// Gone (a 404) is a value too; anything else surfaces once and the stream keeps watching.
+			if (last === '') throw e;
+		}
+		await nextChange();
+	}
+}
 
 const base64 = v.pipe(v.string(), v.nonEmpty(), v.base64());
 const partyId = v.pipe(v.string(), v.includes('::'));
@@ -89,48 +112,56 @@ export const directory = query(async () =>
 // ---- Reads -------------------------------------------------------------------------------
 
 /** Counts for the landing ticker. Aggregates only — DAOs are private, their contents stay so. */
-export const stats = query(async () => {
-	const [daos, proposals, accounts] = await Promise.all([
-		app.daos(),
-		app.proposals(),
-		app.accounts()
-	]);
-	return {
-		daos: daos.length,
-		openProposals: proposals.filter((p) => !p.outcome).length,
-		votesCast: proposals.reduce((n, p) => n + p.ballots.length, 0),
-		members: accounts.length
-	};
-});
+export const stats = query.live(() =>
+	live(async () => {
+		const [daos, proposals, accounts] = await Promise.all([
+			app.daos(),
+			app.proposals(),
+			app.accounts()
+		]);
+		return {
+			daos: daos.length,
+			openProposals: proposals.filter((p) => !p.outcome).length,
+			votesCast: proposals.reduce((n, p) => n + p.ballots.length, 0),
+			members: accounts.length
+		};
+	})
+);
 
 /** The DAOs a party belongs to, with their open proposal count. */
-export const myDaos = query(partyId, async (party) => {
-	const [daos, proposals] = await Promise.all([app.daos(), app.proposals()]);
-	return daos
-		.filter((d) => d.members.includes(party))
-		.map((d) => ({
-			...d,
-			openProposals: proposals.filter((p) => p.dao === d.contractId && !p.outcome).length
-		}));
-});
+export const myDaos = query.live(partyId, (party) =>
+	live(async () => {
+		const [daos, proposals] = await Promise.all([app.daos(), app.proposals()]);
+		return daos
+			.filter((d) => d.members.includes(party))
+			.map((d) => ({
+				...d,
+				openProposals: proposals.filter((p) => p.dao === d.contractId && !p.outcome).length
+			}));
+	})
+);
 
-export const dao = query(contractId, async (id) => {
-	const [found, proposals, names] = await Promise.all([
-		app.daoById(id),
-		app.proposals(),
-		app.accounts()
-	]);
-	return {
-		...found,
-		proposals: proposals.filter((p) => p.dao === id),
-		names: Object.fromEntries(names.map((a) => [a.party, a.name]))
-	};
-});
+export const dao = query.live(contractId, (id) =>
+	live(async () => {
+		const [found, proposals, names] = await Promise.all([
+			app.daoById(id),
+			app.proposals(),
+			app.accounts()
+		]);
+		return {
+			...found,
+			proposals: proposals.filter((p) => p.dao === id),
+			names: Object.fromEntries(names.map((a) => [a.party, a.name]))
+		};
+	})
+);
 
-export const proposal = query(contractId, async (id) => {
-	const [found, names] = await Promise.all([app.proposalById(id), app.accounts()]);
-	return { ...found, names: Object.fromEntries(names.map((a) => [a.party, a.name])) };
-});
+export const proposal = query.live(contractId, (id) =>
+	live(async () => {
+		const [found, names] = await Promise.all([app.proposalById(id), app.accounts()]);
+		return { ...found, names: Object.fromEntries(names.map((a) => [a.party, a.name])) };
+	})
+);
 
 // ---- Writes: prepare here, sign in the browser, execute here ------------------------------
 

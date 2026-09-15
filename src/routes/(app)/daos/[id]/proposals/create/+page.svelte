@@ -25,13 +25,7 @@
 		const ok = await flow.act((signer, who) =>
 			actions.createProposal(signer, who, { dao: id, title, description, days: period })
 		);
-		if (ok) {
-			await Promise.all([
-				dao.refresh(),
-				store.who ? remote.myDaos(store.who.party).refresh() : null
-			]);
-			await goto(`/daos/${id}`);
-		}
+		if (ok) await goto(`/daos/${id}`);
 	}
 </script>
 

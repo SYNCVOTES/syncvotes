@@ -27,25 +27,31 @@ function required(name: string, value: string | undefined): string {
 export const providerParty = () => required('PROVIDER_PARTY', PROVIDER_PARTY);
 export const operatorParty = () => required('OPERATOR_PARTY', OPERATOR_PARTY);
 
-type Sdk = Awaited<ReturnType<typeof SDK.create>>;
+const auth = () =>
+	({
+		method: 'self_signed',
+		issuer: 'syncvotes',
+		credentials: {
+			clientId: required('LEDGER_USER_ID', LEDGER_USER_ID),
+			clientSecret: required('LEDGER_AUTH_SECRET', LEDGER_AUTH_SECRET),
+			audience: required('LEDGER_AUTH_AUDIENCE', LEDGER_AUTH_AUDIENCE),
+			scope: ''
+		}
+	}) as const;
+
+async function create() {
+	const url = required('LEDGER_API_URL', LEDGER_API_URL);
+	const base = await SDK.create({ ledgerClientUrl: url, auth: auth(), logAdapter: 'console' });
+	// The update stream rides the same JSON API over a websocket.
+	return base.extend({ events: { websocketURL: url.replace(/^http/, 'ws'), auth: auth() } });
+}
+
+type Sdk = Awaited<ReturnType<typeof create>>;
 let instance: Promise<Sdk> | undefined;
 
 /** One SDK for the process. `self_signed` is the validator's dev-mode HS256 auth. */
 export function sdk(): Promise<Sdk> {
-	return (instance ??= SDK.create({
-		ledgerClientUrl: required('LEDGER_API_URL', LEDGER_API_URL),
-		auth: {
-			method: 'self_signed',
-			issuer: 'syncvotes',
-			credentials: {
-				clientId: required('LEDGER_USER_ID', LEDGER_USER_ID),
-				clientSecret: required('LEDGER_AUTH_SECRET', LEDGER_AUTH_SECRET),
-				audience: required('LEDGER_AUTH_AUDIENCE', LEDGER_AUTH_AUDIENCE),
-				scope: ''
-			}
-		},
-		logAdapter: 'console'
-	}));
+	return (instance ??= create());
 }
 
 /** Active contracts of one template, as seen by a party this participant hosts. */

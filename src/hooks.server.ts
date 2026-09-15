@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import type { HandleServerError, ServerInit } from '@sveltejs/kit';
 import { packageId } from '@daml.js/model';
 import { sdk } from '$lib/server/participant';
+import { startFeed } from '$lib/server/feed';
 
 /**
  * The app ships with the Daml package it was built against and makes sure the participant has it
@@ -27,6 +28,7 @@ export const init: ServerInit = async () => {
 	const dar = await findDar();
 	await (await sdk()).ledger.dar.upload(await readFile(dar), packageId);
 	console.log(`Daml package ${packageId.slice(0, 8)}… is on the participant (${dar})`);
+	startFeed();
 };
 
 /** An unexpected error still tells the user what happened; there is nothing secret in these. */

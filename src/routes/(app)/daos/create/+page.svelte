@@ -28,10 +28,7 @@
 		const ok = await flow.act((signer, who) =>
 			actions.createDao(signer, who, { name, description, members })
 		);
-		if (ok) {
-			await remote.myDaos(store.who!.party).refresh();
-			await goto('/my-daos');
-		}
+		if (ok) await goto('/my-daos');
 	}
 </script>
 

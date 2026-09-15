@@ -13,30 +13,12 @@
 	const proposal = $derived(remote.proposal(id));
 	const me = $derived(store.who?.party ?? null);
 
-	// Other members' votes land without this page knowing; while the proposal is open, look again
-	// every few seconds.
-	$effect(() => {
-		const query = proposal;
-		if (query.current?.outcome) return;
-		const timer = setInterval(() => void query.refresh(), 5000);
-		return () => clearInterval(timer);
-	});
 	const nameOf = (party: string) => proposal.current?.names[party] ?? party.split('::')[0];
 
-	// A vote or a close archives this contract and creates the next one, so the page follows —
-	// and the DAO's counts and the member's list moved with it.
-	async function act(
+	// The stream brings the new contract the moment the vote lands; nothing to refresh by hand.
+	const act = (
 		what: (signer: Parameters<typeof actions.vote>[0], who: actions.Identity) => Promise<void>
-	) {
-		const ok = await flow.act(what);
-		if (!ok) return;
-		const dao = proposal.current?.dao;
-		await Promise.all([
-			proposal.refresh(),
-			dao ? remote.dao(dao).refresh() : null,
-			me ? remote.myDaos(me).refresh() : null
-		]);
-	}
+	) => flow.act(what);
 </script>
 
 <svelte:head><title>{proposal.current?.title ?? 'Proposal'} — SyncVotes</title></svelte:head>

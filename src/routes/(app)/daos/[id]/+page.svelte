@@ -12,12 +12,6 @@
 	const dao = $derived(remote.dao(page.params.id!));
 	const me = $derived(store.who?.party ?? null);
 
-	// Proposals and votes arrive from other members; keep the list current.
-	$effect(() => {
-		const query = dao;
-		const timer = setInterval(() => void query.refresh(), 10000);
-		return () => clearInterval(timer);
-	});
 	const nameOf = (party: string) => dao.current?.names[party] ?? party.split('::')[0];
 </script>
 
