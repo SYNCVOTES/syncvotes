@@ -2,9 +2,9 @@ import {
 	computeMultiHashForTopology,
 	computeSha256CantonHash,
 	decodePreparedTransaction,
-	decodeTopologyTransaction,
 	hashPreparedTransaction
 } from '@canton-network/core-tx-visualizer';
+import { BinaryReader, WireType } from '@protobuf-ts/runtime';
 import type { Value } from '@canton-network/core-ledger-proto';
 import { packageId } from '@daml.js/model';
 import { fromBase64, toBase64 } from './wallet';
@@ -26,9 +26,11 @@ const TOPOLOGY_TRANSACTION = 11;
 const TOPOLOGY_MULTI_HASH = 55;
 const PUBLIC_KEY_FINGERPRINT = 12;
 
-// Wire values from the topology proto: TOPOLOGY_CHANGE_OP_ADD_REPLACE, PARTICIPANT_PERMISSION_*.
+// Wire values from the topology proto: TOPOLOGY_CHANGE_OP_ADD_REPLACE, PARTICIPANT_PERMISSION_*,
+// SIGNING_KEY_SPEC_EC_CURVE25519.
 const ADD_REPLACE = 1;
 const CONFIRMATION = 2;
+const EC_CURVE25519 = 1;
 
 /** The package every user action must live in; a same-named choice elsewhere is refused. */
 const PACKAGE_NAME = 'syncvotes-governance';
@@ -52,6 +54,44 @@ export async function fingerprintOf(publicKey: Uint8Array): Promise<string> {
 	return '1220' + [...hash].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+/**
+ * A protobuf message as its raw fields, in wire order. The proto packages available do not know
+ * the field that matters most here — the party's signing keys — so the bytes are read directly,
+ * by field number, with the SDK's own reader. Nothing is guessed: every field is either checked
+ * or refused.
+ */
+type Field = { number: number; wire: WireType; value: Uint8Array | bigint };
+
+function fields(bytes: Uint8Array): Field[] {
+	const reader = new BinaryReader(bytes);
+	const out: Field[] = [];
+	while (reader.pos < reader.len) {
+		const [number, wire] = reader.tag();
+		if (wire === WireType.Varint) out.push({ number, wire, value: reader.uint64().toBigInt() });
+		else if (wire === WireType.LengthDelimited) out.push({ number, wire, value: reader.bytes() });
+		else throw new Error(`Unexpected wire type ${wire} in field ${number}`);
+	}
+	return out;
+}
+
+const only = (list: Field[], allowed: number[]) => {
+	const stray = list.find((f) => !allowed.includes(f.number));
+	if (stray) throw new Error(`Unexpected field ${stray.number} in the party topology`);
+};
+const one = (list: Field[], number: number, what: string): Field => {
+	const found = list.filter((f) => f.number === number);
+	if (found.length !== 1) throw new Error(`Expected exactly one ${what} in the party topology`);
+	return found[0];
+};
+const bytesOf = (f: Field) => (f.value instanceof Uint8Array ? f.value : new Uint8Array());
+const text = (f: Field) => new TextDecoder().decode(bytesOf(f));
+const num = (f: Field) => (typeof f.value === 'bigint' ? Number(f.value) : NaN);
+
+const sameKey = (stored: Uint8Array, own: Uint8Array) =>
+	// Raw, or wrapped in a DER SubjectPublicKeyInfo: the key bytes are the tail either way.
+	(stored.length === own.length || stored.length === own.length + 12) &&
+	stored.subarray(stored.length - own.length).every((b, i) => b === own[i]);
+
 export async function verifyTopology(
 	topology: { partyId: string; topologyTransactions: string[]; multiHash: string },
 	publicKey: Uint8Array,
@@ -74,26 +114,42 @@ export async function verifyTopology(
 		throw new Error(`The party would be ${topology.partyId}, not ${party}`);
 	}
 
-	// Canton 3.5 lays the party out as one PartyToParticipant mapping, signed by the namespace
-	// key; the key's own authority over the namespace is implied by the signature. So: exactly
-	// one mapping, for this party, hosted on exactly one participant, for confirmation only.
-	if (topology.topologyTransactions.length !== 1) {
-		throw new Error('Expected the party to be one topology mapping');
+	// Canton 3.5 lays the party out as one transaction: a versioned wrapper around a
+	// TopologyTransaction whose mapping is a PartyToParticipant carrying the party's signing keys.
+	if (bytes.length !== 1) throw new Error('Expected the party to be one topology transaction');
+	const wrapper = fields(bytes[0]);
+	only(wrapper, [1, 2]);
+	const transaction = fields(bytesOf(one(wrapper, 1, 'transaction')));
+	only(transaction, [1, 2, 3]);
+	if (num(one(transaction, 1, 'operation')) !== ADD_REPLACE) {
+		throw new Error('The party topology is not an addition');
 	}
-	const decoded = decodeTopologyTransaction(topology.topologyTransactions[0]);
-	const mapping = decoded.mapping?.mapping;
-	if (decoded.operation !== ADD_REPLACE || mapping?.oneofKind !== 'partyToParticipant') {
-		throw new Error('The party topology is not a hosting mapping');
-	}
-	const m = mapping.partyToParticipant;
-	if (m.party !== party) throw new Error(`The mapping is for ${m.party}, not ${party}`);
-	if (
-		m.threshold !== 1 ||
-		m.participants.length !== 1 ||
-		m.participants[0].permission !== CONFIRMATION
-	) {
+	const mapping = fields(bytesOf(one(transaction, 3, 'mapping')));
+	// Field 9 is PartyToParticipant; any other mapping is refused outright.
+	const hosting = fields(bytesOf(one(mapping, 9, 'hosting mapping')));
+	only(mapping, [9]);
+	only(hosting, [1, 2, 3, 6]);
+
+	if (text(one(hosting, 1, 'party')) !== party) throw new Error('The mapping is for another party');
+	if (num(one(hosting, 2, 'threshold')) !== 1) throw new Error('The hosting threshold is not one');
+
+	const participant = fields(bytesOf(one(hosting, 3, 'hosting participant')));
+	only(participant, [1, 2]);
+	if (num(one(participant, 2, 'permission')) !== CONFIRMATION) {
 		throw new Error('The participant would get more than confirmation rights over your party');
 	}
+
+	// The party's signing keys: exactly this key, and a threshold of one.
+	const signing = fields(bytesOf(one(hosting, 6, 'signing key set')));
+	only(signing, [1, 2]);
+	if (num(one(signing, 2, 'signing threshold')) !== 1)
+		throw new Error('The signing threshold is not one');
+	const key = fields(bytesOf(one(signing, 1, 'signing key')));
+	if (!sameKey(bytesOf(one(key, 3, 'key bytes')), publicKey)) {
+		throw new Error('The party would be signable by a key that is not yours');
+	}
+	if (num(one(key, 6, 'key spec')) !== EC_CURVE25519)
+		throw new Error('The signing key is not ed25519');
 }
 
 // ---- Every action: the prepared transaction -----------------------------------------------

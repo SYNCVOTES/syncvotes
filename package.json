@@ -27,6 +27,7 @@
 		"@lucide/svelte": "^1.46.0",
 		"@noble/curves": "^2.4.0",
 		"@noble/hashes": "^2.4.0",
+		"@protobuf-ts/runtime": "^2.11.1",
 		"@scure/bip39": "^2.4.0",
 		"@sveltejs/adapter-node": "^5.5.4",
 		"@sveltejs/kit": "^2.63.0",

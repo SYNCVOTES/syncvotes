@@ -39,6 +39,9 @@ importers:
       '@noble/hashes':
         specifier: ^2.4.0
         version: 2.4.0
+      '@protobuf-ts/runtime':
+        specifier: ^2.11.1
+        version: 2.11.1
       '@scure/bip39':
         specifier: ^2.4.0
         version: 2.4.0
