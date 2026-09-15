@@ -104,7 +104,7 @@ export function startField(cv: HTMLCanvasElement, reduced: boolean): () => void 
 		// desktop, canvas centre on mobile (keeps the tuned mobile layout as-is).
 		let ocx = ow / 2;
 		let ocy = oh / 2;
-		// copyTop mirrors the .hero-copy clamps in landing.css (standard +
+		// copyTop mirrors the .hero-copy clamps in the hero classes in +page.svelte (standard +
 		// short-desktop variants) — both desktop layouts derive from it, so the
 		// gap to the headline holds by construction and nothing ever overlaps.
 		const vh = window.innerHeight || H;
@@ -112,7 +112,7 @@ export function startField(cv: HTMLCanvasElement, reduced: boolean): () => void 
 		// tall top band the stacked layout leaves for the word — CENTRE the whole
 		// composition (~500px tall) in the viewport (50vh − 250) instead of
 		// pinning it ~46% down, which left a big void above the fold on normal
-		// MacBooks. Stacked (<1500) keeps the top-band pin. Mirrors landing.css.
+		// MacBooks. Stacked (<1500) keeps the top-band pin. Mirrors the hero classes in +page.svelte.
 		const copyTopFallback =
 			W >= 1400
 				? Math.max(88, Math.min(0.5 * vh - 260, vh - 560))
@@ -122,7 +122,7 @@ export function startField(cv: HTMLCanvasElement, reduced: boolean): () => void 
 		// On the wide right-column layout, READ the copy's real rendered top from
 		// the DOM instead of re-deriving it — the layout effect centres .hero-copy
 		// by its measured height, and reading offsetTop makes the canvas mirror
-		// landing.css exactly (no formula to drift out of sync, which is what kept
+		// the hero classes in +page.svelte exactly (no formula to drift out of sync, which is what kept
 		// stranding the word high/low per resolution). Fallback until it mounts.
 		const copyEl = cv.closest('.hero')?.querySelector<HTMLElement>('.hero-copy') ?? null;
 		const copyTop =
@@ -133,16 +133,16 @@ export function startField(cv: HTMLCanvasElement, reduced: boolean): () => void 
 			// that fits one viewport (the old stacked full-width word overflowed
 			// FHD, pushing the CTAs off-screen). Below 1500px the right column gets
 			// too narrow, so small laptops keep the stacked layout. Geometry
-			// mirrors landing.css: copy left = --edge = max(40px, (100vw−1400px)/2),
+			// mirrors the hero classes in +page.svelte: copy left = --edge = max(40px, (100vw−1400px)/2),
 			// headline width = 10.59em of the h1 font clamp.
 			// Ultra-wide (>3300px): --edge keeps centering a 1400px column, which
 			// strands the copy far from the word column's far edge — the word ends
 			// up hugging the right viewport edge with a ~1000px void on the left
 			// (user report at 3562×2588). Above 3300px we center the whole
 			// composition (~2400px of copy + gap + word) instead. Mirrors the
-			// .hero-copy override in landing.css.
+			// .hero-copy override in the hero classes in +page.svelte.
 			const edge = W >= 3300 ? Math.max(40, (W - 2400) / 2) : Math.max(40, (W - 1400) / 2);
-			// Mirror the h1 clamp in landing.css — including the short-desktop
+			// Mirror the h1 clamp in the hero classes in +page.svelte — including the short-desktop
 			// (≤860px tall) variant, or the word floats right of a headline that's
 			// actually narrower than JS assumes (matters now the right column
 			// reaches down to 1500px, which includes short 16:9 laptops).

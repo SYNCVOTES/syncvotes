@@ -51,10 +51,16 @@ submission.
 - `Account` — created by the provider once per party; carries the name others use to add you to a
   DAO, and the choice that creates DAOs.
 - `DAO` — signatory admin and provider, observer members and operator. Private to its members by
-  construction: nobody else on the network holds it. Membership is fixed at creation.
+  construction: nobody else on the network holds it. The admin edits name, description and
+  members in place (`DAO_Update`) and can archive it (`DAO_Archive`; the app refuses while
+  proposals are open). Every edit replaces the contract, so a DAO carries a stable `id` chosen
+  in the browser at creation.
 - `Proposal` — signatory proposer and provider. One ballot per member; passes when a majority of
-  all members voted Yes; closable once settled or after the deadline. Each vote replaces the
-  contract, so a proposal carries a stable `id` for the page to follow.
+  all members voted Yes; closable once settled or after the deadline. The proposer can rewrite
+  the text until the first ballot and withdraw it until it settles; the DAO admin can withdraw
+  too (the proposal copies the admin and the DAO's id at creation, so it still knows its DAO
+  after the DAO contract was replaced). Each vote replaces the contract, so a proposal carries a
+  stable `id` for the page to follow.
 
 Two provider-side parties, as the Featured App Coupon Guidance asks (separate party concerns):
 `PROVIDER_PARTY` holds the FeaturedAppRight, signs every proxy and is the one that earns;
@@ -128,22 +134,22 @@ submissions.
 
 ## Layout
 
-| Path                             | What it is                                                              |
-| -------------------------------- | ----------------------------------------------------------------------- |
-| `daml/src/Main.daml`             | `Account`, `DAO`, `Proposal` — the whole model                          |
-| `daml.js/`                       | Generated bindings — never edit, regenerate with `pnpm daml:codegen`    |
-| `src/lib/wallet.ts`              | Phrase → signer closure, encrypted storage, passkey and password unlock |
-| `src/lib/session.ts`             | Auto-lock: disposes the signer after 15 quiet minutes or on `pagehide`  |
-| `src/lib/wallet-store.svelte.ts` | The wallet as one rune store: onboarding screens, signer, identity      |
-| `src/lib/verify.ts`              | Recomputes hashes and inspects transactions before anything is signed   |
-| `src/lib/actions.ts`             | What the browser does: call the API, verify, sign, call again           |
-| `src/lib/api.remote.ts`          | The server API as remote functions: reads, prepares, execute            |
-| `src/lib/server/participant.ts`  | The wallet SDK, wrapped: topology, allocation, ACS, prepare and execute |
-| `src/lib/server/app.ts`          | Accounts, DAOs and proposals as the operator sees them                  |
-| `src/routes/(app)/`              | My DAOs, DAO, Create DAO, Proposal, Create proposal, Wallet             |
-| `src/routes/+page.svelte`        | The landing (v1's Consensus Engine) with `landing.css` and `field.ts`   |
-| `src/lib/components/ui/`         | shadcn-svelte components, restyled to the v1 look                       |
-| `compose.yaml`                   | The compose project for the servers, Caddy config inline                |
+| Path                             | What it is                                                               |
+| -------------------------------- | ------------------------------------------------------------------------ |
+| `daml/src/Main.daml`             | `Account`, `DAO`, `Proposal` — the whole model                           |
+| `daml.js/`                       | Generated bindings — never edit, regenerate with `pnpm daml:codegen`     |
+| `src/lib/wallet.ts`              | Phrase → signer closure; any number of keys encrypted at rest per device |
+| `src/lib/session.ts`             | Auto-lock: disposes the signer after 15 quiet minutes or on `pagehide`   |
+| `src/lib/wallet-store.svelte.ts` | The wallet as one rune store: onboarding screens, signer, identity       |
+| `src/lib/verify.ts`              | Recomputes hashes and inspects transactions before anything is signed    |
+| `src/lib/actions.ts`             | What the browser does: call the API, verify, sign, call again            |
+| `src/lib/api.remote.ts`          | The server API as remote functions: reads, prepares, execute             |
+| `src/lib/server/participant.ts`  | The wallet SDK, wrapped: topology, allocation, ACS, prepare and execute  |
+| `src/lib/server/app.ts`          | Accounts, DAOs and proposals as the operator sees them                   |
+| `src/routes/(app)/`              | My DAOs, DAO, Create DAO, Proposal, Create proposal, Wallet              |
+| `src/routes/+page.svelte`        | The landing (v1's Consensus Engine), Tailwind on the markup, `field.ts`  |
+| `src/lib/components/ui/`         | shadcn-svelte components, restyled to the v1 look                        |
+| `compose.yaml`                   | The compose project for the servers, Caddy config inline                 |
 
 The private key exists only inside a closure (`Signer`): the page can ask it to sign, to encrypt
 itself for storage, or to dispose — never to reveal itself. Every write is a transaction the

@@ -32,3 +32,10 @@
       `CanActAs` on user parties. Measured: `prepare` needs read rights on the acting party
 - [ ] clients for everything else that talked to the participant unauthenticated (billing agent,
       the gRPC poller behind the WireGuard peer)
+
+- [x] edit and delete DAOs and proposals (Daml 0.1.4: DAO_Update/Archive, Proposal_Update/Cancel,
+      stable DAO id, admin copied into proposals); several keys per device; DAO page and footer as
+      in v1; lucide icons; copyable party ids; landing on Tailwind with what-it-is and
+      under-the-hood sections; contrast raised in its own commit
+- [ ] the billing agent's auth model (one Keycloak client per wallet user, or one service account
+      acting for the treasury only) — the user's call, script lives outside the repo
