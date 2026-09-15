@@ -6,8 +6,7 @@ name: syncvotes
 services:
   app:
     build:
-      context: ..
-      dockerfile: Dockerfile
+      context: .
       args:
         # Which commit this is — `pnpm deploy:*` sets it from git, and refuses an uncommitted tree.
         GIT_SHA: ${GIT_SHA:-unknown}
@@ -17,8 +16,8 @@ services:
       ORIGIN: https://${APP_DOMAIN:?set in .env}
       # The participant is on the validator's network; its JSON API needs no nginx in between.
       LEDGER_API_URL: http://participant:7575
-      PROVIDER_PARTY: ${PROVIDER_PARTY:?set in .env}
-      OPERATOR_PARTY: ${OPERATOR_PARTY:?set in .env}
+      PROVIDER_PARTY: ${PROVIDER_PARTY:?set in the env file}
+      OPERATOR_PARTY: ${OPERATOR_PARTY:?set in the env file}
       LEDGER_USER_ID: ${LEDGER_USER_ID:-administrator}
       LEDGER_AUTH_AUDIENCE: ${LEDGER_AUTH_AUDIENCE:-https://ledger_api.example.com}
       LEDGER_AUTH_SECRET: ${LEDGER_AUTH_SECRET:-unsafe}
@@ -28,17 +27,16 @@ services:
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
-    environment:
-      APP_DOMAIN: ${APP_DOMAIN:?set in .env}
     # The config travels as inline content: with a remote Docker host a bind mount would look
-    # for the file on the server, where this tree does not exist.
+    # for the file on the server, where this tree does not exist. Compose interpolates the
+    # domain into it before Caddy ever sees it.
     configs:
       - source: caddyfile
         target: /etc/caddy/Caddyfile
     # Bound to the public address on purpose: the validator's nginx already holds :80 on
     # loopback, and two processes cannot share a port on the same address.
     ports:
-      - '${PUBLIC_IP:?set in .env}:80:80'
+      - '${PUBLIC_IP:?set in the env file}:80:80'
       - '${PUBLIC_IP}:443:443'
     volumes:
       - caddy-data:/data
@@ -51,8 +49,8 @@ configs:
     # One public domain. The ledger API and the validator's admin UIs stay off the internet —
     # the bundle already binds them to loopback, so nothing here exposes them.
     content: |
-      {$APP_DOMAIN} {
-      	reverse_proxy app:3000
+      ${APP_DOMAIN:?set in the env file} {
+        reverse_proxy app:3000
       }
 
 volumes:

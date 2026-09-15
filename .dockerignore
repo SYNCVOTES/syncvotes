@@ -4,4 +4,4 @@ build
 .svelte-kit
 daml/.daml
 .git
-deploy/*.env
+*.env

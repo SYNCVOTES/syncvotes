@@ -14,8 +14,8 @@ Thumbs.db
 
 # Env
 .env
-deploy/*.env
-!deploy/.env.example
+*.env
+!.env.example
 .env.*
 !.env.example
 !.env.test

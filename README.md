@@ -110,7 +110,7 @@ in commands and ACS filters, which is what keeps a package upgrade from breaking
 | `src/routes/(app)/`              | My DAOs, DAO, Create DAO, Proposal, Create proposal, Wallet             |
 | `src/routes/+page.svelte`        | The landing (v1's Consensus Engine) with `landing.css` and `field.ts`   |
 | `src/lib/components/ui/`         | shadcn-svelte components, restyled to the v1 look                       |
-| `deploy/`                        | Compose project and Caddyfile for the servers                           |
+| `compose.yaml`                   | The compose project for the servers, Caddy config inline                |
 
 The private key exists only inside a closure (`Signer`): the page can ask it to sign, to encrypt
 itself for storage, or to dispose — never to reveal itself. Reads are open (a party id is public
@@ -134,8 +134,8 @@ pnpm deploy:mainnet
 Each is `docker compose build && up -d` against a Docker context named `syncvotes-<network>`: the
 commands run here, that server's Docker daemon executes them, and the build context — this
 working tree, minus `.dockerignore` — travels over SSH. Nothing lives on a server but Docker and
-the validator: no checkout, no runner, no CI. Compose reads `deploy/<network>.env` (template in
-`deploy/.env.example`) locally and bakes the values into the container's environment; the file
+the validator: no checkout, no runner, no CI. Compose reads `<network>.env` (template in
+`.env.example`) locally and bakes the values into the container's environment; the file
 itself never leaves this machine.
 
 The servers' addresses are not in the repository. Once per machine and network:
@@ -154,7 +154,7 @@ bind-mounted — a host path would be resolved on the server, where this tree do
 
 Building on the server is deliberate: it is amd64, the laptop is not, and the layer cache is there.
 
-`deploy/` is a separate compose project that joins the Splice validator's network — the validator
+`compose.yaml` is a separate compose project that joins the Splice validator's network — the validator
 has its own `start.sh`, which does more than `compose up`, so a deploy must never recreate its
 containers. Caddy binds the public IP because the validator's nginx already holds `:80` on
 loopback. The app reaches the participant directly at `participant:7575` on that network.
