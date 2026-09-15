@@ -22,6 +22,8 @@ export type Dao = {
 export type Ballot = { voter: string; vote: 'Yes' | 'No' };
 export type Proposal = {
 	contractId: string;
+	/** The stable handle; the contract id changes with every vote. Older proposals have none. */
+	id: string;
 	dao: string;
 	daoName: string;
 	proposer: string;
@@ -102,17 +104,23 @@ export async function daoById(contractId: string): Promise<Dao> {
 	return dao;
 }
 
-type ProposalPayload = Omit<Proposal, 'contractId' | 'outcome'> & {
+type ProposalPayload = Omit<Proposal, 'contractId' | 'outcome' | 'id'> & {
 	outcome: 'Passed' | 'Failed' | null | undefined;
+	id: string | null | undefined;
 };
 
 export async function proposals(): Promise<Proposal[]> {
 	const found = await read<ProposalPayload>(Main.Proposal.templateId);
-	return found.map((c) => ({ contractId: c.contractId, ...c.payload, outcome: c.payload.outcome ?? null }));
+	return found.map((c) => ({
+		...c.payload,
+		contractId: c.contractId,
+		id: c.payload.id ?? c.contractId,
+		outcome: c.payload.outcome ?? null
+	}));
 }
 
-export async function proposalById(contractId: string): Promise<Proposal> {
-	const proposal = (await proposals()).find((p) => p.contractId === contractId);
+export async function proposalById(id: string): Promise<Proposal> {
+	const proposal = (await proposals()).find((p) => p.id === id);
 	if (!proposal) throw error(404, 'No such proposal');
 	return proposal;
 }

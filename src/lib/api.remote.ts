@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { error } from '@sveltejs/kit';
 import { command, query } from '$app/server';
 import * as v from 'valibot';
@@ -147,7 +148,8 @@ export const prepareCreateProposal = command(
 				proposer: party,
 				title,
 				description,
-				closesAt
+				closesAt,
+				id: randomUUID()
 			})
 		);
 	}
@@ -155,20 +157,24 @@ export const prepareCreateProposal = command(
 
 export const prepareVote = command(
 	v.object({ party: partyId, proposal: contractId, vote: v.picklist(['Yes', 'No']) }),
-	async ({ party, proposal, vote }) =>
-		participant.prepare(
+	async ({ party, proposal, vote }) => {
+		const current = await app.proposalById(proposal);
+		return participant.prepare(
 			party,
-			exercise(Main.Proposal.templateId, proposal, 'Proposal_Vote', { voter: party, vote })
-		)
+			exercise(Main.Proposal.templateId, current.contractId, 'Proposal_Vote', { voter: party, vote })
+		);
+	}
 );
 
 export const prepareClose = command(
 	v.object({ party: partyId, proposal: contractId }),
-	async ({ party, proposal }) =>
-		participant.prepare(
+	async ({ party, proposal }) => {
+		const current = await app.proposalById(proposal);
+		return participant.prepare(
 			party,
-			exercise(Main.Proposal.templateId, proposal, 'Proposal_Close', { closer: party })
-		)
+			exercise(Main.Proposal.templateId, current.contractId, 'Proposal_Close', { closer: party })
+		);
+	}
 );
 
 /** The signed hash comes back; the participant submits and waits for the result. */

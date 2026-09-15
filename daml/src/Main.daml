@@ -70,6 +70,9 @@ template DAO
         title : Text
         description : Text
         closesAt : Time
+        -- A stable handle: every vote replaces the contract, so the contract id cannot be the
+        -- proposal's identity. Optional and last, for the upgrade from 0.1.0.
+        id : Optional Text
       controller proposer
       do
         assertMsg "Only members can propose" (proposer `elem` members)
@@ -77,7 +80,7 @@ template DAO
         assertMsg "The voting deadline must be in the future" (closesAt > now)
         create Proposal with
           provider; operator; dao = self; daoName = name; proposer; title; description
-          members; closesAt; ballots = []; outcome = None
+          members; closesAt; ballots = []; outcome = None; id
 
 -- | The simplest vote that works: each member says Yes or No once; the proposal passes when a
 -- majority of all members said Yes. It can be closed as soon as the outcome is settled, or
@@ -95,6 +98,7 @@ template Proposal
     closesAt : Time
     ballots : [Ballot]
     outcome : Optional Outcome
+    id : Optional Text
   where
     signatory proposer, provider
     observer members, operator

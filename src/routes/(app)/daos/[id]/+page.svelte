@@ -71,7 +71,7 @@
 						{#each d.proposals as p (p.contractId)}
 							{@const yes = p.ballots.filter((b) => b.vote === 'Yes').length}
 							<li>
-								<a href="/proposals/{p.contractId}" class="flex items-center gap-4 px-5 py-4 transition-colors hover:bg-surface-hover">
+								<a href="/proposals/{p.id}" class="flex items-center gap-4 px-5 py-4 transition-colors hover:bg-surface-hover">
 									<div class="min-w-0 flex-1">
 										<div class="truncate font-display text-[15px] font-bold">{p.title}</div>
 										<div class="mt-1 font-mono text-xs text-ink-dim">
