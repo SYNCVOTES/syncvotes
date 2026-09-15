@@ -116,7 +116,7 @@
 
 	// Shared looks. `rv` and `in`, `w` and `on`, `scrolled` are the hooks the script below toggles.
 	const reveal =
-		'rv translate-y-[30px] opacity-0 transition-[opacity,transform] duration-800 ease-[cubic-bezier(0.2,0.8,0.2,1)] [&.in]:translate-y-0 [&.in]:opacity-100 motion-reduce:translate-y-0 motion-reduce:opacity-100';
+		'rv translate-y-[30px] opacity-0 transition-[opacity,translate] duration-800 ease-[cubic-bezier(0.2,0.8,0.2,1)] [&.in]:translate-y-0 [&.in]:opacity-100 motion-reduce:translate-y-0 motion-reduce:opacity-100';
 	const btn =
 		'inline-flex items-center gap-2.5 rounded-full border border-orange bg-orange px-7 py-4 font-mono text-sm font-bold tracking-[0.1em] text-background uppercase transition-transform hover:-translate-y-0.5 max-sm:px-[22px] max-sm:py-3.5 max-sm:text-[13px] max-sm:whitespace-nowrap';
 	const ghost = 'border-border-hover bg-transparent text-ink hover:border-ink';
@@ -126,7 +126,7 @@
 	const grid =
 		'group/grid grid grid-cols-3 gap-px border border-border bg-border max-[900px]:grid-cols-1';
 	const card =
-		'group/card relative translate-y-10 overflow-hidden bg-background px-9 pt-11 pb-13 opacity-0 transition-[opacity,transform,background-color] duration-800 ease-[cubic-bezier(0.2,0.8,0.2,1)] group-[.in]/grid:translate-y-0 group-[.in]/grid:opacity-100 hover:bg-surface motion-reduce:translate-y-0 motion-reduce:opacity-100 [&:nth-child(2)]:delay-150 [&:nth-child(3)]:delay-300 [&:nth-child(4)]:delay-450';
+		'group/card relative translate-y-10 overflow-hidden bg-background px-9 pt-11 pb-13 opacity-0 transition-[opacity,translate,background-color] duration-800 ease-[cubic-bezier(0.2,0.8,0.2,1)] group-[.in]/grid:translate-y-0 group-[.in]/grid:opacity-100 hover:bg-surface motion-reduce:translate-y-0 motion-reduce:opacity-100 [&:nth-child(2)]:delay-150 [&:nth-child(3)]:delay-300 [&:nth-child(4)]:delay-450';
 	const body = 'mt-4 max-w-[320px] font-mono text-sm leading-[1.75] text-ink-mid';
 	const navLink = 'opacity-65 transition-opacity hover:opacity-100';
 	const drawerLink =
@@ -523,7 +523,7 @@
 			>Deploy your DAO <ArrowRight size={16} strokeWidth={2.5} /></a
 		>
 		<p
-			class="mt-8 inline-flex items-center gap-2.5 font-mono text-xs tracking-[0.16em] text-ink-dim uppercase"
+			class="mt-8 flex items-center justify-center gap-2.5 font-mono text-xs tracking-[0.16em] text-ink-dim uppercase"
 		>
 			<span class="size-1.5 animate-pulse-soft rounded-full bg-amber motion-reduce:animate-none"
 			></span>
