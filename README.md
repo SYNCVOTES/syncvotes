@@ -125,6 +125,12 @@ executes only transactions it prepared itself, so its own rules cannot be bypass
 Reads are open: a DAO is private to the _network_, and this app — as operator — sees all of them,
 so listing a party's DAOs takes only the party id. A signed read session is a later iteration.
 
+Reads are live. The server holds one subscription to the participant's update stream (the SDK's
+`events.updates` over the JSON API websocket, as the operator, for the three templates), and
+every read is a SvelteKit live query: it sends its value, then sends it again whenever that feed
+fires and the value changed. Pages neither poll nor refresh; another member's vote lands on your
+screen as it lands on the ledger.
+
 There is no session and no login. The key is the identity: the server learns which party a key is
 by asking the participant (`generate-topology` is a pure function of hint and key), and every
 write carries a signature it cannot forge.
