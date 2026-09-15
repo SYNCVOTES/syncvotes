@@ -26,7 +26,8 @@ services:
       LEDGER_AUTH_AUDIENCE: ${LEDGER_API_AUDIENCE:-https://canton.network.global}
       LEDGER_AUTH_SCOPE: daml_ledger_api
     depends_on:
-      - keycloak
+      keycloak:
+        condition: service_healthy
     networks:
       default: {}
 
@@ -60,6 +61,15 @@ services:
       KC_WALLET_USER_PASSWORD: ${KC_WALLET_USER_PASSWORD:?set in the env file}
     depends_on:
       - keycloak-db
+    # The image has no curl; bash's /dev/tcp asks the management port whether the realm is served.
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - exec 3<>/dev/tcp/localhost/9000 && printf 'GET /auth/health/ready HTTP/1.0\r\n\r\n' >&3 && grep -q '"UP"' <&3
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 90s
     networks:
       default: {}
 
