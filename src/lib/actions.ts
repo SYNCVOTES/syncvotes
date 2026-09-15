@@ -106,9 +106,3 @@ export async function vote(s: Signer, who: Identity, contractId: string, choice:
 	const prepared = await remote.prepareVote({ party: who.party, contractId, vote: choice });
 	await sign(s, who, 'Proposal_Vote', contractId, args, prepared);
 }
-
-export async function close(s: Signer, who: Identity, contractId: string) {
-	const args = { closer: who.party };
-	const prepared = await remote.prepareClose({ party: who.party, contractId });
-	await sign(s, who, 'Proposal_Close', contractId, args, prepared);
-}

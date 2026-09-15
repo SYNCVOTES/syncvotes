@@ -12,6 +12,15 @@
 	const id = $derived(page.params.id!);
 	const proposal = $derived(remote.proposal(id));
 	const me = $derived(store.who?.party ?? null);
+
+	// Other members' votes land without this page knowing; while the proposal is open, look again
+	// every few seconds.
+	$effect(() => {
+		const query = proposal;
+		if (query.current?.outcome) return;
+		const timer = setInterval(() => void query.refresh(), 5000);
+		return () => clearInterval(timer);
+	});
 	const nameOf = (party: string) => proposal.current?.names[party] ?? party.split('::')[0];
 
 	// A vote or a close archives this contract and creates the next one, so the page follows —
@@ -44,9 +53,9 @@
 		{@const n = p.members.length}
 		{@const needed = Math.floor(n / 2) + 1}
 		{@const ended = new Date(p.closesAt).getTime() < Date.now()}
-		{@const settled = yes >= needed || n - no < needed}
 		{@const member = me !== null && p.members.includes(me)}
 		{@const voted = me !== null && p.ballots.some((b) => b.voter === me)}
+		{@const outcome = p.outcome ?? (ended ? (yes >= needed ? 'Passed' : 'Failed') : null)}
 
 		<a href="/daos/{p.dao}" class="eyebrow hover:text-orange">← {p.daoName}</a>
 
@@ -106,11 +115,10 @@
 					</div>
 				</div>
 
-				{#if p.outcome}
+				{#if outcome}
 					<div class="border border-border bg-surface p-5 font-mono text-xs text-ink-mid">
-						Closed as <span class={p.outcome === 'Passed' ? 'text-green' : 'text-red'}
-							>{p.outcome}</span
-						>.
+						{p.outcome ? 'Settled as' : 'Ended as'}
+						<span class={outcome === 'Passed' ? 'text-green' : 'text-red'}>{outcome}</span>.
 					</div>
 				{:else if store.screen.at === 'locked'}
 					<div class="space-y-3 border border-border bg-surface p-5">
@@ -125,37 +133,22 @@
 					<div class="border border-border bg-surface p-5 text-[13px] text-ink-dim">
 						Only members can vote.
 					</div>
+				{:else if voted}
+					<div class="border border-border bg-surface p-5 font-mono text-xs text-ink-dim">
+						You voted.
+					</div>
 				{:else}
-					<div class="space-y-3 border border-border bg-surface p-5">
-						{#if !voted && !ended}
-							<div class="grid grid-cols-2 gap-3">
-								<Button
-									variant="accent"
-									disabled={store.busy}
-									onclick={() => act((s, w) => actions.vote(s, w, p.contractId, 'Yes'))}>Yes</Button
-								>
-								<Button
-									variant="destructive"
-									disabled={store.busy}
-									onclick={() => act((s, w) => actions.vote(s, w, p.contractId, 'No'))}>No</Button
-								>
-							</div>
-						{:else if voted}
-							<p class="font-mono text-xs text-ink-dim">You voted.</p>
-						{/if}
-						{#if settled || ended}
-							<Button
-								variant="outline"
-								class="w-full"
-								disabled={store.busy}
-								onclick={() => act((s, w) => actions.close(s, w, p.contractId))}
-							>
-								Close proposal
-							</Button>
-							<p class="text-xs text-ink-dim">
-								{settled ? 'The outcome is settled.' : 'The deadline has passed.'}
-							</p>
-						{/if}
+					<div class="grid grid-cols-2 gap-3 border border-border bg-surface p-5">
+						<Button
+							variant="accent"
+							disabled={store.busy}
+							onclick={() => act((s, w) => actions.vote(s, w, p.contractId, 'Yes'))}>Yes</Button
+						>
+						<Button
+							variant="destructive"
+							disabled={store.busy}
+							onclick={() => act((s, w) => actions.vote(s, w, p.contractId, 'No'))}>No</Button
+						>
 					</div>
 				{/if}
 			</aside>

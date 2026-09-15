@@ -1,7 +1,7 @@
 module Main where
 
 import DA.List (dedup)
-import DA.Optional (isNone)
+import DA.Optional (fromOptional, isNone)
 
 -- The whole model rests on one idea: every contract a user acts on already carries the app
 -- provider's signature, so the provider is a confirmer of every transaction — which is what
@@ -83,8 +83,8 @@ template DAO
           members; closesAt; ballots = []; outcome = None; id
 
 -- | The simplest vote that works: each member says Yes or No once; the proposal passes when a
--- majority of all members said Yes. It can be closed as soon as the outcome is settled, or
--- after the deadline.
+-- majority of all members said Yes. The vote that settles the outcome records it; a proposal
+-- that reaches its deadline unsettled can be closed by any member.
 template Proposal
   with
     provider : Party
@@ -116,7 +116,8 @@ template Proposal
         now <- getTime
         assertMsg "The deadline has passed" (now < closesAt)
         assertMsg "Already voted" (not (any (\b -> b.voter == voter) ballots))
-        create this with ballots = Ballot voter vote :: ballots
+        let cast = Ballot voter vote :: ballots
+        create this with ballots = cast; outcome = decide members cast
 
     choice Proposal_Close : ContractId Proposal
       with
@@ -126,10 +127,15 @@ template Proposal
         assertMsg "Only members can close" (closer `elem` members)
         assertMsg "Already closed" (isNone outcome)
         now <- getTime
-        let yes = length (filter (\b -> b.vote == Yes) ballots)
-            no = length (filter (\b -> b.vote == No) ballots)
-            needed = length members / 2 + 1
-            -- Settled early when Yes has a majority, or when No has made one impossible.
-            settled = yes >= needed || length members - no < needed
-        assertMsg "Still open" (settled || now >= closesAt)
-        create this with outcome = Some (if yes >= needed then Passed else Failed)
+        assertMsg "Still open" (now >= closesAt)
+        create this with outcome = Some (fromOptional Failed (decide members ballots))
+
+-- | Settled when Yes has a majority of all members, or when No has made one impossible.
+decide : [Party] -> [Ballot] -> Optional Outcome
+decide members ballots =
+  let yes = length (filter (\b -> b.vote == Yes) ballots)
+      no = length (filter (\b -> b.vote == No) ballots)
+      needed = length members / 2 + 1
+  in if yes >= needed then Some Passed
+     else if length members - no < needed then Some Failed
+     else None

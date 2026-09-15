@@ -11,6 +11,13 @@
 
 	const dao = $derived(remote.dao(page.params.id!));
 	const me = $derived(store.who?.party ?? null);
+
+	// Proposals and votes arrive from other members; keep the list current.
+	$effect(() => {
+		const query = dao;
+		const timer = setInterval(() => void query.refresh(), 10000);
+		return () => clearInterval(timer);
+	});
 	const nameOf = (party: string) => dao.current?.names[party] ?? party.split('::')[0];
 </script>
 
@@ -83,6 +90,14 @@
 					<ul class="divide-y divide-border border border-border bg-surface">
 						{#each d.proposals as p (p.contractId)}
 							{@const yes = p.ballots.filter((b) => b.vote === 'Yes').length}
+							{@const ended = new Date(p.closesAt).getTime() < Date.now()}
+							{@const outcome =
+								p.outcome ??
+								(ended
+									? yes >= Math.floor(p.members.length / 2) + 1
+										? 'Passed'
+										: 'Failed'
+									: null)}
 							<li>
 								<a
 									href="/proposals/{p.id}"
@@ -96,7 +111,7 @@
 												: `closes ${relative(p.closesAt)}`} · {yes}/{p.members.length} yes
 										</div>
 									</div>
-									<StatusBadge outcome={p.outcome} closesAt={p.closesAt} />
+									<StatusBadge {outcome} closesAt={p.closesAt} />
 								</a>
 							</li>
 						{/each}

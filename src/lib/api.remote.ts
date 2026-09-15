@@ -224,17 +224,6 @@ export const prepareVote = command(
 	}
 );
 
-export const prepareClose = command(
-	v.object({ party: partyId, contractId }),
-	async ({ party, contractId }) => {
-		const current = await currentProposal(contractId);
-		return participant.prepare(
-			party,
-			exercise(Main.Proposal.templateId, current.contractId, 'Proposal_Close', { closer: party })
-		);
-	}
-);
-
 /** The signed hash comes back; the participant submits and waits for the result. */
 export const execute = command(
 	v.object({
