@@ -26,11 +26,9 @@ const TOPOLOGY_TRANSACTION = 11;
 const TOPOLOGY_MULTI_HASH = 55;
 const PUBLIC_KEY_FINGERPRINT = 12;
 
-// Wire values from the topology proto: TOPOLOGY_CHANGE_OP_ADD_REPLACE, PARTICIPANT_PERMISSION_*,
-// SIGNING_KEY_SPEC_EC_CURVE25519.
+// Wire values from the topology proto: TOPOLOGY_CHANGE_OP_ADD_REPLACE, PARTICIPANT_PERMISSION_*.
 const ADD_REPLACE = 1;
 const CONFIRMATION = 2;
-const EC_CURVE25519 = 1;
 
 /** The package every user action must live in; a same-named choice elsewhere is refused. */
 const PACKAGE_NAME = 'syncvotes-governance';
@@ -54,11 +52,6 @@ export async function fingerprintOf(publicKey: Uint8Array): Promise<string> {
 	return '1220' + [...hash].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-const sameKey = (stored: Uint8Array, own: Uint8Array) =>
-	// Raw, or wrapped in a DER SubjectPublicKeyInfo: the key bytes are the tail either way.
-	(stored.length === own.length || stored.length === own.length + 12) &&
-	stored.subarray(stored.length - own.length).every((b, i) => b === own[i]);
-
 export async function verifyTopology(
 	topology: { partyId: string; topologyTransactions: string[]; multiHash: string },
 	publicKey: Uint8Array,
@@ -81,61 +74,25 @@ export async function verifyTopology(
 		throw new Error(`The party would be ${topology.partyId}, not ${party}`);
 	}
 
-	const seen = new Set<string>();
-	for (const tx of topology.topologyTransactions) {
-		const decoded = decodeTopologyTransaction(tx);
-		const mapping = decoded.mapping?.mapping;
-		if (decoded.operation !== ADD_REPLACE || decoded.serial !== 1 || !mapping) {
-			throw new Error('The party topology is not a fresh creation');
-		}
-		seen.add(mapping.oneofKind ?? '');
-
-		switch (mapping.oneofKind) {
-			case 'namespaceDelegation': {
-				const d = mapping.namespaceDelegation;
-				if (
-					d.namespace !== namespace ||
-					!d.targetKey ||
-					!sameKey(d.targetKey.publicKey, publicKey)
-				) {
-					throw new Error('The namespace would not be controlled by your key');
-				}
-				break;
-			}
-			case 'partyToKeyMapping': {
-				const m = mapping.partyToKeyMapping;
-				if (
-					m.party !== party ||
-					m.threshold !== 1 ||
-					m.signingKeys.length !== 1 ||
-					!sameKey(m.signingKeys[0].publicKey, publicKey) ||
-					m.signingKeys[0].keySpec !== EC_CURVE25519
-				) {
-					throw new Error('The party would be signable by a key that is not yours');
-				}
-				break;
-			}
-			case 'partyToParticipant': {
-				const m = mapping.partyToParticipant;
-				if (
-					m.party !== party ||
-					m.threshold !== 1 ||
-					m.participants.length !== 1 ||
-					m.participants[0].permission !== CONFIRMATION
-				) {
-					throw new Error(
-						'The participant would get more than confirmation rights over your party'
-					);
-				}
-				break;
-			}
-			default:
-				throw new Error(`Unexpected topology mapping: ${mapping.oneofKind}`);
-		}
+	// Canton 3.5 lays the party out as one PartyToParticipant mapping, signed by the namespace
+	// key; the key's own authority over the namespace is implied by the signature. So: exactly
+	// one mapping, for this party, hosted on exactly one participant, for confirmation only.
+	if (topology.topologyTransactions.length !== 1) {
+		throw new Error('Expected the party to be one topology mapping');
 	}
-
-	for (const needed of ['namespaceDelegation', 'partyToKeyMapping', 'partyToParticipant']) {
-		if (!seen.has(needed)) throw new Error(`The party topology lacks its ${needed}`);
+	const decoded = decodeTopologyTransaction(topology.topologyTransactions[0]);
+	const mapping = decoded.mapping?.mapping;
+	if (decoded.operation !== ADD_REPLACE || mapping?.oneofKind !== 'partyToParticipant') {
+		throw new Error('The party topology is not a hosting mapping');
+	}
+	const m = mapping.partyToParticipant;
+	if (m.party !== party) throw new Error(`The mapping is for ${m.party}, not ${party}`);
+	if (
+		m.threshold !== 1 ||
+		m.participants.length !== 1 ||
+		m.participants[0].permission !== CONFIRMATION
+	) {
+		throw new Error('The participant would get more than confirmation rights over your party');
 	}
 }
 
