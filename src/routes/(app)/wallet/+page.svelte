@@ -212,7 +212,7 @@
 					{:else if offered}
 						<span class="font-mono text-xs text-ink-dim">selected</span>
 					{:else}
-						<Button variant="accent" size="sm" onclick={() => flow.select(w.id)}>Unlock</Button>
+						<Button variant="accent" size="sm" onclick={() => flow.select(w.id)}>Select</Button>
 					{/if}
 					<Button
 						variant="ghost"
