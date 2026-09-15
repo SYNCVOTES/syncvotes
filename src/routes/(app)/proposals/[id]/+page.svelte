@@ -6,6 +6,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import StatusBadge from '$lib/components/app/status-badge.svelte';
 	import Problem from '$lib/components/app/problem.svelte';
+	import UnlockForm from '$lib/components/app/unlock-form.svelte';
 	import { relative } from '$lib/format';
 
 	const id = $derived(page.params.id!);
@@ -94,9 +95,14 @@
 					<div class="border border-border bg-surface p-5 font-mono text-xs text-ink-mid">
 						Closed as <span class={p.outcome === 'Passed' ? 'text-green' : 'text-red'}>{p.outcome}</span>.
 					</div>
+				{:else if store.screen.at === 'locked'}
+					<div class="space-y-3 border border-border bg-surface p-5">
+						<p class="text-[13px] text-ink-dim">Unlock your wallet to vote.</p>
+						<UnlockForm />
+					</div>
 				{:else if !store.who}
 					<div class="border border-border bg-surface p-5 text-[13px] text-ink-dim">
-						<a href="/wallet" class="text-orange hover:underline">Unlock your wallet</a> to vote.
+						<a href="/wallet" class="text-orange hover:underline">Connect a wallet</a> to vote.
 					</div>
 				{:else if !member}
 					<div class="border border-border bg-surface p-5 text-[13px] text-ink-dim">Only members can vote.</div>

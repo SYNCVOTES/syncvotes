@@ -1,8 +1,13 @@
 # syncvotes
 
-A placeholder app for seeing how Daml and TypeScript fit together on Canton. Contract types are
-generated from the Daml source; the app runs against its own validator on TestNet at
+On-chain governance for the Canton Network: private DAOs, proposals and votes, signed by a key
+only the member holds. MVP v2, running against its own validator on TestNet at
 <https://dev.syncvotes.com>.
+
+The scope is deliberately the smallest thing that is real governance: a DAO with fixed members,
+text proposals, one Yes/No vote per member, passed by a majority of all members, closed on-chain
+as soon as that is settled. Everything else v1 had — typed actions, weights, veto, treasury — is
+a later iteration.
 
 ## Architecture
 
@@ -36,13 +41,20 @@ the hosting participant, CIP-0103 exposes no method to upload one or to re-host 
 `signMessage` signs UTF-8 text rather than the transaction hash. Real tokens are a different story:
 the token standard's packages are on every validator, so a treasury can be paid from any wallet.
 
-### Rewards
+### The model
 
-Nothing touches `Asset` directly. Every action goes through `AppProxy`, whose signatory is the
-provider party, which makes the provider a **confirmer** of each transaction. Under CIP-0104
-traffic-based rewards go to confirmers; an observer earns nothing. The provider signs the proxy
-once, at creation, and takes no part in the user's later transactions. The proxies double as the
-app's directory: each carries a name, and listing them is how one user finds another.
+Three templates in `daml/src/Main.daml`, one idea: every contract a user acts on already carries
+the provider's signature, so the provider is a **confirmer** of every transaction — which is what
+CIP-0104 pays traffic rewards for — while the user's key is the only one that ever signs a
+submission.
+
+- `Account` — created by the provider once per party; carries the name others use to add you to a
+  DAO, and the choice that creates DAOs.
+- `DAO` — signatory admin and provider, observer members and operator. Private to its members by
+  construction: nobody else on the network holds it. Membership is fixed at creation.
+- `Proposal` — signatory proposer and provider. One ballot per member; passes when a majority of
+  all members voted Yes; closable once settled or after the deadline. Each vote replaces the
+  contract, so a proposal carries a stable `id` for the page to follow.
 
 Two provider-side parties, as the Featured App Coupon Guidance asks (separate party concerns):
 `PROVIDER_PARTY` holds the FeaturedAppRight, signs every proxy and is the one that earns;
@@ -83,23 +95,30 @@ in commands and ACS filters, which is what keeps a package upgrade from breaking
 
 ## Layout
 
-| Path                            | What it is                                                                |
-| ------------------------------- | ------------------------------------------------------------------------- |
-| `daml/src/Main.daml`            | `AppProxy`, and the `Asset` template it acts on                           |
-| `daml.js/`                      | Generated bindings — never edit, regenerate with `pnpm daml:codegen`      |
-| `src/lib/wallet.ts`             | Phrase → signer closure, encrypted storage, passkey and password unlock   |
-| `src/lib/session.ts`            | Auto-lock: disposes the signer after 15 quiet minutes or on `pagehide`    |
-| `src/lib/verify.ts`             | Recomputes hashes and inspects transactions before anything is signed     |
-| `src/lib/actions.ts`            | What the browser does: call the API, verify, sign, call again             |
-| `src/lib/api.remote.ts`         | The server API as remote functions: lookup, enrol, list, prepare, execute |
-| `src/lib/server/participant.ts` | The wallet SDK, wrapped: topology, allocation, ACS, prepare and execute   |
-| `src/lib/server/app.ts`         | Proxies as directory, name registration                                   |
-| `deploy/`                       | Compose project and Caddyfile for the TestNet server                      |
+| Path                             | What it is                                                              |
+| -------------------------------- | ----------------------------------------------------------------------- |
+| `daml/src/Main.daml`             | `Account`, `DAO`, `Proposal` — the whole model                          |
+| `daml.js/`                       | Generated bindings — never edit, regenerate with `pnpm daml:codegen`    |
+| `src/lib/wallet.ts`              | Phrase → signer closure, encrypted storage, passkey and password unlock |
+| `src/lib/session.ts`             | Auto-lock: disposes the signer after 15 quiet minutes or on `pagehide`  |
+| `src/lib/wallet-store.svelte.ts` | The wallet as one rune store: onboarding screens, signer, identity      |
+| `src/lib/verify.ts`              | Recomputes hashes and inspects transactions before anything is signed   |
+| `src/lib/actions.ts`             | What the browser does: call the API, verify, sign, call again           |
+| `src/lib/api.remote.ts`          | The server API as remote functions: reads, prepares, execute            |
+| `src/lib/server/participant.ts`  | The wallet SDK, wrapped: topology, allocation, ACS, prepare and execute |
+| `src/lib/server/app.ts`          | Accounts, DAOs and proposals as the operator sees them                  |
+| `src/routes/(app)/`              | My DAOs, DAO, Create DAO, Proposal, Create proposal, Wallet             |
+| `src/routes/+page.svelte`        | The landing (v1's Consensus Engine) with `landing.css` and `field.ts`   |
+| `src/lib/components/ui/`         | shadcn-svelte components, restyled to the v1 look                       |
+| `deploy/`                        | Compose project and Caddyfile for the servers                           |
 
 The private key exists only inside a closure (`Signer`): the page can ask it to sign, to encrypt
 itself for storage, or to dispose — never to reveal itself. Reads are open (a party id is public
 anyway); every write is a transaction the ledger will only accept with that key's signature, and
 the backend user is granted no rights on user parties, so there is no second path.
+
+Reads are open: a DAO is private to the _network_, and this app — as operator — sees all of them,
+so listing a party's DAOs takes only the party id. A signed read session is a later iteration.
 
 There is no session and no login. The key is the identity: the server learns which party a key is
 by asking the participant (`generate-topology` is a pure function of hint and key), and every

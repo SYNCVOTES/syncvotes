@@ -6,6 +6,7 @@
 	import Stat from '$lib/components/app/stat.svelte';
 	import StatusBadge from '$lib/components/app/status-badge.svelte';
 	import Problem from '$lib/components/app/problem.svelte';
+	import UnlockForm from '$lib/components/app/unlock-form.svelte';
 	import { relative } from '$lib/format';
 
 	const dao = $derived(remote.dao(page.params.id!));
@@ -46,6 +47,8 @@
 			</div>
 			{#if member}
 				<Button href="/daos/{d.contractId}/proposals/create" size="lg">+ New proposal</Button>
+			{:else if store.screen.at === 'locked'}
+				<div class="w-72"><UnlockForm /></div>
 			{/if}
 		</div>
 
