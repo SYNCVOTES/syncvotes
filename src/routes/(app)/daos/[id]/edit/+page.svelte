@@ -44,14 +44,18 @@
 
 	async function save(event: SubmitEvent) {
 		event.preventDefault();
+		const contractId = dao.current?.contractId;
+		if (!contractId) return;
 		const ok = await flow.act((signer, who) =>
-			actions.updateDao(signer, who, id, { name, description, members })
+			actions.updateDao(signer, who, contractId, { name, description, members })
 		);
 		if (ok) await goto(`/daos/${id}`);
 	}
 
 	async function remove() {
-		const ok = await flow.act((signer, who) => actions.archiveDao(signer, who, id));
+		const contractId = dao.current?.contractId;
+		if (!contractId) return;
+		const ok = await flow.act((signer, who) => actions.archiveDao(signer, who, contractId));
 		if (ok) await goto('/my-daos');
 	}
 </script>

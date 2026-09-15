@@ -136,7 +136,7 @@ export const myDaos = query.live(partyId, (party) =>
 			.filter((d) => d.members.includes(party))
 			.map((d) => ({
 				...d,
-				openProposals: proposals.filter((p) => p.dao === d.contractId && !p.outcome).length
+				openProposals: proposals.filter((p) => p.daoId === d.id && !p.outcome).length
 			}));
 	})
 );
@@ -150,7 +150,7 @@ export const dao = query.live(contractId, (id) =>
 		]);
 		return {
 			...found,
-			proposals: proposals.filter((p) => p.dao === id),
+			proposals: proposals.filter((p) => p.daoId === found.id),
 			names: Object.fromEntries(names.map((a) => [a.party, a.name]))
 		};
 	})
@@ -159,11 +159,14 @@ export const dao = query.live(contractId, (id) =>
 export const proposal = query.live(contractId, (id) =>
 	live(async () => {
 		const [found, names] = await Promise.all([app.proposalById(id), app.accounts()]);
-		// The DAO's admin may cancel; a proposal can outlive a deleted DAO, so this may be absent.
-		const admin = await app.daoById(found.dao).then(
-			(d) => d.admin,
-			() => null
-		);
+		// The DAO's admin may cancel. Proposals from before 0.1.4 do not carry it, and a proposal
+		// can outlive a deleted DAO, so this may be absent.
+		const admin =
+			found.admin ??
+			(await app.daoById(found.daoId).then(
+				(d) => d.admin,
+				() => null
+			));
 		return { ...found, admin, names: Object.fromEntries(names.map((a) => [a.party, a.name])) };
 	})
 );
@@ -182,22 +185,25 @@ export const prepareCreateDao = command(
 		party: partyId,
 		daoName: text(60),
 		description: v.pipe(v.string(), v.maxLength(2000)),
-		members: v.pipe(v.array(partyId), v.maxLength(50))
+		members: v.pipe(v.array(partyId), v.maxLength(50)),
+		id: v.pipe(v.string(), v.uuid())
 	}),
-	async ({ party, daoName, description, members }) => {
+	async ({ party, daoName, description, members, id }) => {
 		const account = await app.accountOf(party);
 		const known = await app.accounts();
 		for (const m of members) {
 			if (!known.some((a) => a.party === m))
 				throw error(404, `${m} is not registered with the app`);
 		}
+		if ((await app.daos()).some((d) => d.id === id)) throw error(409, 'That DAO id is taken');
 
 		return participant.prepare(
 			party,
 			exercise(Main.Account.templateId, account.contractId, 'Account_CreateDAO', {
 				daoName,
 				description,
-				members
+				members,
+				id
 			})
 		);
 	}
@@ -260,8 +266,9 @@ export const prepareVote = command(
 	}
 );
 
-async function adminOf(dao: string, party: string) {
-	const found = await app.daoById(dao);
+/** The DAO contract the browser saw, if it is still the current one and the caller is admin. */
+async function adminOf(contractId: string, party: string) {
+	const found = await app.currentDao(contractId);
 	if (found.admin !== party) throw error(403, 'Only the admin can do this');
 	return found;
 }
@@ -292,8 +299,8 @@ export const prepareUpdateDao = command(
 export const prepareArchiveDao = command(
 	v.object({ party: partyId, dao: contractId }),
 	async ({ party, dao }) => {
-		await adminOf(dao, party);
-		const open = (await app.proposals()).filter((p) => p.dao === dao && !p.outcome);
+		const found = await adminOf(dao, party);
+		const open = (await app.proposals()).filter((p) => p.daoId === found.id && !p.outcome);
 		if (open.length > 0) throw error(409, 'Close or cancel the open proposals first');
 		return participant.prepare(party, exercise(Main.DAO.templateId, dao, 'DAO_Archive', {}));
 	}
@@ -326,10 +333,12 @@ export const prepareCancelProposal = command(
 		const current = await currentProposal(contractId);
 		if (current.outcome) throw error(409, 'Already settled');
 		if (current.proposer !== party) {
-			const admin = await app.daoById(current.dao).then(
-				(d) => d.admin,
-				() => null
-			);
+			const admin =
+				current.admin ??
+				(await app.daoById(current.daoId).then(
+					(d) => d.admin,
+					() => null
+				));
 			if (admin !== party) throw error(403, 'Only the proposer or the DAO admin can cancel');
 		}
 		return participant.prepare(

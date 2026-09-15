@@ -48,7 +48,7 @@
 		{@const mine = me !== null && me === p.proposer}
 		{@const canCancel = !p.outcome && (mine || (me !== null && me === p.admin))}
 
-		<a href="/daos/{p.dao}" class="eyebrow hover:text-orange">← {p.daoName}</a>
+		<a href="/daos/{p.daoId}" class="eyebrow hover:text-orange">← {p.daoName}</a>
 
 		<div class="mt-6 mb-8">
 			<div class="mb-3 flex items-center gap-3">
@@ -132,7 +132,7 @@
 									variant="destructive"
 									size="sm"
 									disabled={store.busy}
-									onclick={() => cancel(p.contractId, p.dao)}>Yes, withdraw</Button
+									onclick={() => cancel(p.contractId, p.daoId)}>Yes, withdraw</Button
 								>
 								<Button variant="ghost" size="sm" onclick={() => (cancelling = false)}>Keep</Button>
 							</div>

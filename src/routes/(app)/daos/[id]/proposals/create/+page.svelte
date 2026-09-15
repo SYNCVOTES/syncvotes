@@ -23,7 +23,12 @@
 		event.preventDefault();
 		const period = Math.min(30, Math.max(1, Math.round(Number(days) || 0)));
 		const ok = await flow.act((signer, who) =>
-			actions.createProposal(signer, who, { dao: id, title, description, days: period })
+			actions.createProposal(signer, who, {
+				dao: dao.current!.contractId,
+				title,
+				description,
+				days: period
+			})
 		);
 		if (ok) await goto(`/daos/${id}`);
 	}

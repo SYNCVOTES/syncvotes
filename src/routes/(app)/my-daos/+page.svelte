@@ -55,7 +55,7 @@
 			<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
 				{#each daos.current as dao (dao.contractId)}
 					<DaoCard
-						id={dao.contractId}
+						id={dao.id}
 						name={dao.name}
 						description={dao.description}
 						members={dao.members.length}

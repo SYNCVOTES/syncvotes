@@ -72,7 +72,9 @@ export async function createDao(
 	input: { name: string; description: string; members: string[] }
 ): Promise<void> {
 	const members = await resolve(input.members);
-	const args = { daoName: input.name, description: input.description, members };
+	// The DAO's identity is decided here, so it can be checked here.
+	const id = crypto.randomUUID();
+	const args = { daoName: input.name, description: input.description, members, id };
 	const prepared = await remote.prepareCreateDao({ party: who.party, ...args });
 	await sign(s, who, 'Account_CreateDAO', who.account, args, prepared);
 }
@@ -107,6 +109,7 @@ export async function vote(s: Signer, who: Identity, contractId: string, choice:
 	await sign(s, who, 'Proposal_Vote', contractId, args, prepared);
 }
 
+/** `dao` is the DAO contract as the page last saw it; an edit in between makes this fail loudly. */
 export async function updateDao(
 	s: Signer,
 	who: Identity,

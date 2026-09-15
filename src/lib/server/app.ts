@@ -14,6 +14,8 @@ export { PARTY_HINT };
 export type Account = { contractId: string; party: string; name: string };
 export type Dao = {
 	contractId: string;
+	/** The stable handle; the contract id changes with every edit. Older DAOs have none. */
+	id: string;
 	admin: string;
 	name: string;
 	description: string;
@@ -36,6 +38,9 @@ export type Proposal = {
 	ballots: Ballot[];
 	outcome: 'Passed' | 'Failed' | null;
 	createdAt: string | null;
+	/** The DAO's stable id (its contract id for proposals from before 0.1.4). */
+	daoId: string;
+	admin: string | null;
 };
 
 const read = <T>(templateId: string) => activeContracts<T>(operatorParty(), templateId);
@@ -98,27 +103,45 @@ export async function register(party: string, name: string): Promise<Account> {
 	return accountOf(party);
 }
 
-type DaoPayload = Omit<Dao, 'contractId' | 'createdAt'> & { createdAt: string | null | undefined };
+type DaoPayload = Omit<Dao, 'contractId' | 'createdAt' | 'id'> & {
+	createdAt: string | null | undefined;
+	id: string | null | undefined;
+};
 
 export async function daos(): Promise<Dao[]> {
 	const found = await read<DaoPayload>(Main.DAO.templateId);
 	return found.map((c) => ({
 		...c.payload,
 		contractId: c.contractId,
+		id: c.payload.id ?? c.contractId,
 		createdAt: c.payload.createdAt ?? null
 	}));
 }
 
-export async function daoById(contractId: string): Promise<Dao> {
-	const dao = (await daos()).find((d) => d.contractId === contractId);
+/** By stable id, or by contract id for DAOs from before 0.1.4. */
+export async function daoById(id: string): Promise<Dao> {
+	const dao = (await daos()).find((d) => d.id === id || d.contractId === id);
 	if (!dao) throw error(404, 'No such DAO');
 	return dao;
 }
 
-type ProposalPayload = Omit<Proposal, 'contractId' | 'outcome' | 'id' | 'createdAt'> & {
+/** The browser names the contract it saw; if an edit replaced it meanwhile, say so. */
+export async function currentDao(contractId: string): Promise<Dao> {
+	const dao = (await daos()).find((d) => d.contractId === contractId);
+	if (!dao)
+		throw error(409, 'This DAO changed while you were looking at it — reload and try again');
+	return dao;
+}
+
+type ProposalPayload = Omit<
+	Proposal,
+	'contractId' | 'outcome' | 'id' | 'createdAt' | 'daoId' | 'admin'
+> & {
 	outcome: 'Passed' | 'Failed' | null | undefined;
 	id: string | null | undefined;
 	createdAt: string | null | undefined;
+	daoId: string | null | undefined;
+	admin: string | null | undefined;
 };
 
 export async function proposals(): Promise<Proposal[]> {
@@ -128,7 +151,9 @@ export async function proposals(): Promise<Proposal[]> {
 		contractId: c.contractId,
 		id: c.payload.id ?? c.contractId,
 		outcome: c.payload.outcome ?? null,
-		createdAt: c.payload.createdAt ?? null
+		createdAt: c.payload.createdAt ?? null,
+		daoId: c.payload.daoId ?? c.payload.dao,
+		admin: c.payload.admin ?? null
 	}));
 }
 

@@ -53,10 +53,10 @@
 			</div>
 			<div class="flex shrink-0 items-center gap-2">
 				{#if admin}
-					<Button href="/daos/{d.contractId}/edit" variant="outline">Edit</Button>
+					<Button href="/daos/{d.id}/edit" variant="outline">Edit</Button>
 				{/if}
 				{#if member}
-					<Button href="/daos/{d.contractId}/proposals/create">+ New proposal</Button>
+					<Button href="/daos/{d.id}/proposals/create">+ New proposal</Button>
 				{:else if store.screen.at === 'locked'}
 					<div class="w-72"><UnlockForm /></div>
 				{/if}

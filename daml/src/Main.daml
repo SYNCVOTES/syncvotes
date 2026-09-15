@@ -43,12 +43,15 @@ template Account
         daoName : Text
         description : Text
         members : [Party]
+        -- A stable handle, since every edit replaces the contract. Optional and last, for the
+        -- upgrade from 0.1.2.
+        id : Optional Text
       controller user
       do
         now <- getTime
         create DAO with
           provider; operator; admin = user; name = daoName; description
-          members = dedup (user :: members); createdAt = Some now
+          members = dedup (user :: members); createdAt = Some now; id
 
 -- | A DAO is private to its members: only they, the provider and the operator ever see it.
 -- Membership is whatever the admin last set.
@@ -62,6 +65,7 @@ template DAO
     members : [Party]
     -- Optional and last, for the upgrade from 0.1.2.
     createdAt : Optional Time
+    id : Optional Text
   where
     signatory admin, provider
     observer members, operator
@@ -99,6 +103,7 @@ template DAO
         create Proposal with
           provider; operator; dao = self; daoName = name; proposer; title; description
           members; closesAt; ballots = []; outcome = None; id; createdAt = Some now
+          daoId = this.id; admin = Some admin
 
 -- | The simplest vote that works: each member says Yes or No once; the proposal passes when a
 -- majority of all members said Yes. The vote that settles the outcome records it; a proposal
@@ -117,8 +122,11 @@ template Proposal
     ballots : [Ballot]
     outcome : Optional Outcome
     id : Optional Text
-    -- Optional and last, for the upgrade from 0.1.2.
+    -- Optional and last, for the upgrade from 0.1.2. The DAO's stable id and admin are copied
+    -- in, so a proposal still knows its DAO after the DAO contract has been replaced.
     createdAt : Optional Time
+    daoId : Optional Text
+    admin : Optional Party
   where
     signatory proposer, provider
     observer members, operator
@@ -143,10 +151,8 @@ template Proposal
       controller canceller
       do
         assertMsg "Already settled" (isNone outcome)
-        if canceller == proposer then pure ()
-        else do
-          d <- fetch dao
-          assertMsg "Only the proposer or the DAO admin can cancel" (canceller == d.admin)
+        assertMsg "Only the proposer or the DAO admin can cancel"
+          (canceller == proposer || Some canceller == admin)
 
     choice Proposal_Vote : ContractId Proposal
       with
