@@ -146,9 +146,10 @@
 	--animate-tape: tape 46s linear infinite;
 	--animate-pulse-soft: pulse-soft 1.6s infinite;
 
+	/* Tailwind's translate-* utilities set the `translate` property, so that is what rises. */
 	@keyframes rise {
 		to {
-			transform: translateY(0);
+			translate: 0 0;
 		}
 	}
 	@keyframes fade-in {
