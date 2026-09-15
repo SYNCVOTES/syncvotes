@@ -13,7 +13,7 @@
 	>
 {:else if kind === 'password'}
 	<form
-		class="flex gap-3"
+		class="flex w-full gap-3"
 		onsubmit={(e) => {
 			e.preventDefault();
 			flow.unlock(password);

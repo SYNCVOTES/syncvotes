@@ -5,7 +5,7 @@
 	import { store } from '$lib/wallet-store.svelte';
 	import { theme, toggleTheme } from '$lib/theme.svelte';
 
-	let { children } = $props();
+	let { children, data } = $props();
 
 	const nav = [
 		{ href: '/my-daos', label: 'My DAOs' },
@@ -111,7 +111,9 @@
 			</div>
 			<div class="flex flex-col gap-1 md:items-end">
 				<span class="eyebrow mb-1">Network</span>
-				<a href="/version" class="font-mono text-xs text-ink-mid hover:text-orange">Build</a>
+				<a href="/version" class="font-mono text-xs text-ink-mid hover:text-orange"
+					>Build {data.build.slice(0, 7)}</a
+				>
 				<a
 					href="https://docs.canton.network"
 					target="_blank"

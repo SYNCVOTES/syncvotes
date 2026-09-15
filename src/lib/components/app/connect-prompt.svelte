@@ -22,7 +22,7 @@
 		{locked ? `Unlock it to ${what}.` : `Create or restore a key to ${what}.`}
 	</p>
 	{#if locked}
-		<div class="mt-2 w-full max-w-sm text-left">
+		<div class="mt-2 flex w-full max-w-sm flex-col items-center gap-3">
 			<Problem message={store.problem} />
 			<UnlockForm />
 		</div>
