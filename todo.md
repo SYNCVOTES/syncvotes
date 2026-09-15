@@ -24,3 +24,11 @@
       across validators), payments to the treasury are party-to-party on our validator.
       Treasury party needs a transfer pre-approval (`sdk.amulet.preapproval`) or every incoming
       payment sits as a pending instruction until someone accepts it
+
+# 2026-09-15
+
+- [x] real auth: Keycloak realm under /auth, RS256 everywhere, validator restarted with `-a`;
+      the app's ledger user is a service account with participant-wide read/execute rights and no
+      `CanActAs` on user parties. Measured: `prepare` needs read rights on the acting party
+- [ ] clients for everything else that talked to the participant unauthenticated (billing agent,
+      the gRPC poller behind the WireGuard peer)

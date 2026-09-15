@@ -42,9 +42,22 @@ const auth = () =>
 		}
 	}) as const;
 
+/**
+ * The SDK logs the whole token response every time it fetches one. Only its warnings and errors
+ * get through here, and only as a message — never the context they came with.
+ */
+const logAdapter = {
+	log(level: string, ctx: { error?: unknown; err?: unknown }, message?: string) {
+		if (level !== 'warn' && level !== 'error') return;
+		const cause = ctx.error ?? ctx.err;
+		const detail = cause instanceof Error ? cause.message : typeof cause === 'string' ? cause : '';
+		console[level](`SDK: ${message ?? ''} ${detail}`.trim());
+	}
+};
+
 async function create() {
 	const url = required('LEDGER_API_URL', LEDGER_API_URL);
-	const base = await SDK.create({ ledgerClientUrl: url, auth: auth(), logAdapter: 'console' });
+	const base = await SDK.create({ ledgerClientUrl: url, auth: auth(), logAdapter });
 	// The update stream rides the same JSON API over a websocket.
 	return base.extend({ events: { websocketURL: url.replace(/^http/, 'ws'), auth: auth() } });
 }
@@ -122,8 +135,9 @@ export async function allocateExternal(
 		throw error(409, 'The party topology changed since it was signed — sign in again');
 	}
 
-	// The backend user gets no rights on the party. It needs none: prepare, execute and ACS
-	// reads all work without them, and a `CanActAs` it does not hold is one it cannot misuse.
+	// The backend user gets no rights on the party itself. Reading and executing come from the
+	// participant-wide rights it was set up with (README, "Authentication"); a `CanActAs` it
+	// does not hold is one it cannot misuse.
 	return creation.execute(signature, { grantUserRights: false });
 }
 

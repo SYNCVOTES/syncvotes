@@ -77,6 +77,38 @@ pnpm check          # svelte-check over the whole app
 pnpm lint
 ```
 
+## Authentication
+
+Every ledger call is authenticated — the participant, the validator backend and this app all
+trust one Keycloak realm (`keycloak/realm.json`, served under `/auth` on `APP_DOMAIN` by the same
+Caddy, its values substituted from the env file at import). There is no dev mode, no shared
+secret, no `unsafe` HS256: tokens are RS256, checked against the realm's JWKS.
+
+Three OAuth clients matter: `validator-app-backend` and `syncvotes-app` (client credentials, each
+a service account whose fixed `sub` is its ledger user name) and `wallet-web-ui` / `cns-ui`
+(public, PKCE) for the validator's own UIs, where the operator logs in as `WALLET_USER_NAME`. The
+`daml_ledger_api` scope stamps the ledger audience (`https://canton.network.global`) into a token;
+the validator's own API uses `VALIDATOR_AUDIENCE`.
+
+The app's ledger user holds, once per validator: `ParticipantAdmin` (DAR upload, party
+allocation), `CanReadAsAnyParty`, `CanExecuteAsAnyParty`, `CanReadAs` the operator and
+`CanActAs` the provider. Nothing on user parties themselves — `CanActAs` is never granted, so
+the only way a user's transaction gets submitted is with the user's own signature.
+`CanReadAsAnyParty` is not optional: the participant refuses to _prepare_ a transaction for a
+party the calling user cannot read as (`PERMISSION_DENIED: Claims do not authorize to read
+data for party`), and reads are the one thing this design leaves open.
+
+The validator bundle's `.env` points at the same realm (`AUTH_URL`, `AUTH_JWKS_URL`,
+`AUTH_WELLKNOWN_URL`, `LEDGER_API_AUTH_AUDIENCE`, `VALIDATOR_AUTH_CLIENT_ID/SECRET`,
+`LEDGER_API_ADMIN_USER`, `WALLET_ADMIN_USER`, the UI client ids) and is restarted with
+`start.sh … -a`. Anything else that used to talk to the participant without a token — other
+agents, consoles, gRPC pollers — needs a client in the realm from then on.
+
+The SDK fetches its token with the client credentials and refreshes it when it expires (the realm
+issues five-minute tokens). The update-stream websocket carries the same token as a subprotocol
+(`jwt.token.<jwt>` next to `daml.ws.auth`), which works with RS256 tokens as it did with short
+ones.
+
 ## How the two languages meet
 
 `daml/src/Main.daml` is the source of truth. `pnpm daml:codegen` compiles it to a DAR and runs
@@ -188,8 +220,9 @@ idempotent by package id — so the code and the package it needs always land to
   browser-safe, and what `verify.ts` builds on. Its `validateAuthorizedPartyIds` only understands
   create nodes and throws `Unsupported` on an exercise, so the authority check is written by hand
   from the decoded nodes instead.
-- The SDK's self-signed token provider logs every JWT it mints at info level. Harmless with the
-  validator's dev-mode `unsafe` secret; not something to keep once real auth is in place.
+- The SDK's token providers log the whole token response at info level — the self-signed one
+  its JWTs, the client-credentials one Keycloak's reply. `participant.ts` gives it a log adapter
+  that passes only warnings and errors, and only their message.
 - A package name and version can be uploaded once. A change that is not a valid upgrade (a new
   non-optional field, say) needs a new version — or, as happened here, a package renamed from the
   default `daml` to `syncvotes`. Contract keys would have enforced name uniqueness on-ledger, but
