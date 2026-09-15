@@ -238,7 +238,7 @@
 	<section class="manif">
 		<p>
 			{#each MANIFESTO as w, i (i)}
-				<span><span class="w{w.a ? ' a' : ''}{w.s ? ' s' : ''}">{w.t}</span>{' '}</span>
+				<span><span class="w{w.a ? ' a' : ''}{w.s ? ' s' : ''}">{w.t}</span>&#32;</span>
 			{/each}
 		</p>
 	</section>
