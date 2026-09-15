@@ -15,7 +15,6 @@
 	let description = $state('');
 	let membersText = $state('');
 
-	const directory = remote.directory();
 	const members = $derived(
 		membersText
 			.split(/[\s,]+/)

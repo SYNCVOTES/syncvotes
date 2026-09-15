@@ -32,6 +32,25 @@
 		}
 	];
 
+	// Who sees a DAO: what Canton's sub-transaction privacy means for this app, stated plainly.
+	const WHO = [
+		{
+			tag: 'Members',
+			title: 'See everything',
+			body: 'The DAO, its proposals, every ballot and the outcome — as contracts on their own party, not rows in a database.'
+		},
+		{
+			tag: 'This validator',
+			title: 'Co-signs, cannot act',
+			body: 'Hosts your party and co-signs each contract so the ledger accepts it, so it sees what it signs. Only your key can act, and it never leaves your browser.'
+		},
+		{
+			tag: 'The rest of Canton',
+			title: 'Sees nothing',
+			body: 'No names, no proposals, no votes, no member list. Other validators never receive the transaction; the synchronizer that orders it sees only encrypted views.'
+		}
+	];
+
 	const MANIFESTO: { t: string; a?: boolean; s?: boolean }[] = [
 		{ t: 'Governance' },
 		{ t: 'today' },
@@ -55,7 +74,6 @@
 
 	const stats = remote.stats();
 	const counts = $derived(stats.error ? null : (stats.current ?? null));
-	const ready = $derived(counts !== null);
 	const ticker = $derived([
 		{ k: 'DAOS', v: counts ? String(counts.daos) : 'SYNCING' },
 		{ k: 'OPEN PROPOSALS', v: counts ? String(counts.openProposals) : 'SYNCING' },
@@ -171,6 +189,15 @@
 			cleanups.push(() => window.removeEventListener('scroll', onScroll));
 		}
 
+		// The nav is transparent over the hero and becomes a bar once the page scrolls.
+		const nav = root.querySelector('nav');
+		if (nav) {
+			const onNav = () => nav.classList.toggle('scrolled', window.scrollY > 24);
+			onNav();
+			window.addEventListener('scroll', onNav, { passive: true });
+			cleanups.push(() => window.removeEventListener('scroll', onNav));
+		}
+
 		return () => cleanups.forEach((c) => c());
 	});
 </script>
@@ -202,6 +229,7 @@
 			<a href="https://docs.canton.network" target="_blank" rel="noopener">Canton</a>
 		</div>
 		<div class="nav-right">
+			<!-- eslint-disable-next-line svelte/no-useless-mustaches -- a bare space here is dropped -->
 			<a class="nav-cta" href="/my-daos">Launch<span class="hide-sm">{' '}App</span></a>
 			<button
 				class="nav-burger"
@@ -268,6 +296,7 @@
 	<section class="manif">
 		<p>
 			{#each MANIFESTO as w, i (i)}
+				<!-- eslint-disable-next-line svelte/no-useless-mustaches -- a bare space here is dropped -->
 				<span><span class="w{w.a ? ' a' : ''}{w.s ? ' s' : ''}">{w.t}</span>{' '}</span>
 			{/each}
 		</p>
@@ -275,35 +304,25 @@
 
 	<section class="feed" id="feed">
 		<div class="feed-head">
-			<div><h2 class="rv">The floor <span class="nw">is private</span></h2></div>
-			<div class="feed-meter">
-				<div class="feed-live">
-					<span class="d"></span>{ready ? 'Live · Canton TestNet' : 'Syncing…'}
-				</div>
-				<div class="lbl">Votes cast on-chain</div>
-				{#if counts}
-					<div class="odo">
-						{#each String(counts.votesCast) as d, i (i)}
-							<span class="digit"
-								><span class="reel" style="transform: translateY({-Number(d) * 10}%)"
-									>0<br />1<br />2<br />3<br />4<br />5<br />6<br />7<br />8<br />9</span
-								></span
-							>
-						{/each}
-					</div>
-				{:else}
-					<div class="odo-empty">SYNCING</div>
-				{/if}
+			<div>
+				<div class="tag">// Privacy</div>
+				<h2 class="rv">Every DAO here <span class="nw">is private</span></h2>
 			</div>
-		</div>
-		<div class="feed-empty">
-			<span class="fe-hl">Every DAO here is private</span>
-			<p>
-				Members see their proposals; the network sees nothing. What you get is the count — and a
-				door.
+			<p class="feed-lede rv">
+				Canton delivers a transaction only to the parties in it. A DAO's name, proposals, ballots
+				and members reach the members and the validator that hosts them — nobody else.
 			</p>
-			<a class="btn" href="/daos/create">Deploy your DAO →</a>
 		</div>
+		<div class="moves-grid who">
+			{#each WHO as w (w.tag)}
+				<div class="move">
+					<div class="tag">{w.tag}</div>
+					<h3>{w.title}</h3>
+					<p>{w.body}</p>
+				</div>
+			{/each}
+		</div>
+		<a class="btn rv" href="/daos/create">Deploy your DAO →</a>
 	</section>
 
 	<section class="finale">

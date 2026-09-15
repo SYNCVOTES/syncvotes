@@ -94,7 +94,18 @@
 	align-items: center;
 	gap: 32px;
 	padding: 20px var(--edge);
-	mix-blend-mode: difference;
+	transition:
+		padding 0.3s,
+		background 0.3s,
+		border-color 0.3s;
+	border-bottom: 1px solid transparent;
+}
+.sv-landing nav.scrolled {
+	padding: 12px var(--edge);
+	background: rgba(11, 10, 8, 0.86);
+	backdrop-filter: blur(18px);
+	-webkit-backdrop-filter: blur(18px);
+	border-bottom-color: var(--rule);
 }
 .sv-landing .logo {
 	display: inline-flex;
@@ -365,43 +376,6 @@
 	text-transform: uppercase;
 	color: var(--ink-45);
 }
-.sv-landing .odo {
-	display: inline-flex;
-	gap: 2px;
-}
-.sv-landing .odo .digit {
-	width: 44px;
-	height: 64px;
-	overflow: hidden;
-	border: 1px solid var(--rule);
-	background: var(--bg-2);
-	border-radius: 6px;
-	position: relative;
-}
-.sv-landing .odo .digit .reel {
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	font-family: var(--mono);
-	font-size: 40px;
-	font-weight: 700;
-	line-height: 64px;
-	transition: transform 0.8s cubic-bezier(0.3, 0.9, 0.2, 1);
-	color: var(--acc);
-}
-.sv-landing .odo .sep {
-	font-family: var(--mono);
-	font-size: 40px;
-	color: var(--ink-25);
-	line-height: 64px;
-}
-.sv-landing .odo-empty {
-	font-family: var(--mono);
-	font-size: 22px;
-	letter-spacing: 0.18em;
-	text-transform: uppercase;
-	color: var(--acc);
-}
 
 /* ═══ TICKER ═══ */
 .sv-landing .tape {
@@ -534,7 +508,7 @@
 	font-weight: 700;
 	text-transform: uppercase;
 	letter-spacing: -0.02em;
-	word-spacing: -0.06em;
+	word-spacing: 0.04em;
 	font-size: clamp(34px, 4.6vw, 72px);
 	line-height: 1.1;
 	margin: 0;
@@ -555,6 +529,8 @@
 	font-weight: 500;
 	text-transform: none;
 	font-size: 1.08em;
+	/* The italic leans into its neighbours; give it air on both sides. */
+	margin: 0 0.06em;
 }
 
 /* ═══ LIVE FEED ═══ */
@@ -569,7 +545,7 @@
 	margin-bottom: 48px;
 	gap: 24px;
 }
-/* wraps only when it can't fit — "The floor / is open", never word-per-line */
+/* wraps only when it must — "is private" never splits */
 .sv-landing .feed h2 .nw {
 	white-space: nowrap;
 }
@@ -584,145 +560,33 @@
 	line-height: 1.04;
 	margin: 0;
 }
-.sv-landing .feed-live {
+/* Grid items don't shrink below content by default — let the title column. */
+
+.sv-landing .feed-head .tag {
 	font-family: var(--mono);
-	font-size: 13px;
+	font-size: 12px;
 	letter-spacing: 0.16em;
 	color: var(--ink-45);
 	text-transform: uppercase;
-	display: flex;
-	gap: 10px;
-	align-items: center;
-	white-space: nowrap;
+	margin-bottom: 18px;
 }
-.sv-landing .feed-live .d {
-	width: 7px;
-	height: 7px;
-	border-radius: 50%;
-	background: var(--up);
-	animation: sv-pulse 1.6s infinite;
-}
-.sv-landing .prop {
-	display: grid;
-	grid-template-columns: 110px 1fr 90px 260px 110px;
-	gap: 28px;
-	align-items: center;
-	padding: 26px 8px;
-	border-top: 1px solid var(--rule);
-	font-family: var(--mono);
-	color: inherit;
-	opacity: 0;
-	transform: translateY(24px);
-	transition:
-		opacity 0.7s,
-		transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1),
-		background 0.3s;
-}
-.sv-landing .prop:last-child {
-	border-bottom: 1px solid var(--rule);
-}
-.sv-landing .feed-list.in .prop {
-	opacity: 1;
-	transform: none;
-}
-.sv-landing .feed-list.in .prop:nth-child(2) {
-	transition-delay: 0.08s;
-}
-.sv-landing .feed-list.in .prop:nth-child(3) {
-	transition-delay: 0.16s;
-}
-.sv-landing .feed-list.in .prop:nth-child(4) {
-	transition-delay: 0.24s;
-}
-.sv-landing .feed-list.in .prop:nth-child(5) {
-	transition-delay: 0.32s;
-}
-.sv-landing .prop:hover {
-	background: var(--bg-2);
-}
-.sv-landing .prop .id {
-	color: var(--acc);
-	font-size: 13px;
-}
-.sv-landing .prop .ttl {
-	font-family: var(--disp);
-	font-weight: 600;
-	font-size: 20px;
-	letter-spacing: -0.01em;
-	/* Titles can be "add <party::1220…>" — one 70-char token with no spaces.
-     Break inside it so the feed row / page never stretches horizontally. */
-	overflow-wrap: anywhere;
-	word-break: break-word;
-}
-/* Grid items don't shrink below content by default — let the title column. */
-.sv-landing .prop > div {
-	min-width: 0;
-}
-.sv-landing .prop .dao {
-	font-size: 13px;
-	color: var(--ink-45);
-}
-.sv-landing .bar {
-	height: 6px;
-	background: var(--ink-25);
-	border-radius: 99px;
-	overflow: hidden;
-	display: flex;
-}
-.sv-landing .bar .y {
-	background: var(--acc);
-	width: 0;
-	transition: width 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) 0.3s;
-}
-.sv-landing .bar .n {
-	background: rgba(237, 232, 220, 0.35);
-	width: 0;
-	transition: width 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) 0.3s;
-}
-.sv-landing .feed-list.in .bar .y {
-	width: var(--y);
-}
-.sv-landing .feed-list.in .bar .n {
-	width: var(--n);
-}
-.sv-landing .prop .split {
-	display: flex;
-	justify-content: space-between;
-	font-size: 12.5px;
-	color: var(--ink-45);
-	margin-top: 8px;
-}
-.sv-landing .prop .eta {
-	text-align: right;
-	font-size: 13px;
-	color: var(--ink-70);
-}
-
-/* live-feed empty / loading state (honest — no fabricated rows) */
-.sv-landing .feed-empty {
-	border-top: 1px solid var(--rule);
-	border-bottom: 1px solid var(--rule);
-	padding: 56px 8px;
-	display: flex;
-	flex-direction: column;
-	gap: 16px;
-	align-items: flex-start;
-}
-.sv-landing .feed-empty p {
+.sv-landing .feed-lede {
 	font-family: var(--mono);
 	font-size: 14.5px;
-	line-height: 1.7;
-	color: var(--ink-45);
-	max-width: 480px;
-	margin: 0;
+	line-height: 1.75;
+	color: var(--ink-70);
+	max-width: 460px;
+	margin: 8px 0 0;
 }
-.sv-landing .feed-empty .fe-hl {
-	font-family: var(--disp);
-	font-weight: 700;
-	text-transform: uppercase;
-	letter-spacing: -0.01em;
-	font-size: 22px;
-	color: var(--ink);
+.sv-landing .who {
+	margin-top: 0;
+}
+.sv-landing .who .move h3 {
+	margin-top: 22px;
+	font-size: 26px;
+}
+.sv-landing .feed .btn {
+	margin-top: 48px;
 }
 
 /* ═══ FINALE ═══ */
@@ -890,13 +754,6 @@
 	.sv-landing .moves-grid {
 		grid-template-columns: 1fr;
 	}
-	.sv-landing .prop {
-		grid-template-columns: 1fr;
-		gap: 12px;
-	}
-	.sv-landing .prop .eta {
-		text-align: left;
-	}
 }
 
 @media (max-width: 640px) {
@@ -965,33 +822,12 @@
 		font-size: 13px;
 	}
 
-	/* feed header stacks; heading sized so "THE FLOOR" (≈9.9em in Syne 800)
-     fills the width on one line, "IS OPEN" on the second */
 	.sv-landing .feed-head {
 		flex-direction: column;
 		gap: 24px;
 	}
 	.sv-landing .feed h2 {
-		font-size: min(44px, calc((100vw - 84px) / 9.9));
-	}
-	.sv-landing .feed-meter {
-		align-items: flex-start;
-		text-align: left;
-	}
-	.sv-landing .odo .digit {
-		width: 32px;
-		height: 48px;
-	}
-	.sv-landing .odo .digit .reel {
-		font-size: 28px;
-		line-height: 48px;
-	}
-	.sv-landing .odo .sep {
-		font-size: 28px;
-		line-height: 48px;
-	}
-	.sv-landing .odo-empty {
-		font-size: 18px;
+		font-size: clamp(28px, 8.6vw, 44px);
 	}
 }
 
@@ -1020,18 +856,8 @@
 	}
 	.sv-landing .rv,
 	.sv-landing .move,
-	.sv-landing .prop {
-		opacity: 1;
-		transform: none;
-	}
 	.sv-landing .manif .w {
 		opacity: 1;
-	}
-	.sv-landing .feed-list .bar .y {
-		width: var(--y);
-	}
-	.sv-landing .feed-list .bar .n {
-		width: var(--n);
 	}
 	.sv-landing .cur {
 		display: none;
