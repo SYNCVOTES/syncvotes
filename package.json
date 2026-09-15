@@ -3,9 +3,10 @@
 	"private": true,
 	"version": "0.0.1",
 	"type": "module",
+	"packageManager": "pnpm@11.6.0",
 	"scripts": {
-		"deploy:testnet": "git diff --quiet && git diff --cached --quiet && GIT_SHA=$(git rev-parse --short=12 HEAD) docker --context syncvotes-testnet compose --env-file testnet.env build && docker --context syncvotes-testnet compose --env-file testnet.env up -d",
-		"deploy:mainnet": "git diff --quiet && git diff --cached --quiet && GIT_SHA=$(git rev-parse --short=12 HEAD) docker --context syncvotes-mainnet compose --env-file mainnet.env build && docker --context syncvotes-mainnet compose --env-file mainnet.env up -d",
+		"deploy:testnet": "[ -z \"$(git status --porcelain)\" ] && GIT_SHA=$(git rev-parse --short=12 HEAD) docker --context syncvotes-testnet compose --env-file testnet.env build && docker --context syncvotes-testnet compose --env-file testnet.env up -d",
+		"deploy:mainnet": "[ -z \"$(git status --porcelain)\" ] && GIT_SHA=$(git rev-parse --short=12 HEAD) docker --context syncvotes-mainnet compose --env-file mainnet.env build && docker --context syncvotes-mainnet compose --env-file mainnet.env up -d",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"lint": "prettier --check . && eslint .",
@@ -19,6 +20,7 @@
 		"@daml/types": "3.5.2"
 	},
 	"devDependencies": {
+		"@canton-network/core-ledger-proto": "1.10.0",
 		"@canton-network/core-tx-visualizer": "^1.11.0",
 		"@eslint/js": "^10.0.1",
 		"@internationalized/date": "^3.12.0",

@@ -54,7 +54,12 @@
 				<h2 class="eyebrow">Basic information</h2>
 				<div class="space-y-2">
 					<Label for="name">Name</Label>
-					<Input id="name" placeholder="Canton Technical Committee" maxlength={60} bind:value={name} />
+					<Input
+						id="name"
+						placeholder="Canton Technical Committee"
+						maxlength={60}
+						bind:value={name}
+					/>
 				</div>
 				<div class="space-y-2">
 					<Label for="description">Description</Label>
@@ -78,7 +83,8 @@
 						bind:value={membersText}
 					/>
 					<p class="text-xs text-ink-dim">
-						Members are named by their SyncVotes name. Membership is fixed at creation in this version.
+						Members are named by their SyncVotes name. Membership is fixed at creation in this
+						version.
 						{#if directory.current}
 							Registered: {directory.current.map((e) => e.name).join(', ')}.
 						{/if}

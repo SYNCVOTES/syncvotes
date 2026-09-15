@@ -33,7 +33,9 @@
 		<Problem message={describe(daos.error)} />
 	{:else if !daos.ready}
 		<div class="grid gap-3 md:grid-cols-3">
-			{#each [1, 2, 3] as i (i)}<div class="h-24 animate-pulse border border-border bg-surface"></div>{/each}
+			{#each [1, 2, 3] as i (i)}<div
+					class="h-24 animate-pulse border border-border bg-surface"
+				></div>{/each}
 		</div>
 	{:else}
 		<div class="mb-8 grid grid-cols-2 gap-3 md:grid-cols-3">

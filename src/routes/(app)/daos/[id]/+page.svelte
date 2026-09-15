@@ -39,10 +39,18 @@
 				<div>
 					<div class="mb-2 flex items-center gap-3">
 						<h1 class="display text-3xl md:text-4xl">{d.name}</h1>
-						{#if me === d.admin}<span class="font-mono text-xs font-bold uppercase tracking-[0.18em] text-amber">admin</span>
-						{:else if member}<span class="font-mono text-xs font-bold uppercase tracking-[0.18em] text-orange">member</span>{/if}
+						{#if me === d.admin}<span
+								class="font-mono text-xs font-bold tracking-[0.18em] text-amber uppercase"
+								>admin</span
+							>
+						{:else if member}<span
+								class="font-mono text-xs font-bold tracking-[0.18em] text-orange uppercase"
+								>member</span
+							>{/if}
 					</div>
-					<p class="max-w-[560px] text-sm leading-relaxed text-ink-mid">{d.description || 'No description provided.'}</p>
+					<p class="max-w-[560px] text-sm leading-relaxed text-ink-mid">
+						{d.description || 'No description provided.'}
+					</p>
 				</div>
 			</div>
 			{#if member}
@@ -66,7 +74,9 @@
 					<span class="font-mono text-xs text-ink-dim">{d.proposals.length}</span>
 				</div>
 				{#if d.proposals.length === 0}
-					<div class="border border-dashed border-border px-6 py-12 text-center text-[13px] text-ink-dim">
+					<div
+						class="border border-dashed border-border px-6 py-12 text-center text-[13px] text-ink-dim"
+					>
 						Nothing proposed yet.
 					</div>
 				{:else}
@@ -74,11 +84,16 @@
 						{#each d.proposals as p (p.contractId)}
 							{@const yes = p.ballots.filter((b) => b.vote === 'Yes').length}
 							<li>
-								<a href="/proposals/{p.id}" class="flex items-center gap-4 px-5 py-4 transition-colors hover:bg-surface-hover">
+								<a
+									href="/proposals/{p.id}"
+									class="flex items-center gap-4 px-5 py-4 transition-colors hover:bg-surface-hover"
+								>
 									<div class="min-w-0 flex-1">
 										<div class="truncate font-display text-[15px] font-bold">{p.title}</div>
 										<div class="mt-1 font-mono text-xs text-ink-dim">
-											by {nameOf(p.proposer)} · {p.outcome ? 'closed' : `closes ${relative(p.closesAt)}`} · {yes}/{p.members.length} yes
+											by {nameOf(p.proposer)} · {p.outcome
+												? 'closed'
+												: `closes ${relative(p.closesAt)}`} · {yes}/{p.members.length} yes
 										</div>
 									</div>
 									<StatusBadge outcome={p.outcome} closesAt={p.closesAt} />
@@ -95,7 +110,8 @@
 					{#each d.members as m (m)}
 						<li class="flex items-center justify-between px-4 py-3 font-mono text-xs">
 							<span class={m === me ? 'text-orange' : 'text-ink'}>{nameOf(m)}</span>
-							{#if m === d.admin}<span class="uppercase tracking-[0.14em] text-amber">admin</span>{/if}
+							{#if m === d.admin}<span class="tracking-[0.14em] text-amber uppercase">admin</span
+								>{/if}
 						</li>
 					{/each}
 				</ul>

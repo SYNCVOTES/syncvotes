@@ -14,6 +14,10 @@
 	let password = $state('');
 
 	const screen = $derived(store.screen);
+	let passkeys = $state(false);
+	$effect(() => {
+		wallet.passkeysAvailable().then((ok) => (passkeys = ok));
+	});
 </script>
 
 <svelte:head><title>Wallet — SyncVotes</title></svelte:head>
@@ -32,12 +36,14 @@
 	{:else if screen.at === 'welcome'}
 		<section class="space-y-5 border border-dashed border-border p-8">
 			<p class="text-sm text-ink-mid">
-				There is no key on this device. Create one, or bring back an existing party with its recovery
-				phrase.
+				There is no key on this device. Create one, or bring back an existing party with its
+				recovery phrase.
 			</p>
 			<div class="flex flex-wrap gap-3">
 				<Button size="lg" onclick={flow.startCreate}>Create a new key</Button>
-				<Button size="lg" variant="outline" onclick={flow.startRestore}>I have a recovery phrase</Button>
+				<Button size="lg" variant="outline" onclick={flow.startRestore}
+					>I have a recovery phrase</Button
+				>
 			</div>
 		</section>
 	{:else if screen.at === 'create'}
@@ -47,7 +53,9 @@
 				Write these twelve words down. They are the only way back to this party from another device,
 				and nobody — this app included — can restore them for you.
 			</p>
-			<p class="border border-border bg-surface-active p-5 font-mono text-sm leading-8 select-all">{screen.phrase}</p>
+			<p class="border border-border bg-surface-active p-5 font-mono text-sm leading-8 select-all">
+				{screen.phrase}
+			</p>
 			<label class="flex items-center gap-2 text-sm">
 				<input type="checkbox" class="accent-orange" bind:checked={savedPhrase} />
 				I have written it down
@@ -66,7 +74,12 @@
 			}}
 		>
 			<h2 class="eyebrow">Recovery phrase</h2>
-			<Textarea rows={3} placeholder="twelve words, separated by spaces" class="font-mono" bind:value={phraseInput} />
+			<Textarea
+				rows={3}
+				placeholder="twelve words, separated by spaces"
+				class="font-mono"
+				bind:value={phraseInput}
+			/>
 			<div class="flex gap-3">
 				<Button type="submit" disabled={store.busy || !phraseInput.trim()}>Restore</Button>
 				<Button type="button" variant="ghost" onclick={flow.back}>Back</Button>
@@ -83,7 +96,7 @@
 			<h2 class="eyebrow">Pick a name</h2>
 			<p class="text-sm text-ink-mid">
 				Others add you to DAOs by this name. Your party will be
-				<code class="break-all text-xs">{screen.topology.partyId}</code>.
+				<code class="text-xs break-all">{screen.topology.partyId}</code>.
 			</p>
 			<div class="flex gap-3">
 				<Input placeholder="e.g. alice" class="flex-1" bind:value={nameInput} />
@@ -96,11 +109,13 @@
 		<section class="space-y-5 border border-border bg-surface p-8">
 			<h2 class="eyebrow">Keep the key on this device?</h2>
 			<p class="text-sm text-ink-mid">
-				It is stored encrypted, and unlocked with Touch ID or a password each visit. Without this you
-				will need the recovery phrase every time.
+				It is stored encrypted, and unlocked with Touch ID or a password each visit. Without this
+				you will need the recovery phrase every time.
 			</p>
-			{#if wallet.passkeysAvailable()}
-				<Button disabled={store.busy} onclick={flow.protectWithPasskey}>Use Touch ID / passkey</Button>
+			{#if passkeys}
+				<Button disabled={store.busy} onclick={flow.protectWithPasskey}
+					>Use Touch ID / passkey</Button
+				>
 			{/if}
 			<form
 				class="flex gap-3"
@@ -110,8 +125,16 @@
 					password = '';
 				}}
 			>
-				<Input type="password" placeholder="or a password" autocomplete="new-password" class="flex-1" bind:value={password} />
-				<Button type="submit" variant="outline" disabled={store.busy || password.length < 8}>Use password</Button>
+				<Input
+					type="password"
+					placeholder="or a password"
+					autocomplete="new-password"
+					class="flex-1"
+					bind:value={password}
+				/>
+				<Button type="submit" variant="outline" disabled={store.busy || password.length < 8}
+					>Use password</Button
+				>
 			</form>
 			<Button variant="link" size="sm" disabled={store.busy} onclick={flow.skipProtection}>
 				Don't keep it, just continue this once
@@ -121,7 +144,9 @@
 		<section class="space-y-5 border border-border bg-surface p-8">
 			<h2 class="eyebrow">Unlock</h2>
 			<UnlockForm />
-			<Button type="button" variant="link" size="sm" onclick={flow.forget}>Forget the key on this device</Button>
+			<Button type="button" variant="link" size="sm" onclick={flow.forget}
+				>Forget the key on this device</Button
+			>
 		</section>
 	{:else}
 		<section class="space-y-6">
@@ -137,7 +162,7 @@
 				</div>
 				<div class="mt-5">
 					<div class="eyebrow mb-1">Party</div>
-					<code class="block break-all text-xs text-ink-mid">{screen.who.party}</code>
+					<code class="block text-xs break-all text-ink-mid">{screen.who.party}</code>
 				</div>
 			</div>
 			<div class="flex flex-wrap gap-3">
@@ -145,8 +170,8 @@
 				<Button variant="outline" onclick={lock}>Lock</Button>
 			</div>
 			<p class="text-xs text-ink-dim">
-				The key is disposed after fifteen quiet minutes and whenever you leave the page; the encrypted
-				copy stays on this device.
+				The key is disposed after fifteen quiet minutes and whenever you leave the page; the
+				encrypted copy stays on this device.
 			</p>
 		</section>
 	{/if}

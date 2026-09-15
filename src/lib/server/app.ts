@@ -1,15 +1,15 @@
 import { error } from '@sveltejs/kit';
 import { Main } from '@daml.js/model';
 import { activeContracts, operatorParty, providerParty, submitAsProvider } from './participant';
+import { PARTY_HINT } from '../party';
+
+export { PARTY_HINT };
 
 /**
  * The app's own view of the ledger, read as the operator: it observes every Account, DAO and
  * Proposal, so it can list them for a member and resolve names to parties. Nothing here writes
  * on a user's behalf — the one write, creating an Account, is the provider's own signature.
  */
-
-/** Every party id this app allocates carries this hint; the key's fingerprint tells them apart. */
-export const PARTY_HINT = 'syncvotes';
 
 export type Account = { contractId: string; party: string; name: string };
 export type Dao = {
@@ -39,7 +39,11 @@ const read = <T>(templateId: string) => activeContracts<T>(operatorParty(), temp
 
 export async function accounts(): Promise<Account[]> {
 	const found = await read<{ user: string; name: string }>(Main.Account.templateId);
-	return found.map((c) => ({ contractId: c.contractId, party: c.payload.user, name: c.payload.name }));
+	return found.map((c) => ({
+		contractId: c.contractId,
+		party: c.payload.user,
+		name: c.payload.name
+	}));
 }
 
 export async function accountOf(party: string): Promise<Account> {
@@ -85,7 +89,7 @@ export async function register(party: string, name: string): Promise<Account> {
 				}
 			}
 		],
-		`register-${name}-${Date.now()}`
+		`register-${name}`
 	);
 
 	return accountOf(party);

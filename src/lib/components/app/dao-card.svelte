@@ -29,13 +29,13 @@
 			{monogram}
 		</div>
 		<span
-			class="pt-1 font-mono text-xs font-bold uppercase tracking-[0.18em] {role === 'admin'
+			class="pt-1 font-mono text-xs font-bold tracking-[0.18em] uppercase {role === 'admin'
 				? 'text-amber'
 				: 'text-orange'}">{role}</span
 		>
 	</div>
 
-	<div class="mb-2 font-display text-[17px] font-bold leading-tight tracking-[-0.01em]">{name}</div>
+	<div class="mb-2 font-display text-[17px] leading-tight font-bold tracking-[-0.01em]">{name}</div>
 	<div class="mb-[22px] line-clamp-3 flex-1 text-[12.5px] leading-relaxed text-ink-mid">
 		{description || 'No description provided.'}
 	</div>
@@ -43,12 +43,15 @@
 	<div class="flex items-center gap-6 border-t border-border pt-3.5">
 		<div>
 			<div class="font-mono text-[15px] font-bold">{members}</div>
-			<div class="mt-0.5 font-mono text-xs uppercase tracking-[0.14em] text-ink-dim">Members</div>
+			<div class="mt-0.5 font-mono text-xs tracking-[0.14em] text-ink-dim uppercase">Members</div>
 		</div>
 		<div>
 			<div class="font-mono text-[15px] font-bold">{openProposals}</div>
-			<div class="mt-0.5 font-mono text-xs uppercase tracking-[0.14em] text-ink-dim">Open</div>
+			<div class="mt-0.5 font-mono text-xs tracking-[0.14em] text-ink-dim uppercase">Open</div>
 		</div>
-		<span class="ml-auto text-sm text-ink-dim transition-all group-hover:translate-x-0.5 group-hover:text-orange">→</span>
+		<span
+			class="ml-auto text-sm text-ink-dim transition-all group-hover:translate-x-0.5 group-hover:text-orange"
+			>→</span
+		>
 	</div>
 </a>

@@ -82,16 +82,20 @@ export function signerFromPhrase(phrase: string): Signer {
 	const seed = mnemonicToSeedSync(normalise(phrase));
 
 	let node = hmac(sha512, new TextEncoder().encode('ed25519 seed'), seed);
+	seed.fill(0);
 	for (const index of PATH) {
 		const data = new Uint8Array(37);
 		data.set(node.subarray(0, 32), 1);
 		new DataView(data.buffer).setUint32(33, (index | 0x80000000) >>> 0);
-		node = hmac(sha512, node.subarray(32), data);
+		const next = hmac(sha512, node.subarray(32), data);
+		// Each step's parent key lives in `node` and `data`; neither is needed once the child exists.
+		node.fill(0);
+		data.fill(0);
+		node = next;
 	}
 
 	const privateKey = new Uint8Array(node.subarray(0, 32));
 	node.fill(0);
-	seed.fill(0);
 	return signer(privateKey);
 }
 
@@ -174,9 +178,28 @@ export async function unlockWithPassword(password: string): Promise<Signer> {
 
 type PrfResults = { prf?: { enabled?: boolean; results?: { first: ArrayBuffer } } };
 
-export const passkeysAvailable = () =>
-	typeof PublicKeyCredential !== 'undefined' &&
-	typeof PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === 'function';
+/**
+ * Whether this browser can do what the passkey path needs: a platform authenticator, and the
+ * PRF extension. Newer browsers say so outright; older ones are trusted to have PRF if they
+ * have a platform authenticator at all, which held for every engine that shipped it.
+ */
+export async function passkeysAvailable(): Promise<boolean> {
+	if (typeof PublicKeyCredential === 'undefined') return false;
+	const caps = (
+		PublicKeyCredential as unknown as {
+			getClientCapabilities?: () => Promise<Record<string, boolean>>;
+		}
+	).getClientCapabilities;
+	if (caps) {
+		const c = await caps.call(PublicKeyCredential).catch(() => null);
+		if (c && 'extension:prf' in c)
+			return c['extension:prf'] === true && c.userVerifyingPlatformAuthenticator !== false;
+	}
+	return (
+		PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable?.().catch(() => false) ??
+		false
+	);
+}
 
 const PRF_INPUTS = (salt: Bytes) =>
 	({ prf: { eval: { first: salt } } }) as AuthenticationExtensionsClientInputs;

@@ -60,6 +60,7 @@ async function run(action: () => Promise<void>) {
 	} catch (error) {
 		if (error instanceof wallet.LockedError) {
 			lock();
+			problem = 'The wallet locked itself — unlock and try again';
 			return;
 		}
 		problem = describe(error);
@@ -83,9 +84,15 @@ async function enter(signer: wallet.Signer, who: actions.Identity) {
 /** A key is in hand — find out whether the ledger already knows it. */
 const identify = (signer: wallet.Signer) =>
 	run(async () => {
+		// From here on a key is in memory, so the auto-lock is armed from here on too.
+		session.start(signer, lock);
 		const topology = await actions.lookup(signer);
-		if (topology.exists && topology.name) {
-			screen = { at: 'protect', signer, who: { party: topology.partyId, name: topology.name } };
+		if (topology.exists && topology.name && topology.account) {
+			screen = {
+				at: 'protect',
+				signer,
+				who: { party: topology.partyId, name: topology.name, account: topology.account }
+			};
 			return;
 		}
 		screen = { at: 'name', signer, topology };
@@ -150,12 +157,17 @@ export const flow = {
 				kind === 'passkey'
 					? await wallet.unlockWithPasskey()
 					: await wallet.unlockWithPassword(password ?? '');
+			session.start(signer, lock);
 			const topology = await actions.lookup(signer);
-			if (!topology.exists || !topology.name) {
+			if (!topology.exists || !topology.name || !topology.account) {
 				screen = { at: 'name', signer, topology };
 				return;
 			}
-			await enter(signer, { party: topology.partyId, name: topology.name });
+			await enter(signer, {
+				party: topology.partyId,
+				name: topology.name,
+				account: topology.account
+			});
 		});
 	},
 

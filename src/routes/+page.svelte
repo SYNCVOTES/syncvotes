@@ -33,10 +33,24 @@
 	];
 
 	const MANIFESTO: { t: string; a?: boolean; s?: boolean }[] = [
-		{ t: 'Governance' }, { t: 'today' }, { t: 'is' }, { t: 'theatre', s: true }, { t: '—' },
-		{ t: 'polls' }, { t: 'nobody' }, { t: 'enforces,' }, { t: 'forums' }, { t: 'nobody' }, { t: 'reads.' },
-		{ t: 'We', a: true }, { t: 'made', a: true }, { t: 'the', a: true }, { t: 'vote', a: true },
-		{ t: 'itself', a: true, s: true }, { t: 'the', a: true }, { t: 'execution.', a: true }
+		{ t: 'Governance' },
+		{ t: 'today' },
+		{ t: 'is' },
+		{ t: 'theatre', s: true },
+		{ t: '—' },
+		{ t: 'polls' },
+		{ t: 'nobody' },
+		{ t: 'enforces,' },
+		{ t: 'forums' },
+		{ t: 'nobody' },
+		{ t: 'reads.' },
+		{ t: 'We', a: true },
+		{ t: 'made', a: true },
+		{ t: 'the', a: true },
+		{ t: 'vote', a: true },
+		{ t: 'itself', a: true, s: true },
+		{ t: 'the', a: true },
+		{ t: 'execution.', a: true }
 	];
 
 	const stats = remote.stats();
@@ -75,7 +89,11 @@
 		if (!reduced && !coarse) {
 			const dot = root.querySelector<HTMLElement>('.cur-dot')!;
 			const ring = root.querySelector<HTMLElement>('.cur-ring')!;
-			let x = -100, y = -100, rx = -100, ry = -100, raf = 0;
+			let x = -100,
+				y = -100,
+				rx = -100,
+				ry = -100,
+				raf = 0;
 			const onMove = (e: MouseEvent) => ((x = e.clientX), (y = e.clientY));
 			const loop = () => {
 				rx += (x - rx) * 0.16;
@@ -101,9 +119,14 @@
 		const copy = root.querySelector<HTMLElement>('.hero-copy')!;
 		const centre = () => {
 			if (window.innerWidth < 1400) return hero.style.removeProperty('--hero-copy-top');
-			const vh = window.innerHeight, navClear = 104, foldClear = 44, h = copy.offsetHeight;
+			const vh = window.innerHeight,
+				navClear = 104,
+				foldClear = 44,
+				h = copy.offsetHeight;
 			const centred = navClear + (vh - navClear - foldClear - h) / 2;
-			const top = Math.round(Math.min(Math.max(centred, navClear), Math.max(navClear, vh - foldClear - h)));
+			const top = Math.round(
+				Math.min(Math.max(centred, navClear), Math.max(navClear, vh - foldClear - h))
+			);
 			hero.style.setProperty('--hero-copy-top', `${top}px`);
 		};
 		centre();
@@ -136,7 +159,10 @@
 			const words = m.querySelectorAll('.w');
 			const onScroll = () => {
 				const r = m.getBoundingClientRect();
-				const prog = Math.min(1, Math.max(0, (window.innerHeight * 0.8 - r.top) / (r.height + window.innerHeight * 0.3)));
+				const prog = Math.min(
+					1,
+					Math.max(0, (window.innerHeight * 0.8 - r.top) / (r.height + window.innerHeight * 0.3))
+				);
 				const k = Math.floor(prog * words.length * 1.15);
 				words.forEach((w, i) => w.classList.toggle('on', i < k));
 			};
@@ -162,7 +188,11 @@
 	<div class="cur"><div class="cur-dot"></div></div>
 
 	<nav>
-		<button class="logo" type="button" onclick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+		<button
+			class="logo"
+			type="button"
+			onclick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+		>
 			<BrandMark size={15} /> SYNCVOTES
 		</button>
 		<div class="links">
@@ -247,12 +277,18 @@
 		<div class="feed-head">
 			<div><h2 class="rv">The floor <span class="nw">is private</span></h2></div>
 			<div class="feed-meter">
-				<div class="feed-live"><span class="d"></span>{ready ? 'Live · Canton TestNet' : 'Syncing…'}</div>
+				<div class="feed-live">
+					<span class="d"></span>{ready ? 'Live · Canton TestNet' : 'Syncing…'}
+				</div>
 				<div class="lbl">Votes cast on-chain</div>
 				{#if counts}
 					<div class="odo">
 						{#each String(counts.votesCast) as d, i (i)}
-							<span class="digit"><span class="reel" style="transform: translateY({-Number(d) * 10}%)">0<br />1<br />2<br />3<br />4<br />5<br />6<br />7<br />8<br />9</span></span>
+							<span class="digit"
+								><span class="reel" style="transform: translateY({-Number(d) * 10}%)"
+									>0<br />1<br />2<br />3<br />4<br />5<br />6<br />7<br />8<br />9</span
+								></span
+							>
 						{/each}
 					</div>
 				{:else}

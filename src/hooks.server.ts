@@ -1,6 +1,6 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { ServerInit } from '@sveltejs/kit';
+import type { HandleServerError, ServerInit } from '@sveltejs/kit';
 import { packageId } from '@daml.js/model';
 import { sdk } from '$lib/server/participant';
 
@@ -28,3 +28,8 @@ export const init: ServerInit = async () => {
 	await (await sdk()).ledger.dar.upload(await readFile(dar), packageId);
 	console.log(`Daml package ${packageId.slice(0, 8)}… is on the participant (${dar})`);
 };
+
+/** An unexpected error still tells the user what happened; there is nothing secret in these. */
+export const handleError: HandleServerError = ({ error }) => ({
+	message: error instanceof Error ? error.message : 'Something went wrong'
+});

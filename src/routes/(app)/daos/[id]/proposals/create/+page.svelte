@@ -21,11 +21,15 @@
 
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
+		const period = Math.min(30, Math.max(1, Math.round(Number(days) || 0)));
 		const ok = await flow.act((signer, who) =>
-			actions.createProposal(signer, who, { dao: id, title, description, days })
+			actions.createProposal(signer, who, { dao: id, title, description, days: period })
 		);
 		if (ok) {
-			await dao.refresh();
+			await Promise.all([
+				dao.refresh(),
+				store.who ? remote.myDaos(store.who.party).refresh() : null
+			]);
 			await goto(`/daos/${id}`);
 		}
 	}
@@ -56,7 +60,12 @@
 				</div>
 				<div class="space-y-2">
 					<Label for="description">Description</Label>
-					<Textarea id="description" rows={6} placeholder="What is being decided, and why." bind:value={description} />
+					<Textarea
+						id="description"
+						rows={6}
+						placeholder="What is being decided, and why."
+						bind:value={description}
+					/>
 				</div>
 				<div class="space-y-2">
 					<Label for="days">Voting period (days)</Label>

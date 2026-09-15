@@ -24,7 +24,7 @@ COPY daml/daml.yaml ./daml/daml.yaml
 RUN dpm install "$(grep '^sdk-version:' daml/daml.yaml | cut -d' ' -f2)"
 
 COPY daml ./daml
-RUN pnpm daml:build 2>/dev/null || (cd daml && rm -rf .daml/dist && dpm build)
+RUN cd daml && rm -rf .daml/dist && dpm build
 
 # Codegen writes workspace packages, so it has to happen before install.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./

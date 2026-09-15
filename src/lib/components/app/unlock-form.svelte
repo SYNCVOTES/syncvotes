@@ -9,7 +9,8 @@
 </script>
 
 {#if kind === 'passkey'}
-	<Button disabled={store.busy} onclick={() => flow.unlock()}>Unlock with Touch ID / passkey</Button>
+	<Button disabled={store.busy} onclick={() => flow.unlock()}>Unlock with Touch ID / passkey</Button
+	>
 {:else if kind === 'password'}
 	<form
 		class="flex gap-3"
@@ -19,7 +20,13 @@
 			password = '';
 		}}
 	>
-		<Input type="password" placeholder="password" autocomplete="current-password" class="flex-1" bind:value={password} />
+		<Input
+			type="password"
+			placeholder="password"
+			autocomplete="current-password"
+			class="flex-1"
+			bind:value={password}
+		/>
 		<Button type="submit" disabled={store.busy || !password}>Unlock</Button>
 	</form>
 {/if}

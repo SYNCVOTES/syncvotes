@@ -18,6 +18,21 @@ export default defineConfig({
 				experimental: { async: true }
 			},
 			adapter: adapter(),
+			// The whole custody model assumes no script but ours runs on these pages.
+			csp: {
+				mode: 'auto',
+				directives: {
+					'default-src': ['self'],
+					'script-src': ['self'],
+					'style-src': ['self', 'unsafe-inline', 'https://fonts.googleapis.com'],
+					'font-src': ['self', 'https://fonts.gstatic.com'],
+					'img-src': ['self', 'data:'],
+					'connect-src': ['self'],
+					'frame-ancestors': ['none'],
+					'object-src': ['none'],
+					'base-uri': ['self']
+				}
+			},
 			experimental: {
 				remoteFunctions: true,
 				explicitEnvironmentVariables: true,

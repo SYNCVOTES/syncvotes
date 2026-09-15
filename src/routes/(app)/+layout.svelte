@@ -24,11 +24,14 @@
 		class="sticky top-0 z-50 flex h-[68px] items-center justify-between border-b border-border bg-[rgba(var(--bg-rgb),0.88)] px-4 backdrop-blur-2xl md:px-10"
 	>
 		<div class="flex items-center gap-10">
-			<a href="/" class="flex items-center gap-2.5 font-display text-[15px] font-bold tracking-[0.14em]">
+			<a
+				href="/"
+				class="flex items-center gap-2.5 font-display text-[15px] font-bold tracking-[0.14em]"
+			>
 				<BrandMark size={16} />
 				<span>SYNCVOTES</span>
 				<span
-					class="border border-orange/30 bg-orange/[0.07] px-1.5 py-0.5 font-mono text-xs font-semibold uppercase leading-none tracking-[0.08em] text-orange"
+					class="border border-orange/30 bg-orange/[0.07] px-1.5 py-0.5 font-mono text-xs leading-none font-semibold tracking-[0.08em] text-orange uppercase"
 				>
 					beta
 				</span>
@@ -38,7 +41,7 @@
 				{#each nav as item (item.href)}
 					<a
 						href={item.href}
-						class="rounded-full px-4 py-[7px] font-mono text-xs uppercase tracking-[0.14em] transition-colors {active(
+						class="rounded-full px-4 py-[7px] font-mono text-xs tracking-[0.14em] uppercase transition-colors {active(
 							item.href
 						)
 							? 'bg-orange-dim text-orange'
@@ -81,7 +84,7 @@
 
 			<span class="hidden font-mono text-xs font-semibold text-amber sm:inline">TestNet</span>
 
-			<Button href="/wallet" variant="accent" size="sm" class="normal-case tracking-[0.02em]">
+			<Button href="/wallet" variant="accent" size="sm" class="tracking-[0.02em] normal-case">
 				{#if store.who}<span class="size-2 rounded-full bg-green"></span>{/if}
 				{walletLabel}
 			</Button>

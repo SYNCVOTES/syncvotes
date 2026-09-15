@@ -18,6 +18,9 @@ importers:
         specifier: 3.5.2
         version: 3.5.2
     devDependencies:
+      '@canton-network/core-ledger-proto':
+        specifier: 1.10.0
+        version: 1.10.0
       '@canton-network/core-tx-visualizer':
         specifier: ^1.11.0
         version: 1.11.0
@@ -260,6 +263,9 @@ packages:
 
   '@canton-network/core-ledger-client@1.12.0':
     resolution: {integrity: sha512-EA041tx3AOs+GToU1eezX/oGYkT4HBeR8tuoHcPBogTxMXtccv2eKxEDFs8jTTA7SvKZENzZcdFhxYq2+P8jSQ==}
+
+  '@canton-network/core-ledger-proto@1.10.0':
+    resolution: {integrity: sha512-YIoiQDCaeUkuGuJhkoGKGTJI9t7OTT8Rga7ca4YUGaRHzpm8HY/2D90Om2k6bX3oOz1oY5uxBg6Xui5BPqXbIA==}
 
   '@canton-network/core-ledger-proto@1.11.0':
     resolution: {integrity: sha512-O5Urfrz1GCoKJzscL1vgno0wmI4diY7qWGn6rraSvInyQVQh2Mu15wprHxoYPKW2Hrlbx+RclpJOrB3jwAqozQ==}
@@ -2336,6 +2342,11 @@ snapshots:
       typescript-lru-cache: 2.0.0
     transitivePeerDependencies:
       - supports-color
+
+  '@canton-network/core-ledger-proto@1.10.0':
+    dependencies:
+      '@protobuf-ts/runtime': 2.11.1
+      '@protobuf-ts/runtime-rpc': 2.11.1
 
   '@canton-network/core-ledger-proto@1.11.0':
     dependencies:

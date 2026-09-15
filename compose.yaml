@@ -50,6 +50,7 @@ configs:
     # the bundle already binds them to loopback, so nothing here exposes them.
     content: |
       ${APP_DOMAIN:?set in the env file} {
+        header Strict-Transport-Security "max-age=31536000; includeSubDomains"
         reverse_proxy app:3000
       }
 

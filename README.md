@@ -66,7 +66,7 @@ other network before counting on rewards there.
 ## Setup
 
 There is no local run: the only ledger this app talks to is its validator on TestNet, and the only
-way to run it is `pnpm deploy`. What runs locally is the type-checker and the linter, and for that
+way to run it is `pnpm deploy:testnet`. What runs locally is the type-checker and the linter, and for that
 `daml.js/` has to exist — it is generated and gitignored, so a fresh clone produces it before pnpm
 can resolve `@daml.js/model`. Codegen first, install second:
 
@@ -90,8 +90,9 @@ Codegen names its output `@daml.js/<name>-<version>` from `daml/daml.yaml` — n
 `@daml.js/model`, and everything else uses the alias or a glob. Bumping the version means editing
 `daml/daml.yaml` and that one alias line.
 
-`Main.AppProxy.templateId` is `#daml:Main:AppProxy` — the package-name-scoped id the ledger accepts
-in commands and ACS filters, which is what keeps a package upgrade from breaking submissions.
+`Main.Proposal.templateId` is `#syncvotes-governance:Main:Proposal` — the package-name-scoped id the
+ledger accepts in commands and ACS filters, which is what keeps a package upgrade from breaking
+submissions.
 
 ## Layout
 
@@ -113,9 +114,13 @@ in commands and ACS filters, which is what keeps a package upgrade from breaking
 | `compose.yaml`                   | The compose project for the servers, Caddy config inline                |
 
 The private key exists only inside a closure (`Signer`): the page can ask it to sign, to encrypt
-itself for storage, or to dispose — never to reveal itself. Reads are open (a party id is public
-anyway); every write is a transaction the ledger will only accept with that key's signature, and
-the backend user is granted no rights on user parties, so there is no second path.
+itself for storage, or to dispose — never to reveal itself. Every write is a transaction the
+ledger will only accept with that key's signature, and the backend user is granted no rights on
+user parties, so there is no second path. Before signing, `src/lib/verify.ts` decodes what the
+server prepared and refuses anything but the asked-for choice, on the asked-for contract of this
+package, with the asked-for arguments, acting as the user alone — and at sign-up, a party in the
+key's own namespace, held by this key alone, hosted for confirmation only. The server, in turn,
+executes only transactions it prepared itself, so its own rules cannot be bypassed.
 
 Reads are open: a DAO is private to the _network_, and this app — as operator — sees all of them,
 so listing a party's DAOs takes only the party id. A signed read session is a later iteration.

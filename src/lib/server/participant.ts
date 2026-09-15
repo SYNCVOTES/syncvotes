@@ -66,9 +66,15 @@ export async function activeContracts<T>(
 
 export type Commands = Parameters<Sdk['ledger']['internal']['submit']>[0]['commands'];
 
-/** Submits as the provider — the one local party, used only to create proxies. */
+/** Submits as the provider — the one local party, used only to create accounts. */
 export async function submitAsProvider(commands: Commands, commandId: string) {
-	return (await sdk()).ledger.internal.submit({ commands, actAs: [providerParty()], commandId });
+	try {
+		return await (
+			await sdk()
+		).ledger.internal.submit({ commands, actAs: [providerParty()], commandId });
+	} catch (e) {
+		ledgerError(e);
+	}
 }
 
 // ---- External parties ---------------------------------------------------------------------
@@ -128,20 +134,64 @@ export type Prepared = {
 	hashingSchemeVersion: string;
 };
 
+/**
+ * What this server prepared, by hash, for a little while. Execution is only ever offered for
+ * these: a caller cannot hand in a transaction of their own making and have it submitted, so
+ * every rule the prepare functions enforce actually holds.
+ */
+const prepared = new Map<string, { party: string; at: number }>();
+const PREPARED_TTL = 10 * 60 * 1000;
+
+function remember(hash: string, party: string) {
+	const now = Date.now();
+	for (const [key, entry] of prepared) if (now - entry.at > PREPARED_TTL) prepared.delete(key);
+	prepared.set(hash, { party, at: now });
+}
+
+/**
+ * The SDK throws the ledger's rejection as an Error with the reason in its message; that reason
+ * is what the user needs to see ("Already voted", "The deadline has passed"). A contract that
+ * changed between prepare and execute is the one case worth naming on its own.
+ */
+function ledgerError(e: unknown): never {
+	if (typeof e === 'object' && e !== null && 'status' in e && 'body' in e) throw e;
+	const message = e instanceof Error ? e.message : String(e);
+	if (/CONTRACT_NOT_ACTIVE|INACTIVE_CONTRACT|LOCKED_CONTRACT|CONTRACT_NOT_FOUND/.test(message)) {
+		throw error(409, 'This changed while you were looking at it — reload and try again');
+	}
+	const reason = message.match(
+		/DAML_INTERPRETATION_ERROR[^:]*: [^\n]*?Error: ([^\n"]{1,200})/
+	)?.[1];
+	throw error(400, reason ?? message.slice(0, 300));
+}
+
 /** Step one of a user transaction: the participant builds it and hands back the hash to sign. */
 export async function prepare(party: string, commands: unknown[]): Promise<Prepared> {
-	const { response } = await (await sdk()).ledger.prepare({ partyId: party, commands }).toJSON();
-	return response;
+	try {
+		const { response } = await (await sdk()).ledger.prepare({ partyId: party, commands }).toJSON();
+		remember(response.preparedTransactionHash, party);
+		return response;
+	} catch (e) {
+		ledgerError(e);
+	}
 }
 
 /**
  * Step two: the signed hash goes back and the participant submits. The SDK takes the signing key
  * fingerprint from the party id — for an external party the namespace is its own key.
  */
-export async function execute(party: string, prepared: Prepared, signature: string): Promise<void> {
-	const ledger = (await sdk()).ledger;
-	await ledger.execute(
-		ledger.fromSignature(prepared as Parameters<typeof ledger.fromSignature>[0], signature),
-		{ partyId: party }
-	);
+export async function execute(party: string, tx: Prepared, signature: string): Promise<void> {
+	const known = prepared.get(tx.preparedTransactionHash);
+	if (!known || known.party !== party) throw error(400, 'Nothing was prepared for this signature');
+	prepared.delete(tx.preparedTransactionHash);
+
+	try {
+		const ledger = (await sdk()).ledger;
+		await ledger.execute(
+			ledger.fromSignature(tx as Parameters<typeof ledger.fromSignature>[0], signature),
+			{ partyId: party }
+		);
+	} catch (e) {
+		ledgerError(e);
+	}
 }
