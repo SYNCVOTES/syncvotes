@@ -134,6 +134,38 @@
 	--font-sans: 'Inter', sans-serif;
 	--font-mono: 'JetBrains Mono', monospace;
 	--font-serif: 'Instrument Serif', serif;
+	/* The landing's italic accents; heavier than Instrument Serif at display sizes. */
+	--font-editorial: 'Newsreader', serif;
+
+	/* The landing's inline padding: 40px, or whatever centres a 1400px column. */
+	--spacing-edge: max(40px, calc((100vw - 1400px) / 2));
+
+	/* Landing motion: headline rows rising, copy fading in, the ticker tape, a pulse. */
+	--animate-rise: rise 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+	--animate-fade-in: fade-in 1s forwards;
+	--animate-tape: tape 46s linear infinite;
+	--animate-pulse-soft: pulse-soft 1.6s infinite;
+
+	@keyframes rise {
+		to {
+			transform: translateY(0);
+		}
+	}
+	@keyframes fade-in {
+		to {
+			opacity: 1;
+		}
+	}
+	@keyframes tape {
+		to {
+			transform: translateX(-50%);
+		}
+	}
+	@keyframes pulse-soft {
+		50% {
+			opacity: 0.35;
+		}
+	}
 
 	/* Square corners everywhere; the only round things are pills. */
 	--radius-sm: 0;
