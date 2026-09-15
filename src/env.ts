@@ -3,8 +3,8 @@ import { building } from '$app/env';
 import * as v from 'valibot';
 
 /**
- * All of these are private: only the server endpoint that hands out proxy contracts reads them.
- * They never reach the browser — `$app/env/private` cannot be imported there.
+ * All but NETWORK are private: only the server reads them, and `$app/env/private` cannot be
+ * imported in the browser.
  *
  * Values are read at startup rather than inlined at build time, so one image can run against
  * different participants. Hence they are optional while building and required when the app
@@ -46,6 +46,11 @@ export const variables = defineEnvVars({
 	LEDGER_AUTH_SCOPE: {
 		description: 'Scope to request for ledger tokens',
 		schema: v.optional(v.string(), 'daml_ledger_api')
+	},
+	NETWORK: {
+		description: 'The Canton network this deployment is on, as shown to users: TestNet or MainNet',
+		public: true,
+		schema: v.optional(v.picklist(['TestNet', 'MainNet']), 'TestNet')
 	},
 	GIT_SHA: {
 		description: 'The commit this image was built from, baked in by the Dockerfile',

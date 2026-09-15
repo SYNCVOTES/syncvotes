@@ -3,16 +3,18 @@
 	import * as remote from '$lib/api.remote';
 	import { store, describe } from '$lib/wallet-store.svelte';
 	import { Button } from '$lib/components/ui/button';
-	import Stat from '$lib/components/app/stat.svelte';
+	import { Badge } from '$lib/components/ui/badge';
 	import StatusBadge from '$lib/components/app/status-badge.svelte';
 	import Problem from '$lib/components/app/problem.svelte';
 	import UnlockForm from '$lib/components/app/unlock-form.svelte';
-	import { relative } from '$lib/format';
+	import { relative, dateOf } from '$lib/format';
+	import { NETWORK } from '$lib/network';
 
 	const dao = $derived(remote.dao(page.params.id!));
 	const me = $derived(store.who?.party ?? null);
 
 	const nameOf = (party: string) => dao.current?.names[party] ?? party.split('::')[0];
+	const initial = (party: string) => nameOf(party).slice(0, 1).toUpperCase();
 </script>
 
 <svelte:head><title>{dao.current?.name ?? 'DAO'} — SyncVotes</title></svelte:head>
@@ -24,55 +26,65 @@
 		<div class="h-40 animate-pulse border border-border bg-surface"></div>
 	{:else}
 		{@const d = dao.current}
-		{@const open = d.proposals.filter((p) => !p.outcome)}
-		{@const passed = d.proposals.filter((p) => p.outcome === 'Passed')}
 		{@const member = me !== null && d.members.includes(me)}
+		{@const admin = me !== null && me === d.admin}
 
 		<a href="/my-daos" class="eyebrow hover:text-orange">← My DAOs</a>
 
-		<div class="mt-6 mb-10 flex flex-wrap items-start justify-between gap-6">
+		<div class="mt-6 flex flex-wrap items-start justify-between gap-6">
 			<div class="flex items-start gap-5">
 				<div
-					class="flex size-16 shrink-0 items-center justify-center border border-orange/30 bg-orange-dim font-mono text-sm font-bold tracking-[0.08em] text-orange"
+					class="flex size-20 shrink-0 items-center justify-center border border-orange/30 bg-orange-dim font-display text-2xl font-extrabold text-orange"
 				>
-					{d.name.slice(0, 3).toUpperCase()}
+					{d.name.slice(0, 2).toUpperCase()}
 				</div>
-				<div>
-					<div class="mb-2 flex items-center gap-3">
-						<h1 class="display text-3xl md:text-4xl">{d.name}</h1>
-						{#if me === d.admin}<span
-								class="font-mono text-xs font-bold tracking-[0.18em] text-amber uppercase"
-								>admin</span
-							>
-						{:else if member}<span
-								class="font-mono text-xs font-bold tracking-[0.18em] text-orange uppercase"
-								>member</span
-							>{/if}
+				<div class="min-w-0">
+					<h1 class="display text-3xl md:text-4xl">{d.name}</h1>
+					<div class="mt-3 flex flex-wrap items-center gap-2">
+						<Badge variant="accent">Private</Badge>
+						<Badge>Majority</Badge>
+						{#if admin}<Badge variant="amber">You are admin</Badge>
+						{:else if member}<Badge variant="green">Member</Badge>{/if}
 					</div>
-					<p class="max-w-[560px] text-sm leading-relaxed text-ink-mid">
+					<p class="mt-4 max-w-[600px] text-sm leading-relaxed text-ink-mid">
 						{d.description || 'No description provided.'}
 					</p>
 				</div>
 			</div>
-			{#if member}
-				<Button href="/daos/{d.contractId}/proposals/create" size="lg">+ New proposal</Button>
-			{:else if store.screen.at === 'locked'}
-				<div class="w-72"><UnlockForm /></div>
-			{/if}
+			<div class="flex shrink-0 items-center gap-2">
+				{#if admin}
+					<Button href="/daos/{d.contractId}/edit" variant="outline">Edit</Button>
+				{/if}
+				{#if member}
+					<Button href="/daos/{d.contractId}/proposals/create">+ New proposal</Button>
+				{:else if store.screen.at === 'locked'}
+					<div class="w-72"><UnlockForm /></div>
+				{/if}
+			</div>
 		</div>
 
-		<div class="mb-10 grid grid-cols-2 gap-3 md:grid-cols-4">
-			<Stat value={d.members.length} label="Members" />
-			<Stat value={d.proposals.length} label="Proposals" />
-			<Stat value={open.length} label="Active" accent />
-			<Stat value={passed.length} label="Passed" />
-		</div>
+		<dl class="my-10 grid grid-cols-2 border-y border-border py-6 md:grid-cols-4">
+			{#each [['Members', String(d.members.length)], ['Proposals', String(d.proposals.length)], ['Network', `Canton ${NETWORK}`], ['Established', d.createdAt ? relative(d.createdAt) : '—']] as [label, value], i (label)}
+				<div
+					class="px-5 {i > 0 ? 'md:border-l md:border-border' : ''} {i === 1
+						? 'border-l border-border md:border-l'
+						: ''}"
+				>
+					<dd
+						class="font-mono text-lg font-bold {label === 'Network' ? 'text-orange' : 'text-ink'}"
+					>
+						{value}
+					</dd>
+					<dt class="mt-1 font-mono text-xs tracking-[0.14em] text-ink-dim uppercase">{label}</dt>
+				</div>
+			{/each}
+		</dl>
 
-		<div class="grid gap-10 lg:grid-cols-[1fr_300px]">
-			<section>
-				<div class="mb-4 flex items-center justify-between">
+		<div class="grid gap-6 lg:grid-cols-[1fr_320px]">
+			<section class="border border-border bg-surface p-6">
+				<div class="mb-5 flex items-center justify-between">
 					<h2 class="eyebrow">Proposals</h2>
-					<span class="font-mono text-xs text-ink-dim">{d.proposals.length}</span>
+					<span class="font-mono text-xs text-ink-dim">{d.proposals.length} total</span>
 				</div>
 				{#if d.proposals.length === 0}
 					<div
@@ -81,31 +93,29 @@
 						Nothing proposed yet.
 					</div>
 				{:else}
-					<ul class="divide-y divide-border border border-border bg-surface">
+					<ul class="divide-y divide-border">
 						{#each d.proposals as p (p.contractId)}
-							{@const yes = p.ballots.filter((b) => b.vote === 'Yes').length}
-							{@const ended = new Date(p.closesAt).getTime() < Date.now()}
-							{@const outcome =
-								p.outcome ??
-								(ended
-									? yes >= Math.floor(p.members.length / 2) + 1
-										? 'Passed'
-										: 'Failed'
-									: null)}
 							<li>
 								<a
 									href="/proposals/{p.id}"
-									class="flex items-center gap-4 px-5 py-4 transition-colors hover:bg-surface-hover"
+									class="group -mx-3 flex items-center gap-4 px-3 py-5 transition-colors hover:bg-surface-hover"
 								>
 									<div class="min-w-0 flex-1">
-										<div class="truncate font-display text-[15px] font-bold">{p.title}</div>
+										<div class="mb-2">
+											<StatusBadge outcome={p.outcome} closesAt={p.closesAt} />
+										</div>
+										<div class="truncate font-display text-[16px] font-bold">{p.title}</div>
 										<div class="mt-1 font-mono text-xs text-ink-dim">
-											by {nameOf(p.proposer)} · {p.outcome
+											by {nameOf(p.proposer)} · {p.ballots.length}
+											{p.ballots.length === 1 ? 'vote' : 'votes'} · {p.outcome
 												? 'closed'
-												: `closes ${relative(p.closesAt)}`} · {yes}/{p.members.length} yes
+												: `closes ${relative(p.closesAt)}`}
 										</div>
 									</div>
-									<StatusBadge {outcome} closesAt={p.closesAt} />
+									<span
+										class="text-ink-dim transition-all group-hover:translate-x-0.5 group-hover:text-orange"
+										>→</span
+									>
 								</a>
 							</li>
 						{/each}
@@ -113,17 +123,42 @@
 				{/if}
 			</section>
 
-			<aside>
-				<h2 class="eyebrow mb-4">Members</h2>
-				<ul class="divide-y divide-border border border-border bg-surface">
-					{#each d.members as m (m)}
-						<li class="flex items-center justify-between px-4 py-3 font-mono text-xs">
-							<span class={m === me ? 'text-orange' : 'text-ink'}>{nameOf(m)}</span>
-							{#if m === d.admin}<span class="tracking-[0.14em] text-amber uppercase">admin</span
-								>{/if}
-						</li>
-					{/each}
-				</ul>
+			<aside class="space-y-6">
+				<div class="border border-border bg-surface p-6">
+					<div class="mb-4 flex items-center justify-between">
+						<h2 class="eyebrow">Members</h2>
+						<span class="font-mono text-xs text-ink-dim">{d.members.length}</span>
+					</div>
+					<ul class="space-y-2">
+						{#each d.members as m (m)}
+							<li
+								class="flex items-center gap-3 border border-border px-3 py-2.5 font-mono text-xs"
+							>
+								<span
+									class="flex size-7 shrink-0 items-center justify-center bg-surface-active text-ink-mid"
+									>{initial(m)}</span
+								>
+								<span class="truncate {m === me ? 'text-orange' : 'text-ink'}">{nameOf(m)}</span>
+								{#if m === d.admin}<Badge variant="amber" class="ml-auto">admin</Badge>{/if}
+							</li>
+						{/each}
+					</ul>
+				</div>
+
+				<dl class="space-y-5 border border-border bg-surface p-6">
+					<div>
+						<dt class="eyebrow mb-1">Established</dt>
+						<dd class="font-mono text-sm">{d.createdAt ? dateOf(d.createdAt) : 'Before 0.1.3'}</dd>
+					</div>
+					<div>
+						<dt class="eyebrow mb-1">Network</dt>
+						<dd class="font-mono text-sm text-orange">Canton {NETWORK}</dd>
+					</div>
+					<div>
+						<dt class="eyebrow mb-1">Contract layer</dt>
+						<dd class="font-mono text-sm">Daml · LF 2.2</dd>
+					</div>
+				</dl>
 			</aside>
 		</div>
 	{/if}

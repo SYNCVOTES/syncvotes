@@ -6,6 +6,9 @@ import * as session from './session';
  * The one place the page keeps its wallet: which screen the onboarding is on, the signer while
  * unlocked, and who the user is. Every route reads it; the wallet page and the connect dialog
  * drive it. Runes make it reactive across components without a framework store.
+ *
+ * A device can hold several keys. `wallets` lists them; `selected` is the one the locked screen
+ * offers to unlock, or the one that is unlocked.
  */
 
 export type Screen =
@@ -21,6 +24,8 @@ export type Screen =
 let screen = $state<Screen>({ at: 'loading' });
 let busy = $state(false);
 let problem = $state<string | null>(null);
+let wallets = $state<wallet.StoredWallet[]>([]);
+let selected = $state<string | null>(null);
 
 export const store = {
 	get screen() {
@@ -42,14 +47,33 @@ export const store = {
 	/** Whether a key exists on this device at all. */
 	get hasKey() {
 		return screen.at !== 'welcome' && screen.at !== 'loading';
+	},
+	/** Every key kept on this device. */
+	get wallets() {
+		return wallets;
+	},
+	/** The stored key the locked screen offers, or the one in use. */
+	get selected() {
+		return selected;
 	}
 };
+
+const refresh = () => {
+	wallets = wallet.storedWallets();
+};
+
+/** Shows the locked screen for a stored key, or the welcome screen when there is none. */
+function offer(id: string | null) {
+	refresh();
+	const found = wallets.find((w) => w.id === id) ?? wallets[0];
+	selected = found?.id ?? null;
+	screen = found ? { at: 'locked', lock: found.lock } : { at: 'welcome' };
+}
 
 /** Called once, in the browser: is there a key on this device? */
 export function boot() {
 	if (screen.at !== 'loading') return;
-	const lock = wallet.storedLock();
-	screen = lock ? { at: 'locked', lock } : { at: 'welcome' };
+	offer(wallet.activeWallet());
 }
 
 async function run(action: () => Promise<void>) {
@@ -99,9 +123,24 @@ const identify = (signer: wallet.Signer) =>
 	});
 
 export const flow = {
-	startCreate: () => (screen = { at: 'create', phrase: wallet.newPhrase() }),
-	startRestore: () => (screen = { at: 'restore' }),
+	startCreate() {
+		if ('signer' in screen) screen.signer.dispose();
+		session.lock();
+		screen = { at: 'create', phrase: wallet.newPhrase() };
+	},
+	startRestore() {
+		if ('signer' in screen) screen.signer.dispose();
+		session.lock();
+		screen = { at: 'restore' };
+	},
 	back: () => lock(),
+
+	/** Offers another stored key to unlock; whatever was unlocked is locked first. */
+	select(id: string) {
+		if ('signer' in screen) screen.signer.dispose();
+		session.lock();
+		offer(id);
+	},
 
 	confirmCreate() {
 		if (screen.at !== 'create') return;
@@ -129,7 +168,8 @@ export const flow = {
 		if (screen.at !== 'protect') return;
 		const { signer, who } = screen;
 		return run(async () => {
-			await wallet.lockWithPasskey(signer, who.name);
+			selected = await wallet.lockWithPasskey(signer, who);
+			refresh();
 			await enter(signer, who);
 		});
 	},
@@ -138,7 +178,8 @@ export const flow = {
 		if (screen.at !== 'protect') return;
 		const { signer, who } = screen;
 		return run(async () => {
-			await wallet.lockWithPassword(signer, password);
+			selected = await wallet.lockWithPassword(signer, password, who);
+			refresh();
 			await enter(signer, who);
 		});
 	},
@@ -150,30 +191,37 @@ export const flow = {
 	},
 
 	unlock(password?: string) {
-		if (screen.at !== 'locked') return;
+		if (screen.at !== 'locked' || !selected) return;
+		const id = selected;
 		const kind = screen.lock;
 		return run(async () => {
 			const signer =
 				kind === 'passkey'
-					? await wallet.unlockWithPasskey()
-					: await wallet.unlockWithPassword(password ?? '');
+					? await wallet.unlockWithPasskey(id)
+					: await wallet.unlockWithPassword(password ?? '', id);
 			session.start(signer, lock);
 			const topology = await actions.lookup(signer);
 			if (!topology.exists || !topology.name || !topology.account) {
 				screen = { at: 'name', signer, topology };
 				return;
 			}
-			await enter(signer, {
-				party: topology.partyId,
-				name: topology.name,
-				account: topology.account
-			});
+			const who = { party: topology.partyId, name: topology.name, account: topology.account };
+			// A key from the single-wallet version learns its name the first time it is opened.
+			if (!wallets.find((w) => w.id === id)?.name) {
+				wallet.describeStored(id, who);
+				refresh();
+			}
+			await enter(signer, who);
 		});
 	},
 
-	forget() {
-		wallet.forgetStoredKey();
-		screen = { at: 'welcome' };
+	/** Removes a stored key from this device — the one offered, unless another is named. */
+	forget(id?: string) {
+		const target = id ?? selected;
+		if (!target) return;
+		wallet.forgetStoredKey(target);
+		if (target === selected) lock();
+		else refresh();
 	},
 
 	/** Signs a ledger action with the unlocked key; the page passes what to do. */
@@ -192,6 +240,5 @@ export const flow = {
 export function lock() {
 	if ('signer' in screen) screen.signer.dispose();
 	session.lock();
-	const stored = wallet.storedLock();
-	screen = stored ? { at: 'locked', lock: stored } : { at: 'welcome' };
+	offer(selected);
 }

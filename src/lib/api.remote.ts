@@ -159,7 +159,12 @@ export const dao = query.live(contractId, (id) =>
 export const proposal = query.live(contractId, (id) =>
 	live(async () => {
 		const [found, names] = await Promise.all([app.proposalById(id), app.accounts()]);
-		return { ...found, names: Object.fromEntries(names.map((a) => [a.party, a.name])) };
+		// The DAO's admin may cancel; a proposal can outlive a deleted DAO, so this may be absent.
+		const admin = await app.daoById(found.dao).then(
+			(d) => d.admin,
+			() => null
+		);
+		return { ...found, admin, names: Object.fromEntries(names.map((a) => [a.party, a.name])) };
 	})
 );
 
@@ -250,6 +255,87 @@ export const prepareVote = command(
 			exercise(Main.Proposal.templateId, current.contractId, 'Proposal_Vote', {
 				voter: party,
 				vote
+			})
+		);
+	}
+);
+
+async function adminOf(dao: string, party: string) {
+	const found = await app.daoById(dao);
+	if (found.admin !== party) throw error(403, 'Only the admin can do this');
+	return found;
+}
+
+export const prepareUpdateDao = command(
+	v.object({
+		party: partyId,
+		dao: contractId,
+		daoName: text(60),
+		description: v.pipe(v.string(), v.maxLength(2000)),
+		members: v.pipe(v.array(partyId), v.maxLength(50))
+	}),
+	async ({ party, dao, daoName, description, members }) => {
+		await adminOf(dao, party);
+		const known = await app.accounts();
+		for (const m of members) {
+			if (!known.some((a) => a.party === m))
+				throw error(404, `${m} is not registered with the app`);
+		}
+		return participant.prepare(
+			party,
+			exercise(Main.DAO.templateId, dao, 'DAO_Update', { daoName, description, members })
+		);
+	}
+);
+
+/** Deleting archives the DAO. Its settled proposals stay readable; open ones block it. */
+export const prepareArchiveDao = command(
+	v.object({ party: partyId, dao: contractId }),
+	async ({ party, dao }) => {
+		await adminOf(dao, party);
+		const open = (await app.proposals()).filter((p) => p.dao === dao && !p.outcome);
+		if (open.length > 0) throw error(409, 'Close or cancel the open proposals first');
+		return participant.prepare(party, exercise(Main.DAO.templateId, dao, 'DAO_Archive', {}));
+	}
+);
+
+export const prepareUpdateProposal = command(
+	v.object({
+		party: partyId,
+		contractId,
+		title: text(120),
+		description: v.pipe(v.string(), v.maxLength(5000))
+	}),
+	async ({ party, contractId, title, description }) => {
+		const current = await currentProposal(contractId);
+		if (current.proposer !== party) throw error(403, 'Only the proposer can edit');
+		if (current.ballots.length > 0) throw error(409, 'Voting has started');
+		return participant.prepare(
+			party,
+			exercise(Main.Proposal.templateId, current.contractId, 'Proposal_Update', {
+				title,
+				description
+			})
+		);
+	}
+);
+
+export const prepareCancelProposal = command(
+	v.object({ party: partyId, contractId }),
+	async ({ party, contractId }) => {
+		const current = await currentProposal(contractId);
+		if (current.outcome) throw error(409, 'Already settled');
+		if (current.proposer !== party) {
+			const admin = await app.daoById(current.dao).then(
+				(d) => d.admin,
+				() => null
+			);
+			if (admin !== party) throw error(403, 'Only the proposer or the DAO admin can cancel');
+		}
+		return participant.prepare(
+			party,
+			exercise(Main.Proposal.templateId, current.contractId, 'Proposal_Cancel', {
+				canceller: party
 			})
 		);
 	}

@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import * as remote from '$lib/api.remote';
 	import * as actions from '$lib/actions';
 	import { store, flow } from '$lib/wallet-store.svelte';
 	import { Button } from '$lib/components/ui/button';

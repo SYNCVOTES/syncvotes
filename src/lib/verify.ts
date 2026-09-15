@@ -39,7 +39,11 @@ const PACKAGE_NAME = 'syncvotes-governance';
 export const CHOICES: Record<string, string> = {
 	Account_CreateDAO: 'Main:Account',
 	DAO_CreateProposal: 'Main:DAO',
-	Proposal_Vote: 'Main:Proposal'
+	DAO_Update: 'Main:DAO',
+	DAO_Archive: 'Main:DAO',
+	Proposal_Vote: 'Main:Proposal',
+	Proposal_Update: 'Main:Proposal',
+	Proposal_Cancel: 'Main:Proposal'
 };
 
 // ---- Sign-up: the party topology --------------------------------------------------------

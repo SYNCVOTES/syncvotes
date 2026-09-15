@@ -106,3 +106,36 @@ export async function vote(s: Signer, who: Identity, contractId: string, choice:
 	const prepared = await remote.prepareVote({ party: who.party, contractId, vote: choice });
 	await sign(s, who, 'Proposal_Vote', contractId, args, prepared);
 }
+
+export async function updateDao(
+	s: Signer,
+	who: Identity,
+	dao: string,
+	input: { name: string; description: string; members: string[] }
+): Promise<void> {
+	const members = await resolve(input.members);
+	const args = { daoName: input.name, description: input.description, members };
+	const prepared = await remote.prepareUpdateDao({ party: who.party, dao, ...args });
+	await sign(s, who, 'DAO_Update', dao, args, prepared);
+}
+
+export async function archiveDao(s: Signer, who: Identity, dao: string): Promise<void> {
+	const prepared = await remote.prepareArchiveDao({ party: who.party, dao });
+	await sign(s, who, 'DAO_Archive', dao, {}, prepared);
+}
+
+export async function updateProposal(
+	s: Signer,
+	who: Identity,
+	contractId: string,
+	input: { title: string; description: string }
+): Promise<void> {
+	const prepared = await remote.prepareUpdateProposal({ party: who.party, contractId, ...input });
+	await sign(s, who, 'Proposal_Update', contractId, input, prepared);
+}
+
+export async function cancelProposal(s: Signer, who: Identity, contractId: string) {
+	const args = { canceller: who.party };
+	const prepared = await remote.prepareCancelProposal({ party: who.party, contractId });
+	await sign(s, who, 'Proposal_Cancel', contractId, args, prepared);
+}

@@ -18,6 +18,8 @@ export type Dao = {
 	name: string;
 	description: string;
 	members: string[];
+	/** ISO time; DAOs from before 0.1.3 have none. */
+	createdAt: string | null;
 };
 export type Ballot = { voter: string; vote: 'Yes' | 'No' };
 export type Proposal = {
@@ -33,6 +35,7 @@ export type Proposal = {
 	closesAt: string;
 	ballots: Ballot[];
 	outcome: 'Passed' | 'Failed' | null;
+	createdAt: string | null;
 };
 
 const read = <T>(templateId: string) => activeContracts<T>(operatorParty(), templateId);
@@ -95,11 +98,15 @@ export async function register(party: string, name: string): Promise<Account> {
 	return accountOf(party);
 }
 
-type DaoPayload = { admin: string; name: string; description: string; members: string[] };
+type DaoPayload = Omit<Dao, 'contractId' | 'createdAt'> & { createdAt: string | null | undefined };
 
 export async function daos(): Promise<Dao[]> {
 	const found = await read<DaoPayload>(Main.DAO.templateId);
-	return found.map((c) => ({ contractId: c.contractId, ...c.payload }));
+	return found.map((c) => ({
+		...c.payload,
+		contractId: c.contractId,
+		createdAt: c.payload.createdAt ?? null
+	}));
 }
 
 export async function daoById(contractId: string): Promise<Dao> {
@@ -108,9 +115,10 @@ export async function daoById(contractId: string): Promise<Dao> {
 	return dao;
 }
 
-type ProposalPayload = Omit<Proposal, 'contractId' | 'outcome' | 'id'> & {
+type ProposalPayload = Omit<Proposal, 'contractId' | 'outcome' | 'id' | 'createdAt'> & {
 	outcome: 'Passed' | 'Failed' | null | undefined;
 	id: string | null | undefined;
+	createdAt: string | null | undefined;
 };
 
 export async function proposals(): Promise<Proposal[]> {
@@ -119,7 +127,8 @@ export async function proposals(): Promise<Proposal[]> {
 		...c.payload,
 		contractId: c.contractId,
 		id: c.payload.id ?? c.contractId,
-		outcome: c.payload.outcome ?? null
+		outcome: c.payload.outcome ?? null,
+		createdAt: c.payload.createdAt ?? null
 	}));
 }
 

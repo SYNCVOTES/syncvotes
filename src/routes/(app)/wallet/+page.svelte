@@ -7,6 +7,7 @@
 	import PageHeader from '$lib/components/app/page-header.svelte';
 	import Problem from '$lib/components/app/problem.svelte';
 	import UnlockForm from '$lib/components/app/unlock-form.svelte';
+	import { dateOf } from '$lib/format';
 
 	let phraseInput = $state('');
 	let savedPhrase = $state(false);
@@ -14,6 +15,7 @@
 	let password = $state('');
 
 	const screen = $derived(store.screen);
+	const selectedWallet = $derived(store.wallets.find((w) => w.id === store.selected) ?? null);
 	let passkeys = $state(false);
 	$effect(() => {
 		wallet.passkeysAvailable().then((ok) => (passkeys = ok));
@@ -143,11 +145,14 @@
 	{:else if screen.at === 'locked'}
 		<section class="space-y-5 border border-border bg-surface p-8">
 			<h2 class="eyebrow">Unlock</h2>
+			<p class="text-sm text-ink-mid">
+				{selectedWallet?.name
+					? `Unlock ${selectedWallet.name}.`
+					: 'Unlock the key kept on this device.'}
+			</p>
 			<UnlockForm />
-			<Button type="button" variant="link" size="sm" onclick={flow.forget}
-				>Forget the key on this device</Button
-			>
 		</section>
+		{@render sources()}
 	{:else}
 		<section class="space-y-6">
 			<div class="border border-border bg-surface p-6">
@@ -174,5 +179,59 @@
 				encrypted copy stays on this device.
 			</p>
 		</section>
+		{@render sources()}
 	{/if}
 </div>
+
+<!-- Every key kept on this device: unlock another, add one, or forget one. -->
+{#snippet sources()}
+	<section class="mt-6 space-y-4 border border-border bg-surface p-8">
+		<div class="flex items-center justify-between">
+			<h2 class="eyebrow">Wallet sources</h2>
+			<span class="font-mono text-xs text-ink-dim">{store.wallets.length}</span>
+		</div>
+		<ul class="divide-y divide-border">
+			{#each store.wallets as w (w.id)}
+				{@const unlocked = screen.at === 'home' && w.party === screen.who.party}
+				{@const offered = screen.at === 'locked' && w.id === store.selected}
+				<li class="flex items-center gap-4 py-3.5">
+					<div class="min-w-0 flex-1">
+						<div class="font-mono text-sm {unlocked || offered ? 'text-orange' : 'text-ink'}">
+							{w.name || 'Wallet'}
+						</div>
+						<div class="mt-0.5 font-mono text-xs text-ink-dim">
+							{w.lock === 'passkey' ? 'Passkey' : 'Password'}{w.created
+								? ` · ${dateOf(w.created)}`
+								: ''}
+						</div>
+					</div>
+					{#if unlocked}
+						<span class="flex items-center gap-2 font-mono text-xs text-green">
+							<span class="size-2 rounded-full bg-green"></span> unlocked
+						</span>
+					{:else if offered}
+						<span class="font-mono text-xs text-ink-dim">selected</span>
+					{:else}
+						<Button variant="accent" size="sm" onclick={() => flow.select(w.id)}>Unlock</Button>
+					{/if}
+					<Button
+						variant="ghost"
+						size="sm"
+						aria-label="Forget {w.name || 'this key'}"
+						onclick={() => flow.forget(w.id)}
+					>
+						Forget
+					</Button>
+				</li>
+			{/each}
+		</ul>
+		<div class="flex flex-wrap gap-3 border-t border-border pt-4">
+			<Button variant="link" size="sm" onclick={flow.startCreate}>+ Create a new key</Button>
+			<Button variant="link" size="sm" onclick={flow.startRestore}>Restore from a phrase</Button>
+		</div>
+		<p class="text-xs text-ink-dim">
+			Each key is its own party. Forgetting removes the encrypted copy from this device only; the
+			recovery phrase brings it back anywhere.
+		</p>
+	</section>
+{/snippet}

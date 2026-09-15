@@ -25,6 +25,8 @@ services:
       LEDGER_AUTH_CLIENT_SECRET: ${KC_APP_SECRET:?set in the env file}
       LEDGER_AUTH_AUDIENCE: ${LEDGER_API_AUDIENCE:-https://canton.network.global}
       LEDGER_AUTH_SCOPE: daml_ledger_api
+      # Shown to users; the ledger does not care.
+      NETWORK: ${NETWORK:-TestNet}
     depends_on:
       keycloak:
         condition: service_healthy

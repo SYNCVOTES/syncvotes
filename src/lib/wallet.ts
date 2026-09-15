@@ -101,33 +101,94 @@ export function signerFromPhrase(phrase: string): Signer {
 
 // ---- Encrypted at rest --------------------------------------------------------------------
 
-const STORE = 'syncvotes.key';
+const STORE = 'syncvotes.keys';
+const ACTIVE = 'syncvotes.active';
+const LEGACY = 'syncvotes.key';
 
 type Lock =
 	{ kind: 'passkey'; credentialId: string; salt: string } | { kind: 'password'; salt: string };
 
-type Stored = { version: 1; lock: Lock; iv: string; data: string };
-
-export const storedLock = (): Lock['kind'] | null => {
-	const stored = load();
-	return stored ? stored.lock.kind : null;
+/** One key kept on this device: who it is, how it is locked, when it was added. */
+export type StoredWallet = {
+	id: string;
+	name: string;
+	party: string;
+	created: string;
+	lock: Lock['kind'];
 };
+export type Owner = { name: string; party: string };
 
-export const forgetStoredKey = () => localStorage.removeItem(STORE);
+type Stored = Omit<StoredWallet, 'lock'> & { version: 2; lock: Lock; iv: string; data: string };
 
-function load(): Stored | null {
+function loadAll(): Stored[] {
 	try {
-		const raw = localStorage.getItem(STORE);
-		return raw ? (JSON.parse(raw) as Stored) : null;
+		const list = JSON.parse(localStorage.getItem(STORE) ?? '[]') as Stored[];
+		// A key stored by the single-wallet version becomes the first entry; its name and party
+		// are filled in the first time it is unlocked.
+		const legacy = localStorage.getItem(LEGACY);
+		if (legacy) {
+			const old = JSON.parse(legacy) as { lock: Lock; iv: string; data: string };
+			list.push({ version: 2, id: crypto.randomUUID(), name: '', party: '', created: '', ...old });
+			saveAll(list);
+			localStorage.removeItem(LEGACY);
+		}
+		return list;
 	} catch {
-		return null;
+		return [];
 	}
 }
 
-async function store(s: Signer, lock: Lock, aes: CryptoKey): Promise<void> {
+const saveAll = (list: Stored[]) => localStorage.setItem(STORE, JSON.stringify(list));
+
+export const storedWallets = (): StoredWallet[] =>
+	loadAll().map(({ id, name, party, created, lock }) => ({
+		id,
+		name,
+		party,
+		created,
+		lock: lock.kind
+	}));
+
+export const activeWallet = (): string | null => {
+	try {
+		return localStorage.getItem(ACTIVE);
+	} catch {
+		return null;
+	}
+};
+export const setActiveWallet = (id: string) => localStorage.setItem(ACTIVE, id);
+
+export function forgetStoredKey(id: string) {
+	saveAll(loadAll().filter((w) => w.id !== id));
+	if (activeWallet() === id) localStorage.removeItem(ACTIVE);
+}
+
+/** Fills in what a legacy entry did not know about itself. */
+export function describeStored(id: string, owner: Owner) {
+	saveAll(loadAll().map((w) => (w.id === id ? { ...w, ...owner } : w)));
+}
+
+function find(id: string): Stored {
+	const found = loadAll().find((w) => w.id === id);
+	if (!found) throw new Error('That key is no longer on this device');
+	return found;
+}
+
+/** Adds the key; protecting the same party again replaces its earlier entry. */
+async function store(s: Signer, lock: Lock, aes: CryptoKey, owner: Owner): Promise<string> {
 	const { iv, data } = await s.seal(aes);
-	const stored: Stored = { version: 1, lock, iv, data };
-	localStorage.setItem(STORE, JSON.stringify(stored));
+	const entry: Stored = {
+		version: 2,
+		id: crypto.randomUUID(),
+		...owner,
+		created: new Date().toISOString(),
+		lock,
+		iv,
+		data
+	};
+	saveAll([...loadAll().filter((w) => w.party !== owner.party), entry]);
+	setActiveWallet(entry.id);
+	return entry.id;
 }
 
 async function open(stored: Stored, aes: CryptoKey): Promise<Signer> {
@@ -136,6 +197,7 @@ async function open(stored: Stored, aes: CryptoKey): Promise<Signer> {
 		aes,
 		fromBase64(stored.data)
 	);
+	setActiveWallet(stored.id);
 	return signer(new Uint8Array(plain));
 }
 
@@ -158,15 +220,24 @@ async function passwordKey(password: string, salt: Bytes): Promise<CryptoKey> {
 	);
 }
 
-export async function lockWithPassword(s: Signer, password: string): Promise<void> {
+export async function lockWithPassword(s: Signer, password: string, owner: Owner): Promise<string> {
 	const salt = crypto.getRandomValues(new Uint8Array(16));
-	await store(s, { kind: 'password', salt: toBase64(salt) }, await passwordKey(password, salt));
+	return store(
+		s,
+		{ kind: 'password', salt: toBase64(salt) },
+		await passwordKey(password, salt),
+		owner
+	);
 }
 
-export async function unlockWithPassword(password: string): Promise<Signer> {
-	const stored = load();
-	if (!stored || stored.lock.kind !== 'password') throw new Error('No password-locked key here');
-	return open(stored, await passwordKey(password, fromBase64(stored.lock.salt)));
+export async function unlockWithPassword(password: string, id: string): Promise<Signer> {
+	const stored = find(id);
+	if (stored.lock.kind !== 'password') throw new Error('That key is not locked with a password');
+	try {
+		return await open(stored, await passwordKey(password, fromBase64(stored.lock.salt)));
+	} catch {
+		throw new Error('Wrong password');
+	}
 }
 
 // ---- Passkey ----------------------------------------------------------------------------
@@ -183,6 +254,7 @@ type PrfResults = { prf?: { enabled?: boolean; results?: { first: ArrayBuffer } 
  * PRF extension. Newer browsers say so outright; older ones are trusted to have PRF if they
  * have a platform authenticator at all, which held for every engine that shipped it.
  */
+
 export async function passkeysAvailable(): Promise<boolean> {
 	if (typeof PublicKeyCredential === 'undefined') return false;
 	const caps = (
@@ -235,7 +307,7 @@ async function assertSecret(credentialId: Bytes, salt: Bytes): Promise<ArrayBuff
 	return secret;
 }
 
-export async function lockWithPasskey(s: Signer, label: string): Promise<void> {
+export async function lockWithPasskey(s: Signer, owner: Owner): Promise<string> {
 	// The salt goes into the creation request so the PRF is evaluated there and then — one
 	// prompt. Authenticators that only evaluate on assertion return nothing here, and get asked
 	// once more; that is the second prompt some devices show, not the norm.
@@ -245,7 +317,11 @@ export async function lockWithPasskey(s: Signer, label: string): Promise<void> {
 		publicKey: {
 			challenge: crypto.getRandomValues(new Uint8Array(32)),
 			rp: { name: 'SyncVotes' },
-			user: { id: new Uint8Array(s.publicKey.subarray(0, 16)), name: label, displayName: label },
+			user: {
+				id: new Uint8Array(s.publicKey.subarray(0, 16)),
+				name: owner.name,
+				displayName: owner.name
+			},
 			pubKeyCredParams: [
 				{ type: 'public-key', alg: -7 },
 				{ type: 'public-key', alg: -257 }
@@ -267,16 +343,17 @@ export async function lockWithPasskey(s: Signer, label: string): Promise<void> {
 	const credentialId = new Uint8Array(credential.rawId);
 	const secret = prfResult(credential) ?? (await assertSecret(credentialId, salt));
 
-	await store(
+	return store(
 		s,
 		{ kind: 'passkey', credentialId: toBase64(credentialId), salt: toBase64(salt) },
-		await keyFromSecret(secret, salt)
+		await keyFromSecret(secret, salt),
+		owner
 	);
 }
 
-export async function unlockWithPasskey(): Promise<Signer> {
-	const stored = load();
-	if (!stored || stored.lock.kind !== 'passkey') throw new Error('No passkey-locked key here');
+export async function unlockWithPasskey(id: string): Promise<Signer> {
+	const stored = find(id);
+	if (stored.lock.kind !== 'passkey') throw new Error('That key is not locked with a passkey');
 	const salt = fromBase64(stored.lock.salt);
 	const secret = await assertSecret(fromBase64(stored.lock.credentialId), salt);
 	return open(stored, await keyFromSecret(secret, salt));

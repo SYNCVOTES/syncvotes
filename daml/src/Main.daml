@@ -44,12 +44,14 @@ template Account
         description : Text
         members : [Party]
       controller user
-      do create DAO with
-           provider; operator; admin = user; name = daoName; description
-           members = dedup (user :: members)
+      do
+        now <- getTime
+        create DAO with
+          provider; operator; admin = user; name = daoName; description
+          members = dedup (user :: members); createdAt = Some now
 
 -- | A DAO is private to its members: only they, the provider and the operator ever see it.
--- Membership is fixed at creation in this version.
+-- Membership is whatever the admin last set.
 template DAO
   with
     provider : Party
@@ -58,11 +60,27 @@ template DAO
     name : Text
     description : Text
     members : [Party]
+    -- Optional and last, for the upgrade from 0.1.2.
+    createdAt : Optional Time
   where
     signatory admin, provider
     observer members, operator
 
     ensure name /= "" && admin `elem` members
+
+    -- The admin edits the DAO in place. Proposals keep the member list they were opened with.
+    choice DAO_Update : ContractId DAO
+      with
+        daoName : Text
+        description : Text
+        members : [Party]
+      controller admin
+      do create this with name = daoName; description; members = dedup (admin :: members)
+
+    -- Deleting a DAO archives its contract; the app refuses this while proposals are open.
+    choice DAO_Archive : ()
+      controller admin
+      do pure ()
 
     nonconsuming choice DAO_CreateProposal : ContractId Proposal
       with
@@ -80,7 +98,7 @@ template DAO
         assertMsg "The voting deadline must be in the future" (closesAt > now)
         create Proposal with
           provider; operator; dao = self; daoName = name; proposer; title; description
-          members; closesAt; ballots = []; outcome = None; id
+          members; closesAt; ballots = []; outcome = None; id; createdAt = Some now
 
 -- | The simplest vote that works: each member says Yes or No once; the proposal passes when a
 -- majority of all members said Yes. The vote that settles the outcome records it; a proposal
@@ -99,11 +117,36 @@ template Proposal
     ballots : [Ballot]
     outcome : Optional Outcome
     id : Optional Text
+    -- Optional and last, for the upgrade from 0.1.2.
+    createdAt : Optional Time
   where
     signatory proposer, provider
     observer members, operator
 
     ensure title /= ""
+
+    -- The proposer can rewrite the text until the first ballot is cast.
+    choice Proposal_Update : ContractId Proposal
+      with
+        title : Text
+        description : Text
+      controller proposer
+      do
+        assertMsg "Voting has started" (null ballots)
+        assertMsg "Voting is over" (isNone outcome)
+        create this with title; description
+
+    -- The proposer, or the DAO's admin, withdraws an unsettled proposal.
+    choice Proposal_Cancel : ()
+      with
+        canceller : Party
+      controller canceller
+      do
+        assertMsg "Already settled" (isNone outcome)
+        if canceller == proposer then pure ()
+        else do
+          d <- fetch dao
+          assertMsg "Only the proposer or the DAO admin can cancel" (canceller == d.admin)
 
     choice Proposal_Vote : ContractId Proposal
       with

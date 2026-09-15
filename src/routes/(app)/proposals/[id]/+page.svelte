@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { goto } from '$app/navigation';
 	import * as remote from '$lib/api.remote';
 	import * as actions from '$lib/actions';
 	import { store, flow, describe } from '$lib/wallet-store.svelte';
@@ -19,6 +20,12 @@
 	const act = (
 		what: (signer: Parameters<typeof actions.vote>[0], who: actions.Identity) => Promise<void>
 	) => flow.act(what);
+
+	let cancelling = $state(false);
+	async function cancel(contractId: string, dao: string) {
+		const ok = await act((s, w) => actions.cancelProposal(s, w, contractId));
+		if (ok) await goto(`/daos/${dao}`);
+	}
 </script>
 
 <svelte:head><title>{proposal.current?.title ?? 'Proposal'} — SyncVotes</title></svelte:head>
@@ -38,6 +45,8 @@
 		{@const member = me !== null && p.members.includes(me)}
 		{@const voted = me !== null && p.ballots.some((b) => b.voter === me)}
 		{@const outcome = p.outcome ?? (ended ? (yes >= needed ? 'Passed' : 'Failed') : null)}
+		{@const mine = me !== null && me === p.proposer}
+		{@const canCancel = !p.outcome && (mine || (me !== null && me === p.admin))}
 
 		<a href="/daos/{p.dao}" class="eyebrow hover:text-orange">← {p.daoName}</a>
 
@@ -52,8 +61,17 @@
 							: `closes ${relative(p.closesAt)}`}
 				</span>
 			</div>
-			<h1 class="display text-3xl md:text-4xl">{p.title}</h1>
-			<p class="mt-2 font-mono text-xs text-ink-dim">Proposed by {nameOf(p.proposer)}</p>
+			<div class="flex flex-wrap items-start justify-between gap-4">
+				<div>
+					<h1 class="display text-3xl md:text-4xl">{p.title}</h1>
+					<p class="mt-2 font-mono text-xs text-ink-dim">
+						Proposed by {nameOf(p.proposer)}{p.createdAt ? ` · ${relative(p.createdAt)}` : ''}
+					</p>
+				</div>
+				{#if mine && !p.outcome && p.ballots.length === 0}
+					<Button href="/proposals/{id}/edit" variant="outline" size="sm">Edit</Button>
+				{/if}
+			</div>
 		</div>
 
 		<Problem message={store.problem} />
@@ -102,6 +120,31 @@
 						{p.outcome ? 'Settled as' : 'Ended as'}
 						<span class={outcome === 'Passed' ? 'text-green' : 'text-red'}>{outcome}</span>.
 					</div>
+				{/if}
+				{#if canCancel}
+					<div class="space-y-3 border border-border bg-surface p-5">
+						<p class="text-[13px] text-ink-dim">
+							{mine ? 'Withdraw your proposal.' : 'As admin you can withdraw this proposal.'}
+						</p>
+						{#if cancelling}
+							<div class="flex gap-3">
+								<Button
+									variant="destructive"
+									size="sm"
+									disabled={store.busy}
+									onclick={() => cancel(p.contractId, p.dao)}>Yes, withdraw</Button
+								>
+								<Button variant="ghost" size="sm" onclick={() => (cancelling = false)}>Keep</Button>
+							</div>
+						{:else}
+							<Button variant="destructive" size="sm" onclick={() => (cancelling = true)}
+								>Cancel proposal</Button
+							>
+						{/if}
+					</div>
+				{/if}
+				{#if outcome}
+					<!-- settled: nothing more to do -->
 				{:else if store.screen.at === 'locked'}
 					<div class="space-y-3 border border-border bg-surface p-5">
 						<p class="text-[13px] text-ink-dim">Unlock your wallet to vote.</p>
