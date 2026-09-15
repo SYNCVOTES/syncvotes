@@ -18,9 +18,58 @@ services:
       LEDGER_API_URL: http://participant:7575
       PROVIDER_PARTY: ${PROVIDER_PARTY:?set in the env file}
       OPERATOR_PARTY: ${OPERATOR_PARTY:?set in the env file}
-      LEDGER_USER_ID: ${LEDGER_USER_ID:-administrator}
-      LEDGER_AUTH_AUDIENCE: ${LEDGER_AUTH_AUDIENCE:-https://ledger_api.example.com}
-      LEDGER_AUTH_SECRET: ${LEDGER_AUTH_SECRET:-unsafe}
+      # The app is an OAuth client of the realm below; the participant checks its tokens' RS256
+      # signature against the realm's keys and their audience against LEDGER_API_AUDIENCE.
+      LEDGER_AUTH_URL: https://${APP_DOMAIN}/auth/realms/canton/.well-known/openid-configuration
+      LEDGER_AUTH_CLIENT_ID: syncvotes-app
+      LEDGER_AUTH_CLIENT_SECRET: ${KC_APP_SECRET:?set in the env file}
+      LEDGER_AUTH_AUDIENCE: ${LEDGER_API_AUDIENCE:-https://canton.network.global}
+      LEDGER_AUTH_SCOPE: daml_ledger_api
+    depends_on:
+      - keycloak
+    networks:
+      default: {}
+
+  # The identity provider for the validator, its UIs and this app. Realm shape in keycloak/,
+  # secrets from the env file. Served under /auth on the app's domain, so no second hostname.
+  keycloak:
+    build: ./keycloak
+    restart: unless-stopped
+    environment:
+      KC_HOSTNAME: https://${APP_DOMAIN}/auth
+      KC_HTTP_ENABLED: 'true'
+      KC_PROXY_HEADERS: xforwarded
+      KC_DB_URL: jdbc:postgresql://keycloak-db/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KC_DB_PASSWORD:?set in the env file}
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_ADMIN_PASSWORD:?set in the env file}
+      # Substituted into the realm on first import.
+      LEDGER_API_AUDIENCE: ${LEDGER_API_AUDIENCE:-https://canton.network.global}
+      VALIDATOR_AUDIENCE: ${VALIDATOR_AUDIENCE:?set in the env file}
+      WALLET_UI_URL: ${WALLET_UI_URL:?set in the env file}
+      CNS_UI_URL: ${CNS_UI_URL:?set in the env file}
+      WALLET_USER_NAME: ${WALLET_USER_NAME:?set in the env file}
+      KC_VALIDATOR_SECRET: ${KC_VALIDATOR_SECRET:?set in the env file}
+      KC_APP_SECRET: ${KC_APP_SECRET}
+      KC_VALIDATOR_USER_ID: ${KC_VALIDATOR_USER_ID:?set in the env file}
+      KC_APP_USER_ID: ${KC_APP_USER_ID:?set in the env file}
+      KC_WALLET_USER_ID: ${KC_WALLET_USER_ID:?set in the env file}
+      KC_WALLET_USER_PASSWORD: ${KC_WALLET_USER_PASSWORD:?set in the env file}
+    depends_on:
+      - keycloak-db
+    networks:
+      default: {}
+
+  keycloak-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: ${KC_DB_PASSWORD}
+    volumes:
+      - keycloak-db:/var/lib/postgresql/data
     networks:
       default: {}
 
@@ -51,12 +100,18 @@ configs:
     content: |
       ${APP_DOMAIN:?set in the env file} {
         header Strict-Transport-Security "max-age=31536000; includeSubDomains"
-        reverse_proxy app:3000
+        handle /auth/* {
+          reverse_proxy keycloak:8080
+        }
+        handle {
+          reverse_proxy app:3000
+        }
       }
 
 volumes:
   caddy-data:
   caddy-config:
+  keycloak-db:
 
 networks:
   default:

@@ -27,17 +27,25 @@ export const variables = defineEnvVars({
 			"The backend's own party: observer on every proxy, reads the directory, never earns",
 		schema: required
 	},
-	LEDGER_USER_ID: {
-		description: 'The ledger user the server submits commands as',
+	LEDGER_AUTH_URL: {
+		description: "The identity provider's OpenID discovery document",
+		schema: required
+	},
+	LEDGER_AUTH_CLIENT_ID: {
+		description: 'This app as an OAuth client of the identity provider',
+		schema: required
+	},
+	LEDGER_AUTH_CLIENT_SECRET: {
+		description: "That client's secret",
 		schema: required
 	},
 	LEDGER_AUTH_AUDIENCE: {
-		description: "Audience for the participant's token",
+		description: 'Audience the participant expects in ledger tokens',
 		schema: required
 	},
-	LEDGER_AUTH_SECRET: {
-		description: 'Token signing secret; `unsafe` on a validator running dev-mode auth',
-		schema: required
+	LEDGER_AUTH_SCOPE: {
+		description: 'Scope to request for ledger tokens',
+		schema: v.optional(v.string(), 'daml_ledger_api')
 	},
 	GIT_SHA: {
 		description: 'The commit this image was built from, baked in by the Dockerfile',

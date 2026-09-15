@@ -1,0 +1,167 @@
+{
+	"realm": "canton",
+	"enabled": true,
+	"sslRequired": "external",
+	"offlineSessionMaxLifespanEnabled": true,
+	"offlineSessionMaxLifespan": 5184000,
+	"offlineSessionIdleTimeout": 2592000,
+	"clientScopes": [
+		{
+			"name": "daml_ledger_api",
+			"protocol": "openid-connect",
+			"attributes": { "display.on.consent.screen": "false", "include.in.token.scope": "true" },
+			"protocolMappers": [
+				{
+					"name": "daml_ledger_api_scope",
+					"protocol": "openid-connect",
+					"protocolMapper": "oidc-usermodel-client-role-mapper",
+					"consentRequired": false,
+					"config": {
+						"claim.name": "daml_ledger_api_scope",
+						"jsonType.label": "String",
+						"multivalued": "false",
+						"access.token.claim": "true",
+						"id.token.claim": "false",
+						"userinfo.token.claim": "false",
+						"introspection.token.claim": "false"
+					}
+				},
+				{
+					"name": "audience",
+					"protocol": "openid-connect",
+					"protocolMapper": "oidc-audience-mapper",
+					"consentRequired": false,
+					"config": {
+						"included.custom.audience": "${LEDGER_API_AUDIENCE}",
+						"access.token.claim": "true",
+						"introspection.token.claim": "true",
+						"id.token.claim": "false",
+						"lightweight.claim": "false"
+					}
+				}
+			]
+		},
+		{
+			"name": "openid",
+			"protocol": "openid-connect",
+			"attributes": { "display.on.consent.screen": "false", "include.in.token.scope": "true" },
+			"protocolMappers": [
+				{
+					"name": "aud",
+					"protocol": "openid-connect",
+					"protocolMapper": "oidc-audience-mapper",
+					"consentRequired": false,
+					"config": {
+						"included.custom.audience": "${VALIDATOR_AUDIENCE}",
+						"access.token.claim": "true",
+						"introspection.token.claim": "true",
+						"id.token.claim": "false",
+						"lightweight.claim": "false"
+					}
+				},
+				{
+					"name": "sub",
+					"protocol": "openid-connect",
+					"protocolMapper": "oidc-sub-mapper",
+					"consentRequired": false,
+					"config": {
+						"access.token.claim": "true",
+						"introspection.token.claim": "true",
+						"lightweight.claim": "false"
+					}
+				}
+			]
+		}
+	],
+	"clients": [
+		{
+			"clientId": "ledger-api",
+			"enabled": true,
+			"publicClient": false,
+			"bearerOnly": true,
+			"standardFlowEnabled": false,
+			"directAccessGrantsEnabled": false,
+			"serviceAccountsEnabled": false,
+			"defaultClientScopes": ["daml_ledger_api"],
+			"optionalClientScopes": []
+		},
+		{
+			"clientId": "validator-app-backend",
+			"enabled": true,
+			"publicClient": false,
+			"secret": "${KC_VALIDATOR_SECRET}",
+			"standardFlowEnabled": false,
+			"directAccessGrantsEnabled": false,
+			"serviceAccountsEnabled": true,
+			"defaultClientScopes": ["daml_ledger_api"],
+			"optionalClientScopes": []
+		},
+		{
+			"clientId": "syncvotes-app",
+			"enabled": true,
+			"publicClient": false,
+			"secret": "${KC_APP_SECRET}",
+			"standardFlowEnabled": false,
+			"directAccessGrantsEnabled": false,
+			"serviceAccountsEnabled": true,
+			"defaultClientScopes": ["daml_ledger_api"],
+			"optionalClientScopes": []
+		},
+		{
+			"clientId": "wallet-web-ui",
+			"enabled": true,
+			"publicClient": true,
+			"standardFlowEnabled": true,
+			"directAccessGrantsEnabled": false,
+			"serviceAccountsEnabled": false,
+			"rootUrl": "${WALLET_UI_URL}",
+			"redirectUris": ["${WALLET_UI_URL}/*"],
+			"webOrigins": ["${WALLET_UI_URL}"],
+			"attributes": {
+				"pkce.code.challenge.method": "S256",
+				"post.logout.redirect.uris": "${WALLET_UI_URL}"
+			},
+			"defaultClientScopes": ["openid", "daml_ledger_api"],
+			"optionalClientScopes": ["offline_access"]
+		},
+		{
+			"clientId": "cns-ui",
+			"enabled": true,
+			"publicClient": true,
+			"standardFlowEnabled": true,
+			"directAccessGrantsEnabled": false,
+			"serviceAccountsEnabled": false,
+			"rootUrl": "${CNS_UI_URL}",
+			"redirectUris": ["${CNS_UI_URL}/*"],
+			"webOrigins": ["${CNS_UI_URL}"],
+			"attributes": {
+				"pkce.code.challenge.method": "S256",
+				"post.logout.redirect.uris": "${CNS_UI_URL}"
+			},
+			"defaultClientScopes": ["openid", "daml_ledger_api"],
+			"optionalClientScopes": ["offline_access"]
+		}
+	],
+	"users": [
+		{
+			"id": "${KC_VALIDATOR_USER_ID}",
+			"username": "service-account-validator-app-backend",
+			"enabled": true,
+			"serviceAccountClientId": "validator-app-backend"
+		},
+		{
+			"id": "${KC_APP_USER_ID}",
+			"username": "service-account-syncvotes-app",
+			"enabled": true,
+			"serviceAccountClientId": "syncvotes-app"
+		},
+		{
+			"id": "${KC_WALLET_USER_ID}",
+			"username": "${WALLET_USER_NAME}",
+			"enabled": true,
+			"credentials": [
+				{ "type": "password", "value": "${KC_WALLET_USER_PASSWORD}", "temporary": false }
+			]
+		}
+	]
+}

@@ -4,9 +4,11 @@ import {
 	LEDGER_API_URL,
 	PROVIDER_PARTY,
 	OPERATOR_PARTY,
-	LEDGER_USER_ID,
+	LEDGER_AUTH_URL,
+	LEDGER_AUTH_CLIENT_ID,
+	LEDGER_AUTH_CLIENT_SECRET,
 	LEDGER_AUTH_AUDIENCE,
-	LEDGER_AUTH_SECRET
+	LEDGER_AUTH_SCOPE
 } from '$app/env/private';
 
 /**
@@ -27,15 +29,16 @@ function required(name: string, value: string | undefined): string {
 export const providerParty = () => required('PROVIDER_PARTY', PROVIDER_PARTY);
 export const operatorParty = () => required('OPERATOR_PARTY', OPERATOR_PARTY);
 
+/** OAuth2 client credentials against the identity provider; the ledger user is the token's `sub`. */
 const auth = () =>
 	({
-		method: 'self_signed',
-		issuer: 'syncvotes',
+		method: 'client_credentials',
+		configUrl: required('LEDGER_AUTH_URL', LEDGER_AUTH_URL),
 		credentials: {
-			clientId: required('LEDGER_USER_ID', LEDGER_USER_ID),
-			clientSecret: required('LEDGER_AUTH_SECRET', LEDGER_AUTH_SECRET),
+			clientId: required('LEDGER_AUTH_CLIENT_ID', LEDGER_AUTH_CLIENT_ID),
+			clientSecret: required('LEDGER_AUTH_CLIENT_SECRET', LEDGER_AUTH_CLIENT_SECRET),
 			audience: required('LEDGER_AUTH_AUDIENCE', LEDGER_AUTH_AUDIENCE),
-			scope: ''
+			scope: LEDGER_AUTH_SCOPE
 		}
 	}) as const;
 
@@ -49,7 +52,7 @@ async function create() {
 type Sdk = Awaited<ReturnType<typeof create>>;
 let instance: Promise<Sdk> | undefined;
 
-/** One SDK for the process. `self_signed` is the validator's dev-mode HS256 auth. */
+/** One SDK for the process. */
 export function sdk(): Promise<Sdk> {
 	return (instance ??= create());
 }
