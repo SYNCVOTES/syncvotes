@@ -13,12 +13,12 @@
 	--bg-surface: #14120d;
 	--bg-hover: #1a1712;
 	--bg-active: #221f18;
-	--border: rgba(237, 232, 220, 0.1);
+	--border: rgba(237, 232, 220, 0.12);
 	--border-hover: rgba(237, 232, 220, 0.2);
 	--text: #ede8dc;
 	--text-rgb: 237, 232, 220;
-	--text-mid: rgba(237, 232, 220, 0.55);
-	--text-dim: rgba(237, 232, 220, 0.32);
+	--text-mid: rgba(237, 232, 220, 0.68);
+	--text-dim: rgba(237, 232, 220, 0.46);
 	--accent: #ff4d00;
 	--accent-rgb: 255, 77, 0;
 	--accent-dim: rgba(255, 77, 0, 0.12);
@@ -46,8 +46,8 @@
 		--border-hover: rgba(32, 28, 21, 0.26);
 		--text: #201c15;
 		--text-rgb: 32, 28, 21;
-		--text-mid: rgba(32, 28, 21, 0.64);
-		--text-dim: rgba(32, 28, 21, 0.46);
+		--text-mid: rgba(32, 28, 21, 0.72);
+		--text-dim: rgba(32, 28, 21, 0.56);
 		--accent: #d63c00;
 		--accent-rgb: 214, 60, 0;
 		--accent-dim: rgba(214, 60, 0, 0.1);
@@ -75,8 +75,8 @@
 	--border-hover: rgba(32, 28, 21, 0.26);
 	--text: #201c15;
 	--text-rgb: 32, 28, 21;
-	--text-mid: rgba(32, 28, 21, 0.64);
-	--text-dim: rgba(32, 28, 21, 0.46);
+	--text-mid: rgba(32, 28, 21, 0.72);
+	--text-dim: rgba(32, 28, 21, 0.56);
 	--accent: #d63c00;
 	--accent-rgb: 214, 60, 0;
 	--accent-dim: rgba(214, 60, 0, 0.1);
