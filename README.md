@@ -149,16 +149,15 @@ see what is running where. Runtime dependencies are the generated Daml bindings 
 ships CommonJS that breaks when bundled into an ES module); adapter-node bundles everything else
 into `build/`.
 
-Caddy's config is baked into its image (`deploy/caddy.Dockerfile`) rather than bind-mounted — a
-host path would be resolved on the server, where this tree does not exist.
+Caddy's config is inline in `compose.yaml` (a compose `configs` entry with `content:`) rather than
+bind-mounted — a host path would be resolved on the server, where this tree does not exist.
 
 Building on the server is deliberate: it is amd64, the laptop is not, and the layer cache is there.
 
 `deploy/` is a separate compose project that joins the Splice validator's network — the validator
 has its own `start.sh`, which does more than `compose up`, so a deploy must never recreate its
 containers. Caddy binds the public IP because the validator's nginx already holds `:80` on
-loopback, and answers to `json-ledger-api.localhost` internally so the participant can be reached
-by Host header.
+loopback. The app reaches the participant directly at `participant:7575` on that network.
 
 The DAR is built inside the image, and the app uploads it on startup (`src/hooks.server.ts`) —
 idempotent by package id — so the code and the package it needs always land together.
