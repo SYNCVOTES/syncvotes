@@ -108,6 +108,17 @@
 			"optionalClientScopes": []
 		},
 		{
+			"clientId": "billing-agent",
+			"enabled": true,
+			"publicClient": false,
+			"secret": "${KC_BILLING_SECRET}",
+			"standardFlowEnabled": false,
+			"directAccessGrantsEnabled": false,
+			"serviceAccountsEnabled": true,
+			"defaultClientScopes": ["openid"],
+			"optionalClientScopes": []
+		},
+		{
 			"clientId": "wallet-web-ui",
 			"enabled": true,
 			"publicClient": true,
@@ -154,6 +165,12 @@
 			"username": "service-account-syncvotes-app",
 			"enabled": true,
 			"serviceAccountClientId": "syncvotes-app"
+		},
+		{
+			"id": "${KC_BILLING_USER_ID}",
+			"username": "service-account-billing-agent",
+			"enabled": true,
+			"serviceAccountClientId": "billing-agent"
 		},
 		{
 			"id": "${KC_WALLET_USER_ID}",
