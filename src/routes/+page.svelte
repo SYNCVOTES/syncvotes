@@ -224,7 +224,7 @@
 		</button>
 		<div class="links">
 			<a href="#moves">Protocol</a>
-			<a href="#feed">Live</a>
+			<a href="#feed">Privacy</a>
 			<a href="/my-daos">DAOs</a>
 			<a href="https://docs.canton.network" target="_blank" rel="noopener">Canton</a>
 		</div>
@@ -246,7 +246,7 @@
 	{#if menuOpen}
 		<div class="nav-drawer open" role="presentation" onclick={() => (menuOpen = false)}>
 			<a href="#moves">Protocol</a>
-			<a href="#feed">Live</a>
+			<a href="#feed">Privacy</a>
 			<a href="/my-daos">DAOs</a>
 			<a href="https://docs.canton.network" target="_blank" rel="noopener">Canton</a>
 		</div>
