@@ -58,6 +58,17 @@ export const directory = query(async () =>
 
 // ---- Reads -------------------------------------------------------------------------------
 
+/** Counts for the landing ticker. Aggregates only — DAOs are private, their contents stay so. */
+export const stats = query(async () => {
+	const [daos, proposals, accounts] = await Promise.all([app.daos(), app.proposals(), app.accounts()]);
+	return {
+		daos: daos.length,
+		openProposals: proposals.filter((p) => !p.outcome).length,
+		votesCast: proposals.reduce((n, p) => n + p.ballots.length, 0),
+		members: accounts.length
+	};
+});
+
 /** The DAOs a party belongs to, with their open proposal count. */
 export const myDaos = query(partyId, async (party) => {
 	const [daos, proposals] = await Promise.all([app.daos(), app.proposals()]);

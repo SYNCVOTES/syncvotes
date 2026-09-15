@@ -6,6 +6,7 @@
 	import { Textarea } from '$lib/components/ui/textarea';
 	import PageHeader from '$lib/components/app/page-header.svelte';
 	import Problem from '$lib/components/app/problem.svelte';
+	import UnlockForm from '$lib/components/app/unlock-form.svelte';
 
 	let phraseInput = $state('');
 	let savedPhrase = $state(false);
@@ -117,25 +118,11 @@
 			</Button>
 		</section>
 	{:else if screen.at === 'locked'}
-		<form
-			class="space-y-5 border border-border bg-surface p-8"
-			onsubmit={(e) => {
-				e.preventDefault();
-				flow.unlock(password);
-				password = '';
-			}}
-		>
+		<section class="space-y-5 border border-border bg-surface p-8">
 			<h2 class="eyebrow">Unlock</h2>
-			{#if screen.lock === 'passkey'}
-				<Button type="button" disabled={store.busy} onclick={() => flow.unlock()}>Unlock with Touch ID / passkey</Button>
-			{:else}
-				<div class="flex gap-3">
-					<Input type="password" placeholder="password" autocomplete="current-password" class="flex-1" bind:value={password} />
-					<Button type="submit" disabled={store.busy || !password}>Unlock</Button>
-				</div>
-			{/if}
+			<UnlockForm />
 			<Button type="button" variant="link" size="sm" onclick={flow.forget}>Forget the key on this device</Button>
-		</form>
+		</section>
 	{:else}
 		<section class="space-y-6">
 			<div class="border border-border bg-surface p-6">
