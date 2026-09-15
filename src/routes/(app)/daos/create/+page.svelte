@@ -82,9 +82,6 @@
 					<p class="text-xs text-ink-dim">
 						Members are named by their SyncVotes name. Membership is fixed at creation in this
 						version.
-						{#if directory.current}
-							Registered: {directory.current.map((e) => e.name).join(', ')}.
-						{/if}
 					</p>
 				</div>
 			</section>

@@ -127,7 +127,7 @@
 			>
 				<Input
 					type="password"
-					placeholder="or a password"
+					placeholder={passkeys ? 'or a password' : 'a password'}
 					autocomplete="new-password"
 					class="flex-1"
 					bind:value={password}

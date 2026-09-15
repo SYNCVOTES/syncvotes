@@ -202,7 +202,7 @@
 			<a href="https://docs.canton.network" target="_blank" rel="noopener">Canton</a>
 		</div>
 		<div class="nav-right">
-			<a class="nav-cta" href="/my-daos">Launch<span class="hide-sm">&#32;App</span></a>
+			<a class="nav-cta" href="/my-daos">Launch<span class="hide-sm">{' '}App</span></a>
 			<button
 				class="nav-burger"
 				type="button"
@@ -268,7 +268,7 @@
 	<section class="manif">
 		<p>
 			{#each MANIFESTO as w, i (i)}
-				<span><span class="w{w.a ? ' a' : ''}{w.s ? ' s' : ''}">{w.t}</span>&#32;</span>
+				<span><span class="w{w.a ? ' a' : ''}{w.s ? ' s' : ''}">{w.t}</span>{' '}</span>
 			{/each}
 		</p>
 	</section>

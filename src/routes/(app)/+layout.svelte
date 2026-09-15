@@ -31,7 +31,7 @@
 				<BrandMark size={16} />
 				<span>SYNCVOTES</span>
 				<span
-					class="border border-orange/30 bg-orange/[0.07] px-1.5 py-0.5 font-mono text-xs leading-none font-semibold tracking-[0.08em] text-orange uppercase"
+					class="hidden border border-orange/30 bg-orange/[0.07] px-1.5 py-0.5 font-mono text-xs leading-none font-semibold tracking-[0.08em] text-orange uppercase sm:inline"
 				>
 					beta
 				</span>
