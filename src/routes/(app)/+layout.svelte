@@ -5,7 +5,7 @@
 	import { store } from '$lib/wallet-store.svelte';
 	import { theme, toggleTheme } from '$lib/theme.svelte';
 
-	let { children, data } = $props();
+	let { children } = $props();
 
 	const nav = [
 		{ href: '/my-daos', label: 'My DAOs' },
@@ -53,10 +53,10 @@
 			</nav>
 		</div>
 
-		<div class="flex items-center gap-2">
+		<div class="flex items-center gap-2.5">
 			<button
 				type="button"
-				class="flex size-[34px] items-center justify-center rounded-full border border-border text-ink-mid transition-colors hover:border-orange/40 hover:bg-orange-dim hover:text-orange"
+				class="flex size-8 items-center justify-center rounded-full border border-border text-ink-mid transition-colors hover:border-orange/40 hover:bg-orange-dim hover:text-orange"
 				aria-label={theme.mode === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
 				onclick={toggleTheme}
 			>
@@ -82,9 +82,15 @@
 				{/if}
 			</button>
 
-			<span class="hidden font-mono text-xs font-semibold text-amber sm:inline">TestNet</span>
+			<!-- The network, as a pill like everything else on this row: one dot, one word. -->
+			<span
+				class="hidden h-8 items-center gap-2 rounded-full border border-amber/30 bg-amber/5 px-3 font-mono text-[0.6875rem] tracking-[0.14em] text-amber uppercase sm:flex"
+			>
+				<span class="size-1.5 rounded-full bg-amber"></span>
+				TestNet
+			</span>
 
-			<Button href="/wallet" variant="accent" size="sm" class="tracking-[0.02em] normal-case">
+			<Button href="/wallet" variant="accent" size="sm">
 				{#if store.who}<span class="size-2 rounded-full bg-green"></span>{/if}
 				{walletLabel}
 			</Button>
@@ -111,9 +117,7 @@
 			</div>
 			<div class="flex flex-col gap-1 md:items-end">
 				<span class="eyebrow mb-1">Network</span>
-				<a href="/version" class="font-mono text-xs text-ink-mid hover:text-orange"
-					>Build {data.build.slice(0, 7)}</a
-				>
+				<a href="/version" class="font-mono text-xs text-ink-mid hover:text-orange">Build</a>
 				<a
 					href="https://docs.canton.network"
 					target="_blank"
