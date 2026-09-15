@@ -1,60 +1,131 @@
 module Main where
 
-import DA.Optional (optionalToList)
+import DA.List (dedup)
+import DA.Optional (isNone)
 
-type AssetId = ContractId Asset
-
--- The app provider is a signatory here, and that is the whole point: under CIP-0104 traffic is
--- credited to parties that act as confirmers of a transaction, and signatories are confirmers.
--- A party that is merely an observer earns nothing.
---
--- The provider signs this once, at creation. From then on the user exercises choices on it and
--- signs only for themselves — the provider's authorisation is already baked into the contract,
--- so its key never takes part in user transactions.
+-- The whole model rests on one idea: every contract a user acts on already carries the app
+-- provider's signature, so the provider is a confirmer of every transaction — which is what
+-- CIP-0104 pays traffic rewards for — while the user's own key is the only one that ever signs
+-- a submission. The provider's authority enters once, when the account is created, and every
+-- later contract inherits it through the choice that creates it.
 --
 -- Two provider-side parties, per the Featured App Coupon Guidance on separating concerns: the
 -- provider holds the FeaturedAppRight and only ever signs; the operator is the backend's own
--- party, an observer that reads the directory and never earns. Optional and last so 0.0.1
--- contracts stay valid under smart contract upgrades.
-template AppProxy
+-- party, an observer that reads and never earns.
+
+data Vote = Yes | No
+  deriving (Eq, Show)
+
+data Ballot = Ballot with
+    voter : Party
+    vote : Vote
+  deriving (Eq, Show)
+
+data Outcome = Passed | Failed
+  deriving (Eq, Show)
+
+-- | A user's standing with the app: their name in the directory, and the door through which
+-- they create DAOs. Created by the provider once per party.
+template Account
   with
     provider : Party
+    operator : Party
     user : Party
     name : Text
-    operator : Optional Party
   where
     signatory provider
-    observer user, optionalToList operator
+    observer user, operator
 
-    -- The provider is the only signatory, which makes the set of proxies the app's directory:
-    -- listing them gives a display name for every party. Contract keys would enforce uniqueness
-    -- on-ledger, but they need Daml-LF 2.3 and this package targets 2.2, so the backend checks.
-
-    nonconsuming choice AppProxy_Issue : AssetId
-      with
-        name : Text
-      controller user
-      do create Asset with issuer = user, owner = user, name
-
-    nonconsuming choice AppProxy_Give : AssetId
-      with
-        assetId : AssetId
-        newOwner : Party
-      controller user
-      do exercise assetId Give with newOwner
-
-template Asset
-  with
-    issuer : Party
-    owner  : Party
-    name   : Text
-  where
     ensure name /= ""
-    signatory issuer
-    observer owner
-    choice Give : AssetId
+
+    nonconsuming choice Account_CreateDAO : ContractId DAO
       with
-        newOwner : Party
-      controller owner
-      do create this with
-           owner = newOwner
+        daoName : Text
+        description : Text
+        members : [Party]
+      controller user
+      do create DAO with
+           provider; operator; admin = user; name = daoName; description
+           members = dedup (user :: members)
+
+-- | A DAO is private to its members: only they, the provider and the operator ever see it.
+-- Membership is fixed at creation in this version.
+template DAO
+  with
+    provider : Party
+    operator : Party
+    admin : Party
+    name : Text
+    description : Text
+    members : [Party]
+  where
+    signatory admin, provider
+    observer members, operator
+
+    ensure name /= "" && admin `elem` members
+
+    nonconsuming choice DAO_CreateProposal : ContractId Proposal
+      with
+        proposer : Party
+        title : Text
+        description : Text
+        closesAt : Time
+      controller proposer
+      do
+        assertMsg "Only members can propose" (proposer `elem` members)
+        now <- getTime
+        assertMsg "The voting deadline must be in the future" (closesAt > now)
+        create Proposal with
+          provider; operator; dao = self; daoName = name; proposer; title; description
+          members; closesAt; ballots = []; outcome = None
+
+-- | The simplest vote that works: each member says Yes or No once; the proposal passes when a
+-- majority of all members said Yes. It can be closed as soon as the outcome is settled, or
+-- after the deadline.
+template Proposal
+  with
+    provider : Party
+    operator : Party
+    dao : ContractId DAO
+    daoName : Text
+    proposer : Party
+    title : Text
+    description : Text
+    members : [Party]
+    closesAt : Time
+    ballots : [Ballot]
+    outcome : Optional Outcome
+  where
+    signatory proposer, provider
+    observer members, operator
+
+    ensure title /= ""
+
+    choice Proposal_Vote : ContractId Proposal
+      with
+        voter : Party
+        vote : Vote
+      controller voter
+      do
+        assertMsg "Only members can vote" (voter `elem` members)
+        assertMsg "Voting is over" (isNone outcome)
+        now <- getTime
+        assertMsg "The deadline has passed" (now < closesAt)
+        assertMsg "Already voted" (not (any (\b -> b.voter == voter) ballots))
+        create this with ballots = Ballot voter vote :: ballots
+
+    choice Proposal_Close : ContractId Proposal
+      with
+        closer : Party
+      controller closer
+      do
+        assertMsg "Only members can close" (closer `elem` members)
+        assertMsg "Already closed" (isNone outcome)
+        now <- getTime
+        let yes = length (filter (\b -> b.vote == Yes) ballots)
+            no = length (filter (\b -> b.vote == No) ballots)
+            needed = length members / 2 + 1
+            -- Settled early when Yes has a majority, or when No has made one impossible.
+            settled = yes >= needed || length members - no < needed
+        assertMsg "Still open" (settled || now >= closesAt)
+        create this with outcome = Some (if yes >= needed then Passed else Failed)

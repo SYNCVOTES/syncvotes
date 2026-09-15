@@ -1,0 +1,166 @@
+<script lang="ts">
+	import * as wallet from '$lib/wallet';
+	import { store, flow, lock } from '$lib/wallet-store.svelte';
+	import { Button } from '$lib/components/ui/button';
+	import { Input } from '$lib/components/ui/input';
+	import { Textarea } from '$lib/components/ui/textarea';
+	import PageHeader from '$lib/components/app/page-header.svelte';
+	import Problem from '$lib/components/app/problem.svelte';
+
+	let phraseInput = $state('');
+	let savedPhrase = $state(false);
+	let nameInput = $state('');
+	let password = $state('');
+
+	const screen = $derived(store.screen);
+</script>
+
+<svelte:head><title>Wallet — SyncVotes</title></svelte:head>
+
+<div class="mx-auto max-w-[760px] px-6 py-12 md:px-10">
+	<PageHeader
+		eyebrow="Embedded wallet"
+		title="Wallet"
+		description="Your key lives in this browser and signs every transaction; your party lives on this app's validator. Nothing to install, nobody holds the key but you."
+	/>
+
+	<Problem message={store.problem} />
+
+	{#if screen.at === 'loading'}
+		<p class="text-sm text-ink-dim">Loading…</p>
+	{:else if screen.at === 'welcome'}
+		<section class="space-y-5 border border-dashed border-border p-8">
+			<p class="text-sm text-ink-mid">
+				There is no key on this device. Create one, or bring back an existing party with its recovery
+				phrase.
+			</p>
+			<div class="flex flex-wrap gap-3">
+				<Button size="lg" onclick={flow.startCreate}>Create a new key</Button>
+				<Button size="lg" variant="outline" onclick={flow.startRestore}>I have a recovery phrase</Button>
+			</div>
+		</section>
+	{:else if screen.at === 'create'}
+		<section class="space-y-5 border border-border bg-surface p-8">
+			<h2 class="eyebrow">Your recovery phrase</h2>
+			<p class="text-sm text-ink-mid">
+				Write these twelve words down. They are the only way back to this party from another device,
+				and nobody — this app included — can restore them for you.
+			</p>
+			<p class="border border-border bg-surface-active p-5 font-mono text-sm leading-8 select-all">{screen.phrase}</p>
+			<label class="flex items-center gap-2 text-sm">
+				<input type="checkbox" class="accent-orange" bind:checked={savedPhrase} />
+				I have written it down
+			</label>
+			<div class="flex gap-3">
+				<Button disabled={store.busy || !savedPhrase} onclick={flow.confirmCreate}>Continue</Button>
+				<Button variant="ghost" onclick={flow.back}>Back</Button>
+			</div>
+		</section>
+	{:else if screen.at === 'restore'}
+		<form
+			class="space-y-5 border border-border bg-surface p-8"
+			onsubmit={(e) => {
+				e.preventDefault();
+				flow.confirmRestore(phraseInput);
+			}}
+		>
+			<h2 class="eyebrow">Recovery phrase</h2>
+			<Textarea rows={3} placeholder="twelve words, separated by spaces" class="font-mono" bind:value={phraseInput} />
+			<div class="flex gap-3">
+				<Button type="submit" disabled={store.busy || !phraseInput.trim()}>Restore</Button>
+				<Button type="button" variant="ghost" onclick={flow.back}>Back</Button>
+			</div>
+		</form>
+	{:else if screen.at === 'name'}
+		<form
+			class="space-y-5 border border-border bg-surface p-8"
+			onsubmit={(e) => {
+				e.preventDefault();
+				flow.confirmName(nameInput);
+			}}
+		>
+			<h2 class="eyebrow">Pick a name</h2>
+			<p class="text-sm text-ink-mid">
+				Others add you to DAOs by this name. Your party will be
+				<code class="break-all text-xs">{screen.topology.partyId}</code>.
+			</p>
+			<div class="flex gap-3">
+				<Input placeholder="e.g. alice" class="flex-1" bind:value={nameInput} />
+				<Button type="submit" disabled={store.busy || nameInput.trim().length < 2}>
+					{store.busy ? 'Creating party…' : 'Create party'}
+				</Button>
+			</div>
+		</form>
+	{:else if screen.at === 'protect'}
+		<section class="space-y-5 border border-border bg-surface p-8">
+			<h2 class="eyebrow">Keep the key on this device?</h2>
+			<p class="text-sm text-ink-mid">
+				It is stored encrypted, and unlocked with Touch ID or a password each visit. Without this you
+				will need the recovery phrase every time.
+			</p>
+			{#if wallet.passkeysAvailable()}
+				<Button disabled={store.busy} onclick={flow.protectWithPasskey}>Use Touch ID / passkey</Button>
+			{/if}
+			<form
+				class="flex gap-3"
+				onsubmit={(e) => {
+					e.preventDefault();
+					flow.protectWithPassword(password);
+					password = '';
+				}}
+			>
+				<Input type="password" placeholder="or a password" autocomplete="new-password" class="flex-1" bind:value={password} />
+				<Button type="submit" variant="outline" disabled={store.busy || password.length < 8}>Use password</Button>
+			</form>
+			<Button variant="link" size="sm" disabled={store.busy} onclick={flow.skipProtection}>
+				Don't keep it, just continue this once
+			</Button>
+		</section>
+	{:else if screen.at === 'locked'}
+		<form
+			class="space-y-5 border border-border bg-surface p-8"
+			onsubmit={(e) => {
+				e.preventDefault();
+				flow.unlock(password);
+				password = '';
+			}}
+		>
+			<h2 class="eyebrow">Unlock</h2>
+			{#if screen.lock === 'passkey'}
+				<Button type="button" disabled={store.busy} onclick={() => flow.unlock()}>Unlock with Touch ID / passkey</Button>
+			{:else}
+				<div class="flex gap-3">
+					<Input type="password" placeholder="password" autocomplete="current-password" class="flex-1" bind:value={password} />
+					<Button type="submit" disabled={store.busy || !password}>Unlock</Button>
+				</div>
+			{/if}
+			<Button type="button" variant="link" size="sm" onclick={flow.forget}>Forget the key on this device</Button>
+		</form>
+	{:else}
+		<section class="space-y-6">
+			<div class="border border-border bg-surface p-6">
+				<div class="flex items-start justify-between gap-4">
+					<div>
+						<div class="eyebrow mb-2">Signed in as</div>
+						<div class="font-display text-2xl font-bold">{screen.who.name}</div>
+					</div>
+					<span class="flex items-center gap-2 font-mono text-xs text-green">
+						<span class="size-2 rounded-full bg-green"></span> unlocked
+					</span>
+				</div>
+				<div class="mt-5">
+					<div class="eyebrow mb-1">Party</div>
+					<code class="block break-all text-xs text-ink-mid">{screen.who.party}</code>
+				</div>
+			</div>
+			<div class="flex flex-wrap gap-3">
+				<Button href="/my-daos">My DAOs</Button>
+				<Button variant="outline" onclick={lock}>Lock</Button>
+			</div>
+			<p class="text-xs text-ink-dim">
+				The key is disposed after fifteen quiet minutes and whenever you leave the page; the encrypted
+				copy stays on this device.
+			</p>
+		</section>
+	{/if}
+</div>

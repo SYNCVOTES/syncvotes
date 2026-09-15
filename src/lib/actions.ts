@@ -1,4 +1,3 @@
-import type { Main } from '@daml.js/model';
 import * as remote from './api.remote';
 import { toBase64, type Signer } from './wallet';
 import { verifyPrepared, verifyTopology } from './verify';
@@ -9,8 +8,6 @@ import { verifyPrepared, verifyTopology } from './verify';
  * sends it on. The key itself never leaves its closure in `wallet.ts`.
  */
 
-export type AssetContract = { contractId: string; payload: Main.Asset };
-export type Entry = { party: string; name: string };
 export type Identity = { party: string; name: string };
 export type Topology = Awaited<ReturnType<typeof remote.lookup>>;
 
@@ -30,25 +27,11 @@ export async function enrol(s: Signer, topology: Topology, name: string): Promis
 	return { party, name };
 }
 
-/** Always fresh: queries are cached per argument, and the ledger moves underneath them. */
-export async function listAssets(party: string) {
-	const listing = remote.listAssets(party);
-	await listing.refresh();
-	return listing;
-}
+type Prepared = { preparedTransaction: string; preparedTransactionHash: string; hashingSchemeVersion: string };
 
-/** The Daml choice each intent must turn into; anything else is refused before signing. */
-const CHOICE = { issue: 'AppProxy_Issue', give: 'AppProxy_Give' } as const;
-
-/** Prepare on the server, verify and sign here, execute on the server — which waits for completion. */
-async function transact(
-	s: Signer,
-	who: Identity,
-	intent: Parameters<typeof remote.prepare>[0]['intent']
-): Promise<void> {
-	const prepared = await remote.prepare({ party: who.party, intent });
-	await verifyPrepared(prepared, { party: who.party, choice: CHOICE[intent.kind] });
-
+/** Verify and sign a prepared transaction here, then let the server execute it. */
+async function sign(s: Signer, who: Identity, choice: string, prepared: Prepared): Promise<void> {
+	await verifyPrepared(prepared, { party: who.party, choice });
 	await remote.execute({
 		party: who.party,
 		...prepared,
@@ -56,10 +39,30 @@ async function transact(
 	});
 }
 
-export const issueAsset = (s: Signer, who: Identity, name: string) =>
-	transact(s, who, { kind: 'issue', name });
+export async function createDao(
+	s: Signer,
+	who: Identity,
+	input: { name: string; description: string; members: string[] }
+): Promise<void> {
+	const prepared = await remote.prepareCreateDao({ party: who.party, ...input });
+	await sign(s, who, 'Account_CreateDAO', prepared);
+}
 
-export const giveAsset = (s: Signer, who: Identity, contractId: string, to: string) =>
-	transact(s, who, { kind: 'give', contractId, to });
+export async function createProposal(
+	s: Signer,
+	who: Identity,
+	input: { dao: string; title: string; description: string; days: number }
+): Promise<void> {
+	const prepared = await remote.prepareCreateProposal({ party: who.party, ...input });
+	await sign(s, who, 'DAO_CreateProposal', prepared);
+}
 
-export type Listing = { assets: AssetContract[]; directory: Entry[] };
+export async function vote(s: Signer, who: Identity, proposal: string, choice: 'Yes' | 'No') {
+	const prepared = await remote.prepareVote({ party: who.party, proposal, vote: choice });
+	await sign(s, who, 'Proposal_Vote', prepared);
+}
+
+export async function close(s: Signer, who: Identity, proposal: string) {
+	const prepared = await remote.prepareClose({ party: who.party, proposal });
+	await sign(s, who, 'Proposal_Close', prepared);
+}

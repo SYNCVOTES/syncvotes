@@ -3,26 +3,34 @@ import { command, query } from '$app/server';
 import * as v from 'valibot';
 import { Main } from '@daml.js/model';
 import * as participant from './server/participant';
-import { directory, entryFor, normaliseName, PARTY_HINT, register } from './server/app';
+import * as app from './server/app';
 
 /**
  * The server's API, as remote functions: the page calls these like local functions, SvelteKit
  * does the transport. Everything here runs on the server with the participant credentials; the
  * user's key stays in the browser and only ever contributes signatures.
+ *
+ * Reads are open: a DAO is private to the network — only its members, the provider and the
+ * operator hold it — and this app is the operator. Writes are transactions the ledger accepts
+ * only with the acting party's own signature.
  */
 
 const base64 = v.pipe(v.string(), v.nonEmpty(), v.base64());
 const partyId = v.pipe(v.string(), v.includes('::'));
+const contractId = v.pipe(v.string(), v.nonEmpty());
+const text = (max: number) => v.pipe(v.string(), v.trim(), v.nonEmpty(), v.maxLength(max));
+
+// ---- Identity ----------------------------------------------------------------------------
 
 /**
  * Who is this key? The participant derives the party id from it. If that party already exists
  * the user is returning; otherwise the result carries what the key has to sign to create it.
  */
 export const lookup = query(base64, async (publicKey) => {
-	const topology = await participant.generateTopology(PARTY_HINT, publicKey);
+	const topology = await participant.generateTopology(app.PARTY_HINT, publicKey);
 	const exists = await participant.partyExists(topology.partyId);
 	const name = exists
-		? ((await directory()).find((e) => e.party === topology.partyId)?.name ?? null)
+		? ((await app.accounts()).find((a) => a.party === topology.partyId)?.name ?? null)
 		: null;
 
 	return { ...topology, exists, name };
@@ -32,78 +40,124 @@ export const lookup = query(base64, async (publicKey) => {
 export const enrol = command(
 	v.object({ publicKey: base64, multiHash: base64, signature: base64, name: v.string() }),
 	async ({ publicKey, multiHash, signature, name }) => {
-		const chosen = normaliseName(name);
+		const chosen = app.normaliseName(name);
 
 		// The SDK checks whether the party exists before allocating, so a returning key that never
 		// finished registering lands here too and just gets its name.
-		const { partyId } = await participant.allocateExternal(
-			PARTY_HINT,
-			publicKey,
-			multiHash,
-			signature
-		);
+		const { partyId } = await participant.allocateExternal(app.PARTY_HINT, publicKey, multiHash, signature);
 
-		const entry = await register(partyId, chosen);
-		return { party: entry.party, name: entry.name };
+		const account = await app.register(partyId, chosen);
+		return { party: account.party, name: account.name };
 	}
 );
 
-type AssetPayload = { issuer: string; owner: string; name: string };
+/** The directory: every registered name, for picking members. */
+export const directory = query(async () =>
+	(await app.accounts()).map(({ party, name }) => ({ party, name }))
+);
 
-/** What a party can see, plus the directory so the page can show names instead of party ids. */
-export const listAssets = query(partyId, async (party) => {
-	const [assets, entries] = await Promise.all([
-		participant.activeContracts<AssetPayload>(party, Main.Asset.templateId),
-		directory()
-	]);
+// ---- Reads -------------------------------------------------------------------------------
 
+/** The DAOs a party belongs to, with their open proposal count. */
+export const myDaos = query(partyId, async (party) => {
+	const [daos, proposals] = await Promise.all([app.daos(), app.proposals()]);
+	return daos
+		.filter((d) => d.members.includes(party))
+		.map((d) => ({
+			...d,
+			openProposals: proposals.filter((p) => p.dao === d.contractId && !p.outcome).length
+		}));
+});
+
+export const dao = query(contractId, async (id) => {
+	const [found, proposals, names] = await Promise.all([app.daoById(id), app.proposals(), app.accounts()]);
 	return {
-		assets,
-		directory: entries.map(({ party, name }) => ({ party, name }))
+		...found,
+		proposals: proposals.filter((p) => p.dao === id),
+		names: Object.fromEntries(names.map((a) => [a.party, a.name]))
 	};
 });
 
-/**
- * Turns an intent into a transaction the user's key can sign. Every action goes through the
- * user's proxy, which is what puts the provider among the confirmers.
- */
-export const prepare = command(
+export const proposal = query(contractId, async (id) => {
+	const [found, names] = await Promise.all([app.proposalById(id), app.accounts()]);
+	return { ...found, names: Object.fromEntries(names.map((a) => [a.party, a.name])) };
+});
+
+// ---- Writes: prepare here, sign in the browser, execute here ------------------------------
+
+const exercise = (templateId: string, contractId: string, choice: string, choiceArgument: unknown) => [
+	{ ExerciseCommand: { templateId, contractId, choice, choiceArgument } }
+];
+
+export const prepareCreateDao = command(
 	v.object({
 		party: partyId,
-		intent: v.variant('kind', [
-			v.object({ kind: v.literal('issue'), name: v.pipe(v.string(), v.trim(), v.nonEmpty()) }),
-			v.object({ kind: v.literal('give'), contractId: v.string(), to: v.string() })
-		])
+		name: text(60),
+		description: v.pipe(v.string(), v.trim(), v.maxLength(2000)),
+		members: v.array(v.string())
 	}),
-	async ({ party, intent }) => {
-		const proxy = await entryFor(party);
+	async ({ party, name, description, members }) => {
+		const account = await app.accountOf(party);
+		const known = await app.accounts();
+		const resolved = members.map((m) => {
+			const wanted = app.normaliseName(m);
+			const found = known.find((a) => a.name === wanted);
+			if (!found) throw error(404, `Nobody is registered as "${wanted}"`);
+			return found.party;
+		});
 
-		let choice: string;
-		let choiceArgument: unknown;
-
-		if (intent.kind === 'give') {
-			const to = normaliseName(intent.to);
-			const recipient = (await directory()).find((e) => e.name === to);
-			if (!recipient) throw error(404, `Nobody is registered as "${to}"`);
-
-			choice = 'AppProxy_Give';
-			choiceArgument = { assetId: intent.contractId, newOwner: recipient.party };
-		} else {
-			choice = 'AppProxy_Issue';
-			choiceArgument = { name: intent.name };
-		}
-
-		return participant.prepare(party, [
-			{
-				ExerciseCommand: {
-					templateId: Main.AppProxy.templateId,
-					contractId: proxy.contractId,
-					choice,
-					choiceArgument
-				}
-			}
-		]);
+		return participant.prepare(
+			party,
+			exercise(Main.Account.templateId, account.contractId, 'Account_CreateDAO', {
+				daoName: name,
+				description,
+				members: resolved
+			})
+		);
 	}
+);
+
+export const prepareCreateProposal = command(
+	v.object({
+		party: partyId,
+		dao: contractId,
+		title: text(120),
+		description: v.pipe(v.string(), v.trim(), v.maxLength(5000)),
+		days: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(30))
+	}),
+	async ({ party, dao, title, description, days }) => {
+		const found = await app.daoById(dao);
+		if (!found.members.includes(party)) throw error(403, 'Only members can propose');
+
+		const closesAt = new Date(Date.now() + days * 86_400_000).toISOString();
+		return participant.prepare(
+			party,
+			exercise(Main.DAO.templateId, dao, 'DAO_CreateProposal', {
+				proposer: party,
+				title,
+				description,
+				closesAt
+			})
+		);
+	}
+);
+
+export const prepareVote = command(
+	v.object({ party: partyId, proposal: contractId, vote: v.picklist(['Yes', 'No']) }),
+	async ({ party, proposal, vote }) =>
+		participant.prepare(
+			party,
+			exercise(Main.Proposal.templateId, proposal, 'Proposal_Vote', { voter: party, vote })
+		)
+);
+
+export const prepareClose = command(
+	v.object({ party: partyId, proposal: contractId }),
+	async ({ party, proposal }) =>
+		participant.prepare(
+			party,
+			exercise(Main.Proposal.templateId, proposal, 'Proposal_Close', { closer: party })
+		)
 );
 
 /** The signed hash comes back; the participant submits and waits for the result. */

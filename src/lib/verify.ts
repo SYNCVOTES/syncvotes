@@ -12,7 +12,8 @@ import { fromBase64, toBase64 } from './wallet';
  * The server prepares transactions and hands back a hash; the key signs the hash. Without these
  * checks the browser would sign whatever hash it was given. With them, a hash is only signed if it
  * matches bytes the browser has decoded itself, those bytes exercise the choice the user asked
- * for on the app's proxy, and the only authority the signature grants is the user's own party.
+ * for on the template it belongs to, and the only authority the signature grants is the user's
+ * own party.
  * The hashing is the same code the wallet SDK uses for its offline-signing flow.
  */
 
@@ -20,7 +21,13 @@ import { fromBase64, toBase64 } from './wallet';
 const TOPOLOGY_TRANSACTION = 11;
 const TOPOLOGY_MULTI_HASH = 55;
 
-const PROXY = 'Main:AppProxy';
+/** The only choices a user is ever asked to sign, and the template each lives on. */
+export const CHOICES: Record<string, string> = {
+	Account_CreateDAO: 'Main:Account',
+	DAO_CreateProposal: 'Main:DAO',
+	Proposal_Vote: 'Main:Proposal',
+	Proposal_Close: 'Main:Proposal'
+};
 
 export async function verifyTopology(topology: {
 	topologyTransactions: string[];
@@ -60,8 +67,8 @@ export async function verifyPrepared(
 	const roots = tx.transaction?.roots ?? [];
 	const byId = new Map(nodes.map((node) => [node.nodeId, node]));
 
-	// One root, and it is the user exercising the asked-for choice on the app's proxy. Whatever
-	// hangs below it is the choice's own body, authorised by the proxy's signatory, not by us.
+	// One root, and it is the user exercising the asked-for choice on the right template. Whatever
+	// hangs below it is the choice's own body, authorised by that contract's signatories, not by us.
 	const root = roots.length === 1 ? byId.get(roots[0])?.versionedNode : undefined;
 	if (root?.oneofKind !== 'v1' || root.v1.nodeType.oneofKind !== 'exercise') {
 		throw new Error('Expected a single choice exercise, got something else');
@@ -69,10 +76,9 @@ export async function verifyPrepared(
 
 	const { choiceId, templateId, actingParties } = root.v1.nodeType.exercise;
 	const template = `${templateId?.moduleName}:${templateId?.entityName}`;
-	if (choiceId !== expected.choice || template !== PROXY) {
-		throw new Error(
-			`Expected to sign ${expected.choice} on ${PROXY}, got ${choiceId} on ${template}`
-		);
+	const home = CHOICES[expected.choice];
+	if (!home || choiceId !== expected.choice || template !== home) {
+		throw new Error(`Expected to sign ${expected.choice} on ${home}, got ${choiceId} on ${template}`);
 	}
 	if (actingParties.some((p) => p !== expected.party)) {
 		throw new Error(`The choice would be exercised by ${actingParties.join(', ')}, not you`);

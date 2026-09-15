@@ -3,34 +3,47 @@ import { Main } from '@daml.js/model';
 import { activeContracts, operatorParty, providerParty, submitAsProvider } from './participant';
 
 /**
- * The app's own state on the ledger: one `AppProxy` per user, created by the provider.
- *
- * The proxy is what makes the provider a confirmer of every user transaction — see Main.daml —
- * and, since the operator observes all of them, together they are the directory that lets one
- * user name another. Reads go through the operator; the provider only ever signs.
+ * The app's own view of the ledger, read as the operator: it observes every Account, DAO and
+ * Proposal, so it can list them for a member and resolve names to parties. Nothing here writes
+ * on a user's behalf — the one write, creating an Account, is the provider's own signature.
  */
 
 /** Every party id this app allocates carries this hint; the key's fingerprint tells them apart. */
 export const PARTY_HINT = 'syncvotes';
 
-export type Entry = { contractId: string; party: string; name: string };
+export type Account = { contractId: string; party: string; name: string };
+export type Dao = {
+	contractId: string;
+	admin: string;
+	name: string;
+	description: string;
+	members: string[];
+};
+export type Ballot = { voter: string; vote: 'Yes' | 'No' };
+export type Proposal = {
+	contractId: string;
+	dao: string;
+	daoName: string;
+	proposer: string;
+	title: string;
+	description: string;
+	members: string[];
+	closesAt: string;
+	ballots: Ballot[];
+	outcome: 'Passed' | 'Failed' | null;
+};
 
-export async function directory(): Promise<Entry[]> {
-	const proxies = await activeContracts<{ user: string; name: string }>(
-		operatorParty(),
-		Main.AppProxy.templateId
-	);
-	return proxies.map((p) => ({
-		contractId: p.contractId,
-		party: p.payload.user,
-		name: p.payload.name
-	}));
+const read = <T>(templateId: string) => activeContracts<T>(operatorParty(), templateId);
+
+export async function accounts(): Promise<Account[]> {
+	const found = await read<{ user: string; name: string }>(Main.Account.templateId);
+	return found.map((c) => ({ contractId: c.contractId, party: c.payload.user, name: c.payload.name }));
 }
 
-export async function entryFor(party: string): Promise<Entry> {
-	const entry = (await directory()).find((e) => e.party === party);
-	if (!entry) throw error(404, 'This party is not registered with the app');
-	return entry;
+export async function accountOf(party: string): Promise<Account> {
+	const account = (await accounts()).find((a) => a.party === party);
+	if (!account) throw error(404, 'This party is not registered with the app');
+	return account;
 }
 
 /** Names are what users type to reach each other, so keep them short and unambiguous. */
@@ -48,24 +61,24 @@ export function normaliseName(input: unknown): string {
 }
 
 /** Registers a party under a name. Uniqueness is checked here; Daml-LF 2.2 has no contract keys. */
-export async function register(party: string, name: string): Promise<Entry> {
-	const entries = await directory();
+export async function register(party: string, name: string): Promise<Account> {
+	const all = await accounts();
 
-	const mine = entries.find((e) => e.party === party);
+	const mine = all.find((a) => a.party === party);
 	if (mine) return mine;
 
-	if (entries.some((e) => e.name === name)) throw error(409, `The name "${name}" is taken`);
+	if (all.some((a) => a.name === name)) throw error(409, `The name "${name}" is taken`);
 
 	await submitAsProvider(
 		[
 			{
 				CreateCommand: {
-					templateId: Main.AppProxy.templateId,
+					templateId: Main.Account.templateId,
 					createArguments: {
 						provider: providerParty(),
+						operator: operatorParty(),
 						user: party,
-						name,
-						operator: operatorParty()
+						name
 					}
 				}
 			}
@@ -73,5 +86,33 @@ export async function register(party: string, name: string): Promise<Entry> {
 		`register-${name}-${Date.now()}`
 	);
 
-	return entryFor(party);
+	return accountOf(party);
+}
+
+type DaoPayload = { admin: string; name: string; description: string; members: string[] };
+
+export async function daos(): Promise<Dao[]> {
+	const found = await read<DaoPayload>(Main.DAO.templateId);
+	return found.map((c) => ({ contractId: c.contractId, ...c.payload }));
+}
+
+export async function daoById(contractId: string): Promise<Dao> {
+	const dao = (await daos()).find((d) => d.contractId === contractId);
+	if (!dao) throw error(404, 'No such DAO');
+	return dao;
+}
+
+type ProposalPayload = Omit<Proposal, 'contractId' | 'outcome'> & {
+	outcome: 'Passed' | 'Failed' | null | undefined;
+};
+
+export async function proposals(): Promise<Proposal[]> {
+	const found = await read<ProposalPayload>(Main.Proposal.templateId);
+	return found.map((c) => ({ contractId: c.contractId, ...c.payload, outcome: c.payload.outcome ?? null }));
+}
+
+export async function proposalById(contractId: string): Promise<Proposal> {
+	const proposal = (await proposals()).find((p) => p.contractId === contractId);
+	if (!proposal) throw error(404, 'No such proposal');
+	return proposal;
 }

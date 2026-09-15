@@ -1,3 +1,233 @@
 @import 'tailwindcss';
-@plugin '@tailwindcss/forms';
-@plugin '@tailwindcss/typography';
+@import '$lib/assets/fonts/fonts.css';
+
+/*
+ * The "Consensus Engine" palette, carried over from SyncVotes v1: warm black, bone ink, one
+ * orange accent, flat surfaces with hairline borders. Dark is the default; light is a full
+ * second palette, switched by data-theme (a manual choice) or, failing that, the system.
+ */
+
+:root {
+	color-scheme: dark;
+	--bg-deep: #0b0a08;
+	--bg-rgb: 11, 10, 8;
+	--bg-surface: #14120d;
+	--bg-hover: #1a1712;
+	--bg-active: #221f18;
+	--border: rgba(237, 232, 220, 0.1);
+	--border-hover: rgba(237, 232, 220, 0.2);
+	--text: #ede8dc;
+	--text-rgb: 237, 232, 220;
+	--text-mid: rgba(237, 232, 220, 0.55);
+	--text-dim: rgba(237, 232, 220, 0.32);
+	--accent: #ff4d00;
+	--accent-rgb: 255, 77, 0;
+	--accent-dim: rgba(255, 77, 0, 0.12);
+	--red: #ff6b7e;
+	--red-rgb: 255, 107, 126;
+	--red-dim: rgba(255, 107, 126, 0.12);
+	--amber: #f5a623;
+	--amber-rgb: 245, 166, 35;
+	--green: #7be0a3;
+	--green-rgb: 123, 224, 163;
+	--blue: #ff8a5c;
+	--blue-rgb: 255, 138, 92;
+	--purple: #b48cff;
+}
+
+@media (prefers-color-scheme: light) {
+	:root:not([data-theme='dark']) {
+		color-scheme: light;
+		--bg-deep: #f7f4ed;
+		--bg-rgb: 247, 244, 237;
+		--bg-surface: #fffdf8;
+		--bg-hover: #efece3;
+		--bg-active: #e9e5da;
+		--border: rgba(32, 28, 21, 0.14);
+		--border-hover: rgba(32, 28, 21, 0.26);
+		--text: #201c15;
+		--text-rgb: 32, 28, 21;
+		--text-mid: rgba(32, 28, 21, 0.64);
+		--text-dim: rgba(32, 28, 21, 0.46);
+		--accent: #d63c00;
+		--accent-rgb: 214, 60, 0;
+		--accent-dim: rgba(214, 60, 0, 0.1);
+		--red: #c92b40;
+		--red-rgb: 201, 43, 64;
+		--red-dim: rgba(201, 43, 64, 0.1);
+		--amber: #9a6a00;
+		--amber-rgb: 154, 106, 0;
+		--green: #177d4d;
+		--green-rgb: 23, 125, 77;
+		--blue: #b8461c;
+		--blue-rgb: 184, 70, 28;
+		--purple: #6b3fc9;
+	}
+}
+
+:root[data-theme='light'] {
+	color-scheme: light;
+	--bg-deep: #f7f4ed;
+	--bg-rgb: 247, 244, 237;
+	--bg-surface: #fffdf8;
+	--bg-hover: #efece3;
+	--bg-active: #e9e5da;
+	--border: rgba(32, 28, 21, 0.14);
+	--border-hover: rgba(32, 28, 21, 0.26);
+	--text: #201c15;
+	--text-rgb: 32, 28, 21;
+	--text-mid: rgba(32, 28, 21, 0.64);
+	--text-dim: rgba(32, 28, 21, 0.46);
+	--accent: #d63c00;
+	--accent-rgb: 214, 60, 0;
+	--accent-dim: rgba(214, 60, 0, 0.1);
+	--red: #c92b40;
+	--red-rgb: 201, 43, 64;
+	--red-dim: rgba(201, 43, 64, 0.1);
+	--amber: #9a6a00;
+	--amber-rgb: 154, 106, 0;
+	--green: #177d4d;
+	--green-rgb: 23, 125, 77;
+	--blue: #b8461c;
+	--blue-rgb: 184, 70, 28;
+	--purple: #6b3fc9;
+}
+
+/* Tailwind utilities and the shadcn components read these; the names are the ones shadcn expects. */
+@theme inline {
+	--color-background: var(--bg-deep);
+	--color-foreground: var(--text);
+	--color-card: var(--bg-surface);
+	--color-card-foreground: var(--text);
+	--color-popover: var(--bg-surface);
+	--color-popover-foreground: var(--text);
+	--color-primary: var(--accent);
+	--color-primary-foreground: var(--bg-deep);
+	--color-secondary: var(--bg-hover);
+	--color-secondary-foreground: var(--text);
+	--color-muted: var(--bg-hover);
+	--color-muted-foreground: var(--text-mid);
+	--color-accent: var(--bg-active);
+	--color-accent-foreground: var(--text);
+	--color-destructive: var(--red);
+	--color-destructive-foreground: var(--bg-deep);
+	--color-border: var(--border);
+	--color-input: var(--border);
+	--color-ring: var(--accent);
+
+	/* The palette by its own names, for everything that is not a shadcn part. */
+	--color-ink: var(--text);
+	--color-ink-mid: var(--text-mid);
+	--color-ink-dim: var(--text-dim);
+	--color-surface: var(--bg-surface);
+	--color-surface-hover: var(--bg-hover);
+	--color-surface-active: var(--bg-active);
+	--color-border-hover: var(--border-hover);
+	--color-orange: var(--accent);
+	--color-orange-dim: var(--accent-dim);
+	--color-green: var(--green);
+	--color-red: var(--red);
+	--color-red-dim: var(--red-dim);
+	--color-amber: var(--amber);
+	--color-blue: var(--blue);
+
+	--font-display: 'Syne', sans-serif;
+	--font-sans: 'Inter', sans-serif;
+	--font-mono: 'JetBrains Mono', monospace;
+	--font-serif: 'Instrument Serif', serif;
+
+	/* Square corners everywhere; the only round things are pills. */
+	--radius-sm: 0;
+	--radius-md: 0;
+	--radius-lg: 0;
+	--radius-xl: 0;
+}
+
+@layer base {
+	html {
+		-webkit-font-smoothing: antialiased;
+		-moz-osx-font-smoothing: grayscale;
+		text-rendering: optimizeLegibility;
+	}
+
+	body {
+		background-color: var(--bg-deep);
+		color: var(--text);
+		font-family: var(--font-sans);
+		font-size: 0.9375rem;
+		line-height: 1.6;
+		min-height: 100vh;
+	}
+
+	/* Ambient glow and a faint dot grid, fixed behind everything. */
+	body::before {
+		content: '';
+		position: fixed;
+		inset: 0;
+		z-index: -1;
+		background:
+			radial-gradient(ellipse 80% 60% at 10% 20%, rgba(var(--accent-rgb), 0.05) 0%, transparent 60%),
+			radial-gradient(ellipse 60% 50% at 90% 80%, rgba(var(--blue-rgb), 0.04) 0%, transparent 55%),
+			radial-gradient(ellipse 50% 40% at 50% 0%, rgba(var(--amber-rgb), 0.025) 0%, transparent 50%);
+		pointer-events: none;
+	}
+
+	body::after {
+		content: '';
+		position: fixed;
+		inset: 0;
+		z-index: -1;
+		background-image: radial-gradient(circle, rgba(var(--text-rgb), 0.02) 1px, transparent 1px);
+		background-size: 24px 24px;
+		pointer-events: none;
+	}
+
+	::selection {
+		background-color: var(--accent);
+		color: var(--bg-deep);
+	}
+
+	::-webkit-scrollbar {
+		width: 6px;
+		height: 6px;
+	}
+	::-webkit-scrollbar-track {
+		background: var(--bg-deep);
+	}
+	::-webkit-scrollbar-thumb {
+		background: var(--border-hover);
+		border-radius: 3px;
+	}
+
+	a {
+		color: inherit;
+		text-decoration: none;
+	}
+
+	code,
+	pre,
+	kbd,
+	samp {
+		font-family: var(--font-mono);
+	}
+}
+
+@layer components {
+	/* The mono, uppercase, letter-spaced label that opens every v1 section: "// PERSONAL WORKSPACE". */
+	.eyebrow {
+		font-family: var(--font-mono);
+		font-size: 0.6875rem;
+		letter-spacing: 0.18em;
+		text-transform: uppercase;
+		color: var(--text-dim);
+	}
+
+	/* Page titles: Syne, extrabold, uppercase, tight. */
+	.display {
+		font-family: var(--font-display);
+		font-weight: 800;
+		text-transform: uppercase;
+		letter-spacing: -0.02em;
+		line-height: 0.95;
+	}
+}
