@@ -8,6 +8,7 @@
 	import Stat from '$lib/components/app/stat.svelte';
 	import Problem from '$lib/components/app/problem.svelte';
 	import { describe } from '$lib/wallet-store.svelte';
+	import Plus from '@lucide/svelte/icons/plus';
 
 	const who = $derived(store.who);
 	const daos = $derived(who ? remote.myDaos(who.party) : null);
@@ -23,7 +24,7 @@
 		description="DAOs where your key is admin or member. On-chain membership only — derived from the DAO contracts on Canton Network."
 	>
 		{#snippet action()}
-			<Button href="/daos/create" size="lg">+ Create DAO</Button>
+			<Button href="/daos/create" size="lg"><Plus strokeWidth={2.5} /> Create DAO</Button>
 		{/snippet}
 	</PageHeader>
 

@@ -7,6 +7,8 @@
 	import { Button } from '$lib/components/ui/button';
 	import StatusBadge from '$lib/components/app/status-badge.svelte';
 	import Problem from '$lib/components/app/problem.svelte';
+	import BackLink from '$lib/components/app/back-link.svelte';
+	import PartyId from '$lib/components/app/party-id.svelte';
 	import UnlockForm from '$lib/components/app/unlock-form.svelte';
 	import { relative } from '$lib/format';
 
@@ -48,7 +50,7 @@
 		{@const mine = me !== null && me === p.proposer}
 		{@const canCancel = !p.outcome && (mine || (me !== null && me === p.admin))}
 
-		<a href="/daos/{p.daoId}" class="eyebrow hover:text-orange">← {p.daoName}</a>
+		<BackLink href="/daos/{p.daoId}" label={p.daoName} />
 
 		<div class="mt-6 mb-8">
 			<div class="mb-3 flex items-center gap-3">
@@ -64,8 +66,10 @@
 			<div class="flex flex-wrap items-start justify-between gap-4">
 				<div>
 					<h1 class="display text-3xl md:text-4xl">{p.title}</h1>
-					<p class="mt-2 font-mono text-xs text-ink-dim">
-						Proposed by {nameOf(p.proposer)}{p.createdAt ? ` · ${relative(p.createdAt)}` : ''}
+					<p class="mt-2 flex flex-wrap items-center gap-x-2 font-mono text-xs text-ink-dim">
+						<span>Proposed by <span class="text-ink-mid">{nameOf(p.proposer)}</span></span>
+						<PartyId party={p.proposer} />
+						{#if p.createdAt}<span>· {relative(p.createdAt)}</span>{/if}
 					</p>
 				</div>
 				{#if mine && !p.outcome && p.ballots.length === 0}
@@ -91,8 +95,9 @@
 					{:else}
 						<ul class="divide-y divide-border border border-border bg-surface">
 							{#each p.ballots as b (b.voter)}
-								<li class="flex items-center justify-between px-4 py-3 font-mono text-xs">
+								<li class="flex items-center gap-3 px-4 py-3 font-mono text-xs">
 									<span class={b.voter === me ? 'text-orange' : ''}>{nameOf(b.voter)}</span>
+									<PartyId party={b.voter} class="min-w-0 flex-1" />
 									<span class={b.vote === 'Yes' ? 'text-green' : 'text-red'}>{b.vote}</span>
 								</li>
 							{/each}

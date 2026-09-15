@@ -11,6 +11,7 @@
 	import PageHeader from '$lib/components/app/page-header.svelte';
 	import ConnectPrompt from '$lib/components/app/connect-prompt.svelte';
 	import Problem from '$lib/components/app/problem.svelte';
+	import BackLink from '$lib/components/app/back-link.svelte';
 
 	const id = $derived(page.params.id!);
 	const proposal = $derived(remote.proposal(id));
@@ -42,9 +43,7 @@
 <svelte:head><title>Edit proposal — SyncVotes</title></svelte:head>
 
 <div class="mx-auto max-w-[760px] px-6 py-12 md:px-10">
-	<a href="/proposals/{id}" class="eyebrow hover:text-orange"
-		>← {proposal.current?.title ?? 'Proposal'}</a
-	>
+	<BackLink href="/proposals/{id}" label={proposal.current?.title ?? 'Proposal'} />
 	<div class="mt-6">
 		<PageHeader
 			eyebrow="Settings"

@@ -5,6 +5,9 @@
 	import { store } from '$lib/wallet-store.svelte';
 	import { theme, toggleTheme } from '$lib/theme.svelte';
 	import { NETWORK } from '$lib/network';
+	import Sun from '@lucide/svelte/icons/sun';
+	import Moon from '@lucide/svelte/icons/moon';
+	import ArrowUpRight from '@lucide/svelte/icons/arrow-up-right';
 
 	let { children } = $props();
 
@@ -30,9 +33,9 @@
 
 <div class="flex min-h-screen flex-col">
 	<header
-		class="sticky top-0 z-50 flex h-[68px] items-center justify-between border-b border-border bg-[rgba(var(--bg-rgb),0.88)] px-4 backdrop-blur-2xl md:px-10"
+		class="sticky top-0 z-50 flex flex-wrap items-center justify-between border-b border-border bg-[rgba(var(--bg-rgb),0.88)] px-4 backdrop-blur-2xl md:h-[68px] md:px-10"
 	>
-		<div class="flex items-center gap-10">
+		<div class="flex h-[60px] items-center gap-10 md:h-auto">
 			<a
 				href="/"
 				class="flex items-center gap-2.5 font-display text-[15px] font-bold tracking-[0.14em]"
@@ -69,26 +72,7 @@
 				aria-label={theme.mode === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
 				onclick={toggleTheme}
 			>
-				{#if theme.mode === 'dark'}
-					<svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-						<circle cx="12" cy="12" r="4.5" stroke="currentColor" stroke-width="1.8" />
-						<path
-							d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"
-							stroke="currentColor"
-							stroke-width="1.8"
-							stroke-linecap="round"
-						/>
-					</svg>
-				{:else}
-					<svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-						<path
-							d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7Z"
-							stroke="currentColor"
-							stroke-width="1.8"
-							stroke-linejoin="round"
-						/>
-					</svg>
-				{/if}
+				{#if theme.mode === 'dark'}<Sun size={16} />{:else}<Moon size={16} />{/if}
 			</button>
 
 			<!-- The network, as a pill like everything else on this row: one dot, one word. -->
@@ -104,6 +88,24 @@
 				{walletLabel}
 			</Button>
 		</div>
+
+		<!-- On phones the nav gets its own row under the brand. -->
+		<nav
+			class="-mx-4 flex w-[calc(100%+2rem)] items-center gap-1 border-t border-border px-3 py-1.5 md:hidden"
+		>
+			{#each nav as item (item.href)}
+				<a
+					href={item.href}
+					class="rounded-full px-3 py-1.5 font-mono text-[0.6875rem] tracking-[0.14em] uppercase transition-colors {active(
+						item.href
+					)
+						? 'bg-orange-dim text-orange'
+						: 'text-ink-mid hover:text-ink'}"
+				>
+					{item.label}
+				</a>
+			{/each}
+		</nav>
 	</header>
 
 	<main class="flex-1">
@@ -132,7 +134,8 @@
 						href={link.href}
 						target="_blank"
 						rel="noopener"
-						class="font-mono text-xs text-ink-mid hover:text-orange">{link.label} ↗</a
+						class="inline-flex items-center gap-0.5 font-mono text-xs text-ink-mid hover:text-orange"
+						>{link.label}<ArrowUpRight size={12} aria-hidden="true" /></a
 					>
 				{/each}
 			</div>

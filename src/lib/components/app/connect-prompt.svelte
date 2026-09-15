@@ -3,6 +3,7 @@
 	import { store } from '$lib/wallet-store.svelte';
 	import UnlockForm from './unlock-form.svelte';
 	import Problem from './problem.svelte';
+	import Lock from '@lucide/svelte/icons/lock';
 
 	let { what = 'see DAOs you participate in' }: { what?: string } = $props();
 	const locked = $derived(store.screen.at === 'locked');
@@ -10,9 +11,9 @@
 
 <div class="flex flex-col items-center gap-4 py-20 text-center">
 	<div
-		class="flex size-16 items-center justify-center border border-border bg-surface text-2xl text-ink-dim"
+		class="flex size-16 items-center justify-center border border-border bg-surface text-ink-dim"
 	>
-		⬡
+		<Lock size={22} strokeWidth={1.6} aria-hidden="true" />
 	</div>
 	<p class="font-display text-[17px] font-bold">
 		{locked ? 'Your wallet is locked' : 'Connect your wallet'}

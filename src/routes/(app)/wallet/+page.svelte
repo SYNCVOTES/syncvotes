@@ -8,6 +8,8 @@
 	import Problem from '$lib/components/app/problem.svelte';
 	import UnlockForm from '$lib/components/app/unlock-form.svelte';
 	import { dateOf } from '$lib/format';
+	import Plus from '@lucide/svelte/icons/plus';
+	import PartyId from '$lib/components/app/party-id.svelte';
 
 	let phraseInput = $state('');
 	let savedPhrase = $state(false);
@@ -34,7 +36,8 @@
 	<Problem message={store.problem} />
 
 	{#if screen.at === 'loading'}
-		<p class="text-sm text-ink-dim">Loading…</p>
+		<!-- Whether a key is on this device is only known once the page runs. -->
+		<div class="h-44 animate-pulse border border-border bg-surface"></div>
 	{:else if screen.at === 'welcome'}
 		<section class="space-y-5 border border-dashed border-border p-8">
 			<p class="text-sm text-ink-mid">
@@ -98,7 +101,8 @@
 			<h2 class="eyebrow">Pick a name</h2>
 			<p class="text-sm text-ink-mid">
 				Others add you to DAOs by this name. Your party will be
-				<code class="text-xs break-all">{screen.topology.partyId}</code>.
+				<code class="text-xs break-all">{screen.topology.partyId}</code>
+				<PartyId party={screen.topology.partyId} class="align-middle [&>span]:hidden" />
 			</p>
 			<div class="flex gap-3">
 				<Input placeholder="e.g. alice" class="flex-1" bind:value={nameInput} />
@@ -167,7 +171,10 @@
 				</div>
 				<div class="mt-5">
 					<div class="eyebrow mb-1">Party</div>
-					<code class="block text-xs break-all text-ink-mid">{screen.who.party}</code>
+					<div class="flex items-start gap-2">
+						<code class="block min-w-0 text-xs break-all text-ink-mid">{screen.who.party}</code>
+						<PartyId party={screen.who.party} class="[&>span]:hidden" />
+					</div>
 				</div>
 			</div>
 			<div class="flex flex-wrap gap-3">
@@ -226,7 +233,9 @@
 			{/each}
 		</ul>
 		<div class="flex flex-wrap gap-3 border-t border-border pt-4">
-			<Button variant="link" size="sm" onclick={flow.startCreate}>+ Create a new key</Button>
+			<Button variant="link" size="sm" onclick={flow.startCreate}
+				><Plus size={14} /> Create a new key</Button
+			>
 			<Button variant="link" size="sm" onclick={flow.startRestore}>Restore from a phrase</Button>
 		</div>
 		<p class="text-xs text-ink-dim">

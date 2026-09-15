@@ -1,4 +1,5 @@
 <script lang="ts">
+	import ArrowRight from '@lucide/svelte/icons/arrow-right';
 	let {
 		id,
 		name,
@@ -49,9 +50,10 @@
 			<div class="font-mono text-[15px] font-bold">{openProposals}</div>
 			<div class="mt-0.5 font-mono text-xs tracking-[0.14em] text-ink-dim uppercase">Open</div>
 		</div>
-		<span
-			class="ml-auto text-sm text-ink-dim transition-all group-hover:translate-x-0.5 group-hover:text-orange"
-			>→</span
-		>
+		<ArrowRight
+			size={16}
+			class="ml-auto text-ink-dim transition-all group-hover:translate-x-0.5 group-hover:text-orange"
+			aria-hidden="true"
+		/>
 	</div>
 </a>

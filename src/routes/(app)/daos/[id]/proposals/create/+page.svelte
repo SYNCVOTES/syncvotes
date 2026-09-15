@@ -11,6 +11,7 @@
 	import PageHeader from '$lib/components/app/page-header.svelte';
 	import ConnectPrompt from '$lib/components/app/connect-prompt.svelte';
 	import Problem from '$lib/components/app/problem.svelte';
+	import BackLink from '$lib/components/app/back-link.svelte';
 
 	const id = $derived(page.params.id!);
 	const dao = $derived(remote.dao(id));
@@ -37,7 +38,7 @@
 <svelte:head><title>New proposal — SyncVotes</title></svelte:head>
 
 <div class="mx-auto max-w-[760px] px-6 py-12 md:px-10">
-	<a href="/daos/{id}" class="eyebrow hover:text-orange">← {dao.current?.name ?? 'DAO'}</a>
+	<BackLink href="/daos/{id}" label={dao.current?.name ?? 'DAO'} />
 	<div class="mt-6">
 		<PageHeader
 			eyebrow="New proposal"
