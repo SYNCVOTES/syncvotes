@@ -1,4 +1,4 @@
-import { operatorParty, sdk, activeContracts } from './participant';
+import { operatorParty, sdk, streamActiveContracts } from './participant';
 import * as index from './index';
 
 /**
@@ -26,12 +26,13 @@ let started = false;
 async function bootstrap(): Promise<number> {
 	const ledger = await sdk();
 	const offset = await ledger.ledger.ledgerEnd();
-	for (const templateId of index.TEMPLATES) {
-		const contracts = await activeContracts<Record<string, unknown>>(operatorParty(), templateId);
-		for (const c of contracts)
-			index.created({ contractId: c.contractId, templateId, createArgument: c.payload });
-	}
+	let n = 0;
+	await streamActiveContracts(operatorParty(), index.TEMPLATES, offset, (c) => {
+		index.created(c);
+		n++;
+	});
 	index.commit();
+	console.log(`Index built from ${n} active contracts at offset ${offset}`);
 	return offset;
 }
 
