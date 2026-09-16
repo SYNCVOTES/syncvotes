@@ -77,13 +77,6 @@ export function lock() {
 	offer(selected);
 }
 
-/** A key is in memory from here on, so the auto-lock is armed from here on too. */
-function hold(signer: wallet.Signer, next: Screen) {
-	autoLock.start(lock);
-	screen = next;
-	return signer;
-}
-
 /**
  * The read session lives on the server and can be gone while the key is still here: a restart,
  * another tab locking, a cookie that expired. Signing a fresh challenge is all it takes.
@@ -134,12 +127,13 @@ export function describe(error: unknown): string {
 /** The read session first, so the pages that open next are allowed to read. */
 async function enter(signer: wallet.Signer, who: actions.Identity) {
 	await actions.openSession(signer, who);
-	hold(signer, { at: 'home', signer, who });
+	screen = { at: 'home', signer, who };
 }
 
 /** A key is in hand: does the ledger know it? A known key is signed in; a new one picks a hint. */
 async function identify(signer: wallet.Signer, andThen: 'protect' | 'enter') {
-	hold(signer, screen);
+	// A key is in memory from here on, so the auto-lock is armed from here on too.
+	autoLock.start(lock);
 	const found = await actions.lookup(signer);
 	if (!found.exists) {
 		screen = { at: 'hint', signer, fingerprint: found.fingerprint };
