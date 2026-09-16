@@ -20,7 +20,7 @@ export function signedForm<
 	intent: (fields: Fields, result: Output) => actions.Intent,
 	then: (result: Output) => Promise<unknown> | unknown
 ) {
-	return f.preflight(schema).enhance(async ({ submit }) => {
+	return f.preflight(schema).enhance(async ({ submit, element }) => {
 		try {
 			await submit();
 		} catch (e) {
@@ -29,10 +29,18 @@ export function signedForm<
 		}
 		const result = f.result;
 		if (!result) return;
-		const fields = v.parse(schema, f.fields.value());
+		const fields = v.parse(schema, submitted(element));
 		const ok = await flow.act((s, w) =>
 			actions.sign(s, w, intent(fields, result), result.prepared)
 		);
 		if (ok) await then(result);
 	});
 }
+
+/** Every field's value as the server received it; `as('number')` names its input `n:<field>`. */
+const submitted = (element: HTMLFormElement) =>
+	Object.fromEntries(
+		[...new FormData(element)].map(([name, value]) =>
+			name.startsWith('n:') ? [name.slice(2), Number(value)] : [name, value]
+		)
+	);

@@ -238,18 +238,16 @@ export const daoProposals = query.live(
 		})
 );
 
-/** Which of these party ids can be added: registered, and not members yet. */
+type MemberCheck = 'addable' | 'already' | 'unknown';
+
+/** Whether each of these party ids can be added: registered and not a member yet. */
 export const checkMembers = query(
 	v.object({ dao: contractId, parties: v.pipe(v.array(partyId), v.maxLength(2000)) }),
-	({ dao, parties }) => {
-		const me = memberOnly(dao);
-		const unique = [...new Set(parties)].filter((p) => p !== me.party);
-		const isMember = (p: string) => ledger.members.get(dao)?.has(p) ?? false;
-		return {
-			registered: unique.filter((p) => ledger.accounts.has(p) && !isMember(p)),
-			already: unique.filter(isMember),
-			unknown: unique.filter((p) => !ledger.accounts.has(p))
-		};
+	({ dao, parties }): Record<string, MemberCheck> => {
+		memberOnly(dao);
+		const check = (p: string): MemberCheck =>
+			ledger.members.get(dao)?.has(p) ? 'already' : ledger.accounts.has(p) ? 'addable' : 'unknown';
+		return Object.fromEntries(parties.map((p) => [p, check(p)]));
 	}
 );
 

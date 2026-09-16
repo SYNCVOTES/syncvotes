@@ -20,7 +20,7 @@
 		onadd
 	}: { dao: string; busy?: boolean; onadd: (parties: string[]) => Promise<boolean> } = $props();
 
-	type Status = 'checking' | 'ok' | 'unknown' | 'already';
+	type Status = 'checking' | Awaited<ReturnType<typeof remote.checkMembers>>[string];
 	let tokens = $state<string[]>([]);
 	let status = $state<Record<string, Status>>({});
 	let text = $state('');
@@ -33,7 +33,7 @@
 			.map((t) => t.trim())
 			.filter((t) => t.includes('::'));
 	const by = (s: Status) => tokens.filter((t) => status[t] === s);
-	const ready = $derived(by('ok'));
+	const ready = $derived(by('addable'));
 	const shown = $derived(expanded || tokens.length <= FOLD ? tokens : tokens.slice(0, FOLD));
 
 	let pending: string[] = [];
@@ -53,12 +53,7 @@
 		const batch = pending.splice(0);
 		if (batch.length === 0) return;
 		try {
-			const r = await remote.checkMembers({ dao, parties: batch });
-			for (const t of r.registered) status[t] = 'ok';
-			for (const t of r.already) status[t] = 'already';
-			for (const t of r.unknown) status[t] = 'unknown';
-			// Yourself: the server drops you from every list; you are in already.
-			for (const t of batch) if (status[t] === 'checking') status[t] = 'already';
+			Object.assign(status, await remote.checkMembers({ dao, parties: batch }));
 		} catch {
 			for (const t of batch) status[t] = 'unknown';
 		}
@@ -72,13 +67,13 @@
 
 	const look: Record<Status, string> = {
 		checking: 'border-border text-ink-dim',
-		ok: 'border-orange/40 bg-orange/10 text-orange',
+		addable: 'border-orange/40 bg-orange/10 text-orange',
 		unknown: 'border-red/40 bg-red/10 text-red',
 		already: 'border-border bg-surface-hover text-ink-dim'
 	};
 	const note: Record<Status, string> = {
 		checking: '',
-		ok: '',
+		addable: '',
 		unknown: 'not registered',
 		already: 'already a member'
 	};
@@ -123,7 +118,7 @@
 					title={t}
 				>
 					{#if status[t] === 'checking'}<Loader size={12} class="animate-spin" />
-					{:else if status[t] === 'ok'}<Check size={12} />
+					{:else if status[t] === 'addable'}<Check size={12} />
 					{:else}<X size={12} />{/if}
 					<PartyId party={t} class="[&_button]:hidden [&>span>span:first-child]:text-current" />
 					{#if note[status[t]]}<span class="opacity-70">{note[status[t]]}</span>{/if}
@@ -168,7 +163,7 @@
 		disabled={busy || ready.length === 0 || by('checking').length > 0}
 		onclick={async () => {
 			if (await onadd(ready)) {
-				tokens = tokens.filter((t) => status[t] !== 'ok');
+				tokens = tokens.filter((t) => status[t] !== 'addable');
 			}
 		}}
 	>
