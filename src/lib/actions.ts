@@ -16,7 +16,10 @@ export type Lookup = Awaited<ReturnType<typeof remote.lookup>>;
 export type Topology = Awaited<ReturnType<typeof remote.topology>>;
 export type Progress = (done: number, total: number) => void;
 
+/** Members per transaction. Adding a member is a small create. */
 export const BATCH = 200;
+/** Voting rights per transaction: each is a fetch and a create, and the signed transaction travels back up. */
+export const RIGHTS_BATCH = 100;
 
 /** Whether the ledger already knows this key. */
 export const lookup = (s: Signer): Promise<Lookup> => remote.lookup(toBase64(s.publicKey));
@@ -198,7 +201,7 @@ export async function openVoting(
 	progress?: Progress
 ) {
 	const members = await remote.memberCids(daoId);
-	const batches = chunks(members, BATCH);
+	const batches = chunks(members, RIGHTS_BATCH);
 	let proposal = await currentContract(pid);
 	for (const [i, batch] of batches.entries()) {
 		progress?.(i, batches.length + 1);

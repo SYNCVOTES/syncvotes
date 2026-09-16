@@ -27,6 +27,8 @@ services:
       LEDGER_AUTH_SCOPE: daml_ledger_api
       # Shown to users; the ledger does not care.
       NETWORK: ${NETWORK:-TestNet}
+      # A signed transaction that issues a hundred voting rights comes back as a ~1 MB request.
+      BODY_SIZE_LIMIT: 8M
     depends_on:
       keycloak:
         condition: service_healthy
