@@ -11,17 +11,12 @@
 	import FormSection from '$lib/components/form-section.svelte';
 	import Field from '$lib/components/field.svelte';
 	import FormActions from '$lib/components/form-actions.svelte';
+	import PartyTagInput from '$lib/components/party-tag-input.svelte';
 
 	let name = $state('');
 	let description = $state('');
-	let membersText = $state('');
-
-	const members = $derived(
-		membersText
-			.split(/[\s,]+/)
-			.map((m) => m.trim())
-			.filter(Boolean)
-	);
+	let members = $state<string[]>([]);
+	let membersState = $state({ valid: true, checking: false });
 
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
@@ -70,13 +65,12 @@
 				<Field
 					label="Additional members"
 					id="members"
-					hint="Members are named by their SyncVotes name. You can change the list later."
+					hint="Optional — paste one address or a whole list. Only parties registered with SyncVotes on this network can be added. You are added as admin, so you can create the DAO now and add members later."
 				>
-					<Textarea
-						id="members"
-						rows={3}
-						placeholder="Names, separated by spaces or commas — alice bob carol"
-						bind:value={membersText}
+					<PartyTagInput
+						bind:value={members}
+						bind:status={membersState}
+						exclude={store.who?.party}
 					/>
 				</Field>
 			</FormSection>
@@ -84,7 +78,7 @@
 			<FormActions
 				label="Create DAO"
 				busy={store.busy}
-				disabled={name.trim().length < 2}
+				disabled={name.trim().length < 2 || !membersState.valid || membersState.checking}
 				cancelHref="/my-daos"
 			/>
 		</form>

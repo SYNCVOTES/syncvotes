@@ -55,23 +55,13 @@ async function sign(
 	});
 }
 
-/** Names → parties, resolved here so the signed member list is the one the user typed. */
-async function resolve(names: string[]): Promise<string[]> {
-	const directory = await remote.directory();
-	return names.map((raw) => {
-		const name = raw.trim().toLowerCase();
-		const found = directory.find((e) => e.name === name);
-		if (!found) throw new Error(`Nobody is registered as "${name}"`);
-		return found.party;
-	});
-}
-
 export async function createDao(
 	s: Signer,
 	who: Identity,
 	input: { name: string; description: string; members: string[] }
 ): Promise<void> {
-	const members = await resolve(input.members);
+	// Members arrive as party ids, checked against the registry as they were typed.
+	const members = input.members;
 	// The DAO's identity is decided here, so it can be checked here.
 	const id = crypto.randomUUID();
 	const args = { daoName: input.name, description: input.description, members, id };
@@ -116,7 +106,7 @@ export async function updateDao(
 	dao: string,
 	input: { name: string; description: string; members: string[] }
 ): Promise<void> {
-	const members = await resolve(input.members);
+	const members = input.members;
 	const args = { daoName: input.name, description: input.description, members };
 	const prepared = await remote.prepareUpdateDao({ party: who.party, dao, ...args });
 	await sign(s, who, 'DAO_Update', dao, args, prepared);

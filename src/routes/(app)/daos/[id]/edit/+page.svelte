@@ -15,6 +15,7 @@
 	import Field from '$lib/components/field.svelte';
 	import FormActions from '$lib/components/form-actions.svelte';
 	import DangerZone from '$lib/components/danger-zone.svelte';
+	import PartyTagInput from '$lib/components/party-tag-input.svelte';
 
 	const id = $derived(page.params.id!);
 	const me = $derived(store.who?.party ?? null);
@@ -22,7 +23,8 @@
 
 	let name = $state('');
 	let description = $state('');
-	let membersText = $state('');
+	let members = $state<string[]>([]);
+	let membersState = $state({ valid: true, checking: false });
 	let loaded = $state(false);
 
 	// Fill the form once from the live query; later updates must not overwrite what is typed.
@@ -31,19 +33,9 @@
 		if (!d || loaded) return;
 		name = d.name;
 		description = d.description;
-		membersText = d.members
-			.filter((m) => m !== d.admin)
-			.map((m) => d.names[m] ?? m)
-			.join(' ');
+		members = d.members.filter((m) => m !== d.admin);
 		loaded = true;
 	});
-
-	const members = $derived(
-		membersText
-			.split(/[\s,]+/)
-			.map((m) => m.trim())
-			.filter(Boolean)
-	);
 
 	async function save(event: SubmitEvent) {
 		event.preventDefault();
@@ -97,21 +89,22 @@
 				<Field
 					label="Members besides you"
 					id="members"
-					hint="Members are named by their SyncVotes name. You stay the admin and a member."
+					hint="Names or party addresses of parties registered with SyncVotes. You stay the admin and a member."
 				>
-					<Textarea
-						id="members"
-						rows={3}
-						placeholder="Names, separated by spaces or commas — alice bob carol"
-						bind:value={membersText}
-					/>
+					{#if loaded}
+						<PartyTagInput
+							bind:value={members}
+							bind:status={membersState}
+							exclude={me ?? undefined}
+						/>
+					{/if}
 				</Field>
 			</FormSection>
 
 			<FormActions
 				label="Save changes"
 				busy={store.busy}
-				disabled={name.trim().length < 2}
+				disabled={name.trim().length < 2 || !membersState.valid || membersState.checking}
 				cancelHref="/daos/{id}"
 			/>
 		</form>

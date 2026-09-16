@@ -122,6 +122,12 @@ export const sessionStart = command(
 
 export const sessionEnd = command(() => session.end());
 
+/** One registered party, by name or party id — what a member chip checks itself against. */
+export const member = query(v.pipe(v.string(), v.trim(), v.maxLength(300)), async (token) => {
+	const found = (await app.accounts()).find((a) => a.party === token || a.name === token);
+	return found ? { party: found.party, name: found.name } : null;
+});
+
 /** The directory: every registered name, for picking members. */
 export const directory = query(async () =>
 	(await app.accounts()).map(({ party, name }) => ({ party, name }))
