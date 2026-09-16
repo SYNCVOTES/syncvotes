@@ -13,7 +13,11 @@
 		exclude = [],
 		busy = false,
 		onadd
-	}: { exclude?: string[]; busy?: boolean; onadd: (parties: string[]) => void } = $props();
+	}: {
+		exclude?: string[];
+		busy?: boolean;
+		onadd: (parties: string[]) => Promise<boolean>;
+	} = $props();
 
 	let text = $state('');
 	let checking = $state(false);
@@ -80,7 +84,15 @@
 		</ul>
 	{/if}
 	{#if result && result.registered.length}
-		<Button disabled={busy} onclick={() => onadd(result!.registered)}>
+		<Button
+			disabled={busy}
+			onclick={async () => {
+				if (await onadd(result!.registered)) {
+					text = '';
+					result = null;
+				}
+			}}
+		>
 			Add {fmt(result.registered.length)}
 			{result.registered.length === 1 ? 'member' : 'members'}
 		</Button>

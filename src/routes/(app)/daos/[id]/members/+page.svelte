@@ -38,8 +38,8 @@
 
 	async function add(parties: string[]) {
 		const contractId = dao?.current?.contractId;
-		if (!contractId) return;
-		await flow.act((s, w) =>
+		if (!contractId) return false;
+		return flow.act((s, w) =>
 			actions.addMembers(s, w, contractId, parties, track('Adding members'))
 		);
 	}

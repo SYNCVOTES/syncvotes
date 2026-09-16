@@ -13,7 +13,9 @@ import * as index from './index';
 type Event =
 	| {
 			CreatedEvent: {
-				value: { contractId: string; templateId: string; createArgument: Record<string, unknown> };
+				contractId: string;
+				templateId: string;
+				createArgument: Record<string, unknown>;
 			};
 	  }
 	| { ArchivedEvent: { contractId: string } };
