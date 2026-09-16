@@ -70,20 +70,67 @@ export function sdk(): Promise<Sdk> {
 	return (instance ??= create());
 }
 
-/** Active contracts of one template, as seen by a party this participant hosts. */
-export async function activeContracts<T>(
-	party: string,
-	templateId: string
-): Promise<{ contractId: string; payload: T }[]> {
-	const contracts = await (
-		await sdk()
-	).ledger.acs.read({
-		parties: [party],
-		templateIds: [templateId],
-		filterByParty: true
-	});
+export type Created = {
+	contractId: string;
+	templateId: string;
+	createArgument: Record<string, unknown>;
+};
 
-	return contracts.map((c) => ({ contractId: c.contractId, payload: c.createArgument as T }));
+/**
+ * Every active contract of these templates as `party` sees them, at `offset`, streamed. The JSON
+ * API's list endpoint stops at a couple of hundred elements; its websocket has no such limit, so
+ * that is what a full index is built from. The token is the SDK's own.
+ */
+export async function streamActiveContracts(
+	party: string,
+	templateIds: string[],
+	offset: number,
+	onContract: (c: Created) => void
+): Promise<void> {
+	const ledger = await sdk();
+	const provider = (
+		ledger.events as unknown as {
+			websocketClient: { accessTokenProvider: { getAccessToken(): Promise<string> } };
+		}
+	).websocketClient.accessTokenProvider;
+	const token = await provider.getAccessToken();
+	const url =
+		required('LEDGER_API_URL', LEDGER_API_URL).replace(/^http/, 'ws') +
+		'/v2/state/active-contracts';
+	const filtersByParty = {
+		[party]: {
+			cumulative: templateIds.map((templateId) => ({
+				identifierFilter: {
+					TemplateFilter: { value: { templateId, includeCreatedEventBlob: false } }
+				}
+			}))
+		}
+	};
+
+	await new Promise<void>((resolve, reject) => {
+		const ws = new WebSocket(url, [`jwt.token.${token}`, 'daml.ws.auth']);
+		let failed: Error | undefined;
+		ws.onopen = () =>
+			ws.send(
+				JSON.stringify({ filter: { filtersByParty }, verbose: false, activeAtOffset: offset })
+			);
+		ws.onmessage = (m) => {
+			const entry = JSON.parse(String(m.data)) as {
+				contractEntry?: { JsActiveContract?: { createdEvent?: Created } };
+				error?: unknown;
+			};
+			const created = entry.contractEntry?.JsActiveContract?.createdEvent;
+			if (created) onContract(created);
+			else if (entry.error) failed = new Error(JSON.stringify(entry.error).slice(0, 300));
+		};
+		ws.onerror = () => (failed = new Error('The active-contracts stream failed'));
+		ws.onclose = (e) =>
+			failed
+				? reject(failed)
+				: e.code === 1000
+					? resolve()
+					: reject(new Error(`The active-contracts stream closed: ${e.code} ${e.reason}`));
+	});
 }
 
 export type Commands = Parameters<Sdk['ledger']['internal']['submit']>[0]['commands'];
