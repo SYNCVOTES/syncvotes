@@ -16,7 +16,6 @@
 	import Field from '$lib/components/field.svelte';
 	import FormActions from '$lib/components/form-actions.svelte';
 	import DangerZone from '$lib/components/danger-zone.svelte';
-	import PartyTagInput from '$lib/components/party-tag-input.svelte';
 
 	const id = $derived(page.params.id!);
 	const me = $derived(store.who?.party ?? null);
@@ -24,8 +23,6 @@
 
 	let name = $state('');
 	let description = $state('');
-	let members = $state<string[]>([]);
-	let membersState = $state({ valid: true, checking: false });
 	let loaded = $state(false);
 
 	// Fill the form once from the live query; later updates must not overwrite what is typed.
@@ -34,7 +31,6 @@
 		if (!d || loaded) return;
 		name = d.name;
 		description = d.description;
-		members = d.members.filter((m) => m !== d.admin);
 		loaded = true;
 	});
 
@@ -43,7 +39,7 @@
 		const contractId = dao?.current?.contractId;
 		if (!contractId) return;
 		const ok = await flow.act((signer, who) =>
-			actions.updateDao(signer, who, contractId, { name, description, members })
+			actions.updateDao(signer, who, contractId, { name, description })
 		);
 		if (ok) await goto(`/daos/${id}`);
 	}
@@ -62,7 +58,7 @@
 	<PageHeader
 		eyebrow="Settings"
 		title="Edit DAO"
-		description="Changes are signed by your key like everything else. Open proposals keep the member list they were opened with."
+		description="Changes are signed by your key like everything else. Members are managed on their own page."
 	/>
 
 	{#if !dao}
@@ -71,7 +67,7 @@
 		<QueryError error={dao.error} refresh={() => dao.reconnect()} />
 	{:else if !dao.ready}
 		<Skeleton height="h-64" />
-	{:else if dao.current.admin !== me}
+	{:else if !dao.current.me.admin}
 		<p class="text-[13px] text-ink-dim">Only the admin can edit this DAO.</p>
 	{:else}
 		<form class="space-y-8" onsubmit={save}>
@@ -86,26 +82,10 @@
 				</Field>
 			</FormSection>
 
-			<FormSection title="Members">
-				<Field
-					label="Members besides you"
-					id="members"
-					hint="Names or party addresses of parties registered with SyncVotes. You stay the admin and a member."
-				>
-					{#if loaded}
-						<PartyTagInput
-							bind:value={members}
-							bind:status={membersState}
-							exclude={me ?? undefined}
-						/>
-					{/if}
-				</Field>
-			</FormSection>
-
 			<FormActions
 				label="Save changes"
 				busy={store.busy}
-				disabled={name.trim().length < 2 || !membersState.valid || membersState.checking}
+				disabled={name.trim().length < 2}
 				cancelHref="/daos/{id}"
 			/>
 		</form>

@@ -52,7 +52,7 @@
 	<PageHeader
 		eyebrow="Settings"
 		title="Edit proposal"
-		description="The text can change until the first ballot is cast; the deadline cannot."
+		description="The text can change until the vote opens; the deadline cannot."
 	/>
 
 	{#if !proposal}
@@ -63,8 +63,8 @@
 		<Skeleton height="h-64" />
 	{:else if proposal.current.proposer !== me}
 		<p class="text-[13px] text-ink-dim">Only the proposer can edit.</p>
-	{:else if proposal.current.ballots.length > 0}
-		<p class="text-[13px] text-ink-dim">Voting has started; the text is fixed now.</p>
+	{:else if proposal.current.ready}
+		<p class="text-[13px] text-ink-dim">Voting has opened; the text is fixed now.</p>
 	{:else}
 		<form class="space-y-8" onsubmit={save}>
 			<Problem message={store.problem} />

@@ -15,28 +15,42 @@
 	import Panel from '$lib/components/panel.svelte';
 	import Note from '$lib/components/note.svelte';
 	import Tally from '$lib/components/tally.svelte';
-	import SectionTitle from '$lib/components/section-title.svelte';
 	import List from '$lib/components/list.svelte';
 	import ListItem from '$lib/components/list-item.svelte';
 	import Skeleton from '$lib/components/skeleton.svelte';
+	import LoadMore from '$lib/components/load-more.svelte';
+	import SearchInput from '$lib/components/search-input.svelte';
 	import DangerZone from '$lib/components/danger-zone.svelte';
+	import SigningProgress from '$lib/components/signing-progress.svelte';
 	import { relative } from '$lib/format';
 
 	const id = $derived(page.params.id!);
 	const me = $derived(store.who?.party ?? null);
 	const proposal = $derived(me ? remote.proposal(id) : null);
 
-	const nameOf = (party: string) => proposal?.current?.names[party] ?? party.split('::')[0];
+	let q = $state('');
+	let limit = $state(20);
+	const ballots = $derived(me ? remote.proposalBallots({ id, offset: 0, limit, q }) : null);
+	let progress = $state({ done: 0, total: 0, what: '' });
 
 	// The stream brings the new contract the moment the vote lands; nothing to refresh by hand.
-	const vote = (contractId: string, choice: 'Yes' | 'No') =>
-		flow.act((s, w) => actions.vote(s, w, contractId, choice));
+	const vote = (right: string, choice: 'Yes' | 'No') =>
+		flow.act((s, w) => actions.vote(s, w, right, choice));
 
-	const close = (contractId: string) => flow.act((s, w) => actions.closeProposal(s, w, contractId));
+	const open = (daoId: string) =>
+		flow.act((s, w) =>
+			actions.openVoting(
+				s,
+				w,
+				id,
+				daoId,
+				(done, total) => (progress = { done, total, what: 'Opening the vote' })
+			)
+		);
 
-	async function cancel(contractId: string, dao: string) {
+	async function cancel(contractId: string, daoId: string) {
 		const ok = await flow.act((s, w) => actions.cancelProposal(s, w, contractId));
-		if (ok) await goto(`/daos/${dao}`);
+		if (ok) await goto(`/daos/${daoId}`);
 	}
 </script>
 
@@ -50,50 +64,46 @@
 	{#if !proposal}
 		<ConnectPrompt what="see this proposal" />
 	{:else if proposal.error}
-		<QueryError error={proposal.error} refresh={() => proposal.reconnect()} />
+		<QueryError error={proposal.error} refresh={() => proposal?.reconnect()} />
 	{:else if !proposal.ready}
 		<Skeleton />
 	{:else}
 		{@const p = proposal.current}
-		{@const yes = p.ballots.filter((b) => b.vote === 'Yes').length}
-		{@const no = p.ballots.filter((b) => b.vote === 'No').length}
-		{@const n = p.members.length}
-		{@const needed = Math.floor(n / 2) + 1}
+		{@const needed = Math.floor(p.eligible / 2) + 1}
 		{@const ended = new Date(p.closesAt).getTime() < Date.now()}
-		{@const member = me !== null && p.members.includes(me)}
-		{@const myBallot = p.ballots.find((b) => b.voter === me) ?? null}
-		{@const voted = myBallot !== null}
-		{@const outcome = p.outcome ?? (ended ? (yes >= needed ? 'Passed' : 'Failed') : null)}
-		{@const mine = me !== null && me === p.proposer}
-		{@const canCancel = !p.outcome && (mine || (me !== null && me === p.admin))}
+		{@const mine = me === p.proposer}
+		{@const canCancel = !p.outcome && (mine || me === p.admin)}
 
 		<div class="mb-8">
 			<div class="mb-3 flex items-center gap-3">
-				<StatusBadge outcome={p.outcome} closesAt={p.closesAt} />
+				<StatusBadge outcome={p.outcome} closesAt={p.closesAt} ready={p.ready} />
 				<span class="font-mono text-xs text-ink-dim">
 					{p.outcome
 						? 'closed'
-						: ended
-							? `ended ${relative(p.closesAt)}`
-							: `closes ${relative(p.closesAt)}`}
+						: !p.ready
+							? 'voting not open yet'
+							: ended
+								? `ended ${relative(p.closesAt)}`
+								: `closes ${relative(p.closesAt)}`}
 				</span>
 			</div>
 			<div class="flex flex-wrap items-start justify-between gap-4">
 				<div>
 					<h1 class="display text-3xl md:text-4xl">{p.title}</h1>
 					<p class="mt-2 flex flex-wrap items-center gap-x-2 font-mono text-xs text-ink-dim">
-						<span>Proposed by <span class="text-ink-mid">{nameOf(p.proposer)}</span></span>
+						<span>Proposed by</span>
 						<PartyId party={p.proposer} />
-						{#if p.createdAt}<span>· {relative(p.createdAt)}</span>{/if}
+						<span>· {relative(p.createdAt)}</span>
 					</p>
 				</div>
-				{#if mine && !p.outcome && p.ballots.length === 0}
+				{#if mine && !p.ready}
 					<Button href="/proposals/{id}/edit" variant="outline" size="sm">Edit</Button>
 				{/if}
 			</div>
 		</div>
 
 		<Problem message={store.problem} />
+		<SigningProgress {...progress} />
 
 		<div class="grid gap-8 lg:grid-cols-[1fr_320px]">
 			<section class="space-y-8">
@@ -102,45 +112,73 @@
 				</Panel>
 
 				<div>
-					<SectionTitle title="Ballots" />
-					{#if p.ballots.length === 0}
-						<p class="text-[13px] text-ink-dim">No votes yet.</p>
+					<div class="mb-4 flex items-center justify-between gap-4">
+						<h2 class="eyebrow">Ballots</h2>
+						<div class="w-56"><SearchInput bind:value={q} placeholder="Filter by party id" /></div>
+					</div>
+					{#if ballots?.error}
+						<QueryError error={ballots.error} refresh={() => ballots?.reconnect()} />
+					{:else if !ballots?.ready}
+						<Skeleton height="h-24" />
+					{:else if ballots.current.total === 0}
+						<p class="text-[13px] text-ink-dim">
+							{q ? 'No ballot matches that.' : 'No votes yet.'}
+						</p>
 					{:else}
 						<List>
-							{#each p.ballots as b (b.voter)}
+							{#each ballots.current.items as b (b.voter)}
 								<ListItem class="flex items-center gap-3 font-mono text-xs">
-									<span class={b.voter === me ? 'text-orange' : ''}>{nameOf(b.voter)}</span>
-									<PartyId party={b.voter} class="min-w-0 flex-1" />
+									<PartyId
+										party={b.voter}
+										class="min-w-0 flex-1 {b.voter === me
+											? '[&>span>span:first-child]:text-orange'
+											: ''}"
+									/>
+									<span class="text-ink-dim">{relative(b.castAt)}</span>
+									{#if !b.counted}<span
+											class="text-ink-dim"
+											title="Cast; the provider has not counted it yet">pending</span
+										>{/if}
 									<span class={b.vote === 'Yes' ? 'text-green' : 'text-red'}>{b.vote}</span>
 								</ListItem>
 							{/each}
 						</List>
+						<LoadMore
+							shown={ballots.current.items.length}
+							total={ballots.current.total}
+							noun="ballots"
+							onmore={() => (limit += 20)}
+						/>
 					{/if}
 				</div>
 			</section>
 
 			<aside class="space-y-6">
-				<Tally {yes} {no} total={n} {needed} />
+				<Tally yes={p.yes} no={p.no} total={p.eligible} {needed} cast={p.cast} />
 
-				{#if outcome}
-					<Note>
-						{p.outcome ? 'Settled as' : 'Ended as'}
-						<span class={outcome === 'Passed' ? 'text-green' : 'text-red'}>{outcome}</span
-						>{p.outcome ? '.' : ' — not recorded on the ledger yet.'}
-						{#if !p.outcome && member}
+				{#if !p.ready}
+					<Note mono={false}>
+						{#if mine}
+							Voting has not opened: rights still have to be issued to the members.
 							<div class="mt-3">
-								<Button
-									size="sm"
-									variant="accent"
-									disabled={store.busy}
-									onclick={() => close(p.contractId)}
+								<Button size="sm" disabled={store.busy} onclick={() => open(p.daoId)}
+									>Open the vote</Button
 								>
-									Close proposal
-								</Button>
 							</div>
+						{:else}
+							The proposer has not opened the vote yet.
 						{/if}
 					</Note>
+				{:else if p.outcome}
+					<Note>
+						Settled as <span class={p.outcome === 'Passed' ? 'text-green' : 'text-red'}
+							>{p.outcome}</span
+						>.
+					</Note>
+				{:else if ended}
+					<Note>The deadline has passed; the last ballots are being counted.</Note>
 				{/if}
+
 				{#if canCancel}
 					<DangerZone
 						compact
@@ -151,36 +189,33 @@
 						onconfirm={() => cancel(p.contractId, p.daoId)}
 					/>
 				{/if}
-				{#if outcome}
-					<!-- settled: nothing more to do -->
-				{:else if store.screen.at === 'locked'}
-					<Panel padding="sm" class="space-y-3">
-						<p class="text-[13px] text-ink-dim">Unlock your wallet to vote.</p>
-						<UnlockForm />
-					</Panel>
-				{:else if !store.who}
-					<Note mono={false}>
-						<a href="/wallet" class="text-orange hover:underline">Connect a wallet</a> to vote.
-					</Note>
-				{:else if !member}
-					<Note mono={false}>Only members can vote.</Note>
-				{:else if voted}
-					<Note>
-						You voted <span class={myBallot?.vote === 'Yes' ? 'text-green' : 'text-red'}
-							>{myBallot?.vote}</span
-						>.
-					</Note>
-				{:else}
-					<Panel padding="sm" class="grid grid-cols-2 gap-3">
-						<Button variant="accent" disabled={store.busy} onclick={() => vote(p.contractId, 'Yes')}
-							>Yes</Button
+
+				{#if p.ready && !p.outcome && !ended}
+					{#if store.screen.at === 'locked'}
+						<Panel padding="sm" class="space-y-3">
+							<p class="text-[13px] text-ink-dim">Unlock your wallet to vote.</p>
+							<UnlockForm />
+						</Panel>
+					{:else if p.me.vote}
+						<Note
+							>You voted <span class={p.me.vote === 'Yes' ? 'text-green' : 'text-red'}
+								>{p.me.vote}</span
+							>.</Note
 						>
-						<Button
-							variant="destructive"
-							disabled={store.busy}
-							onclick={() => vote(p.contractId, 'No')}>No</Button
+					{:else if p.me.right}
+						{@const right = p.me.right}
+						<Panel padding="sm" class="grid grid-cols-2 gap-3">
+							<Button variant="accent" disabled={store.busy} onclick={() => vote(right, 'Yes')}
+								>Yes</Button
+							>
+							<Button variant="destructive" disabled={store.busy} onclick={() => vote(right, 'No')}
+								>No</Button
+							>
+						</Panel>
+					{:else}
+						<Note mono={false}>You joined after this vote opened, so it has no ballot for you.</Note
 						>
-					</Panel>
+					{/if}
 				{/if}
 			</aside>
 		</div>

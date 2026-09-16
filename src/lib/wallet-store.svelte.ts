@@ -1,6 +1,7 @@
 import * as wallet from './wallet';
 import * as actions from './actions';
 import * as session from './session';
+import { label } from './format';
 
 /**
  * The one place the page keeps its wallet: which screen the onboarding is on, the signer while
@@ -16,7 +17,7 @@ export type Screen =
 	| { at: 'welcome' }
 	| { at: 'create'; phrase: string }
 	| { at: 'restore' }
-	| { at: 'name'; signer: wallet.Signer; topology: actions.Topology }
+	| { at: 'hint'; signer: wallet.Signer; fingerprint: string }
 	| { at: 'protect'; signer: wallet.Signer; who: actions.Identity }
 	| { at: 'locked'; lock: 'passkey' | 'password' }
 	| { at: 'home'; signer: wallet.Signer; who: actions.Identity };
@@ -137,16 +138,12 @@ const identify = (signer: wallet.Signer) =>
 	run(async () => {
 		// From here on a key is in memory, so the auto-lock is armed from here on too.
 		session.start(signer, lock);
-		const topology = await actions.lookup(signer);
-		if (topology.exists && topology.name && topology.account) {
-			screen = {
-				at: 'protect',
-				signer,
-				who: { party: topology.partyId, name: topology.name, account: topology.account }
-			};
+		const found = await actions.lookup(signer);
+		if (found.exists) {
+			screen = { at: 'protect', signer, who: { party: found.party, account: found.account } };
 			return;
 		}
-		screen = { at: 'name', signer, topology };
+		screen = { at: 'hint', signer, fingerprint: found.fingerprint };
 	});
 
 export const flow = {
@@ -182,11 +179,13 @@ export const flow = {
 		return identify(wallet.signerFromPhrase(phrase));
 	},
 
-	confirmName(name: string) {
-		if (screen.at !== 'name') return;
-		const { signer, topology } = screen;
+	/** The hint is the label in the party id; the key signs the topology that names it. */
+	confirmHint(hint: string) {
+		if (screen.at !== 'hint') return;
+		const { signer } = screen;
 		return run(async () => {
-			const who = await actions.enrol(signer, topology, name);
+			const topology = await actions.topology(signer, hint);
+			const who = await actions.enrol(signer, hint, topology);
 			screen = { at: 'protect', signer, who };
 		});
 	},
@@ -195,7 +194,7 @@ export const flow = {
 		if (screen.at !== 'protect') return;
 		const { signer, who } = screen;
 		return run(async () => {
-			selected = await wallet.lockWithPasskey(signer, who);
+			selected = await wallet.lockWithPasskey(signer, { name: label(who.party), party: who.party });
 			refresh();
 			await enter(signer, who);
 		});
@@ -205,7 +204,10 @@ export const flow = {
 		if (screen.at !== 'protect') return;
 		const { signer, who } = screen;
 		return run(async () => {
-			selected = await wallet.lockWithPassword(signer, password, who);
+			selected = await wallet.lockWithPassword(signer, password, {
+				name: label(who.party),
+				party: who.party
+			});
 			refresh();
 			await enter(signer, who);
 		});
@@ -227,15 +229,15 @@ export const flow = {
 					? await wallet.unlockWithPasskey(id)
 					: await wallet.unlockWithPassword(password ?? '', id);
 			session.start(signer, lock);
-			const topology = await actions.lookup(signer);
-			if (!topology.exists || !topology.name || !topology.account) {
-				screen = { at: 'name', signer, topology };
+			const found = await actions.lookup(signer);
+			if (!found.exists) {
+				screen = { at: 'hint', signer, fingerprint: found.fingerprint };
 				return;
 			}
-			const who = { party: topology.partyId, name: topology.name, account: topology.account };
-			// A key from the single-wallet version learns its name the first time it is opened.
-			if (!wallets.find((w) => w.id === id)?.name) {
-				wallet.describeStored(id, who);
+			const who = { party: found.party, account: found.account };
+			// A stored key learns which party it is the first time it is opened here.
+			if (wallets.find((w) => w.id === id)?.party !== who.party) {
+				wallet.describeStored(id, { name: label(who.party), party: who.party });
 				refresh();
 			}
 			await enter(signer, who);

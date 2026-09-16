@@ -5,12 +5,13 @@
 	import NavLink from './nav-link.svelte';
 	import ThemeToggle from './theme-toggle.svelte';
 	import NetworkPill from './network-pill.svelte';
+	import { hintOf } from '$lib/format';
 
 	/** The app's header: brand, nav, theme, network, and the way into the wallet. */
 	let { nav }: { nav: { href: string; label: string }[] } = $props();
 
 	const walletLabel = $derived(
-		store.who ? store.who.name : store.hasKey ? 'Unlock wallet' : 'Connect wallet'
+		store.who ? hintOf(store.who.party) : store.hasKey ? 'Unlock wallet' : 'Connect wallet'
 	);
 </script>
 

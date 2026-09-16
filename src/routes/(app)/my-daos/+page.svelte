@@ -11,6 +11,7 @@
 	import Skeleton from '$lib/components/skeleton.svelte';
 	import EmptyState from '$lib/components/empty-state.svelte';
 	import Plus from '@lucide/svelte/icons/plus';
+	import PartyId from '$lib/components/party-id.svelte';
 
 	const who = $derived(store.who);
 	const daos = $derived(who ? remote.myDaos(who.party) : null);
@@ -47,7 +48,8 @@
 
 		{#if daos.current.length === 0}
 			<EmptyState title="No DAOs yet">
-				Create one, or ask a friend to add <span class="font-mono text-ink">{who.name}</span> as a member.
+				Create one, or give a DAO's admin your party id to be added:
+				<span class="inline-block"><PartyId party={who.party} /></span>
 			</EmptyState>
 		{:else}
 			<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -56,7 +58,7 @@
 						id={dao.id}
 						name={dao.name}
 						description={dao.description}
-						members={dao.members.length}
+						members={dao.members}
 						openProposals={dao.openProposals}
 						role={dao.admin === who.party ? 'admin' : 'member'}
 					/>

@@ -5,107 +5,100 @@ import * as v from 'valibot';
 import { Main } from '@daml.js/model';
 import * as participant from './server/participant';
 import * as app from './server/app';
+import * as index from './server/index';
 import { nextChange } from './server/feed';
 import * as session from './server/session';
+import { fingerprintOf } from './verify';
+import { normaliseName, nameProblem } from './names';
 
 /**
  * The server's API, as remote functions: the page calls these like local functions, SvelteKit
  * does the transport. Everything here runs on the server with the participant credentials; the
  * user's key stays in the browser and only ever contributes signatures.
  *
- * Reads of a party's DAOs need a read session — a challenge signed by that party's key, once
- * per unlock (`server/session.ts`); the app is the operator and sees every DAO, so it is the app
- * that keeps them to their members. Writes are transactions the ledger accepts only with the
- * acting party's own signature.
- *
- * Reads are live: each is a stream that sends its value, then sends it again whenever the ledger
- * feed reports a change and the value differs. Nothing on the client polls or refreshes.
+ * Reads come from the in-memory index and are live: each is a stream that sends its value, then
+ * sends it again whenever what it shows changed. They need a read session — a challenge signed
+ * by the party's key, once per unlock (`server/session.ts`) — and membership. Writes are
+ * transactions the ledger accepts only with the acting party's own signature.
  */
 
-/** Runs `load` now and after every ledger change, yielding only when the result changed. */
-async function* live<T>(load: () => Promise<T>): AsyncGenerator<T> {
+/** Runs `load` now and whenever `key` changes, yielding only when the result changed. */
+async function* live<T>(key: string, load: () => T | Promise<T>): AsyncGenerator<T> {
 	let last = '';
 	for (;;) {
 		try {
 			const value = await load();
-			const key = JSON.stringify(value);
-			if (key !== last) {
-				last = key;
+			const serialised = JSON.stringify(value);
+			if (serialised !== last) {
+				last = serialised;
 				yield value;
 			}
 		} catch (e) {
 			// Access gone (401/403/404) ends the stream with that error, so a page never keeps
-			// showing a snapshot of something it may no longer see. A transient failure after a
-			// first value is swallowed and the stream keeps watching.
+			// showing a snapshot of something it may no longer see.
 			const status = (e as { status?: number }).status;
 			if (last === '' || status === 401 || status === 403 || status === 404) throw e;
 		}
-		await nextChange();
+		await nextChange(key);
 	}
 }
 
 const base64 = v.pipe(v.string(), v.nonEmpty(), v.base64());
-const partyId = v.pipe(v.string(), v.includes('::'));
+const partyId = v.pipe(v.string(), v.includes('::'), v.maxLength(300));
 const contractId = v.pipe(v.string(), v.nonEmpty());
 const text = (max: number) => v.pipe(v.string(), v.trim(), v.nonEmpty(), v.maxLength(max));
+const paging = {
+	offset: v.pipe(v.number(), v.integer(), v.minValue(0)),
+	limit: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(100))
+};
+const BATCH = 200;
 
 // ---- Identity ----------------------------------------------------------------------------
 
 /**
- * Who is this key? The participant derives the party id from it. If that party already exists
- * the user is returning; otherwise the result carries what the key has to sign to create it.
+ * Who is this key? A party's namespace is the fingerprint of its key, so a registered party is
+ * found by that alone. A key nobody has seen gets to choose the hint its party id will carry.
  */
 export const lookup = query(base64, async (publicKey) => {
-	const topology = await participant.generateTopology(app.PARTY_HINT, publicKey);
-	const exists = await participant.partyExists(topology.partyId);
-	const account = exists
-		? (await app.accounts()).find((a) => a.party === topology.partyId)
-		: undefined;
-
-	return { ...topology, exists, name: account?.name ?? null, account: account?.contractId ?? null };
+	const fingerprint = await fingerprintOf(new Uint8Array(Buffer.from(publicKey, 'base64')));
+	const account = app.accountByFingerprint(fingerprint);
+	return account
+		? { exists: true as const, party: account.party, account: account.contractId, fingerprint }
+		: { exists: false as const, fingerprint };
 });
 
-/** The key signed its topology: create the party and register its name. */
+const hintOf = (hint: string) => {
+	const chosen = normaliseName(hint);
+	const problem = nameProblem(chosen);
+	if (problem) throw error(400, problem);
+	return chosen;
+};
+
+/** The party this key would be under this hint, and what the key has to sign to create it. */
+export const topology = query(
+	v.object({ publicKey: base64, hint: v.string() }),
+	({ publicKey, hint }) => participant.generateTopology(hintOf(hint), publicKey)
+);
+
+/** The key signed its topology: create the party and its account. */
 export const enrol = command(
-	v.object({
-		publicKey: base64,
-		multiHash: base64,
-		signature: base64,
-		name: v.pipe(v.string(), v.maxLength(60))
-	}),
-	async ({ publicKey, multiHash, signature, name }) => {
+	v.object({ publicKey: base64, hint: v.string(), multiHash: base64, signature: base64 }),
+	async ({ publicKey, hint, multiHash, signature }) => {
 		// The ledger verifies this signature when it allocates a new party; for a party that
-		// already exists it never looks, so check here — or anyone holding a public key could
-		// register that party under a name of their choosing.
+		// already exists it never looks, so check here too.
 		const valid = ed25519.verify(
 			Buffer.from(signature, 'base64'),
 			Buffer.from(multiHash, 'base64'),
 			Buffer.from(publicKey, 'base64')
 		);
 		if (!valid) throw error(403, 'The signature does not match the key');
-
-		const chosen = app.normaliseName(name);
-		const topology = await participant.generateTopology(app.PARTY_HINT, publicKey);
-		if (topology.multiHash !== multiHash)
+		const chosen = hintOf(hint);
+		const fresh = await participant.generateTopology(chosen, publicKey);
+		if (fresh.multiHash !== multiHash)
 			throw error(409, 'The party topology changed — sign in again');
-
-		// Name before allocation: a party allocated and then refused a name is stuck.
-		const all = await app.accounts();
-		const mine = all.find((a) => a.party === topology.partyId);
-		if (!mine && all.some((a) => a.name === chosen))
-			throw error(409, `The name "${chosen}" is taken`);
-
-		// The SDK checks whether the party exists before allocating, so a returning key that never
-		// finished registering lands here too and just gets its name.
-		const { partyId } = await participant.allocateExternal(
-			app.PARTY_HINT,
-			publicKey,
-			multiHash,
-			signature
-		);
-
-		const account = await app.register(partyId, chosen);
-		return { party: account.party, name: account.name, account: account.contractId };
+		const { partyId } = await participant.allocateExternal(chosen, publicKey, multiHash, signature);
+		const account = await app.register(partyId);
+		return { party: account.party, account: account.contractId };
 	}
 );
 
@@ -125,97 +118,111 @@ export const sessionStart = command(
 
 export const sessionEnd = command(() => session.end());
 
-/** One registered party, by name or party id — what a member chip checks itself against. */
-export const member = query(v.pipe(v.string(), v.trim(), v.maxLength(300)), async (token) => {
+/** Whether a party id is registered — what a member chip checks itself against. */
+export const member = query(v.pipe(v.string(), v.trim(), v.maxLength(300)), (token) => {
 	session.required();
-	const found = (await app.accounts()).find((a) => a.party === token || a.name === token);
-	return found ? { party: found.party, name: found.name } : null;
+	return app.isRegistered(token) ? { party: token } : null;
 });
 
-/** The directory: every registered name. For signed-in users; the identity graph is not public. */
-export const directory = query(async () => {
+/** Which of these party ids are registered — a pasted list, checked in one go. */
+export const checkMembers = query(v.pipe(v.array(partyId), v.maxLength(2000)), (parties) => {
 	session.required();
-	return (await app.accounts()).map(({ party, name }) => ({ party, name }));
+	const unique = [...new Set(parties)];
+	return {
+		registered: unique.filter((p) => app.isRegistered(p)),
+		unknown: unique.filter((p) => !app.isRegistered(p))
+	};
 });
 
 // ---- Reads -------------------------------------------------------------------------------
 
 /** Counts for the landing ticker. Aggregates only — DAOs are private, their contents stay so. */
-export const stats = query.live(() =>
-	live(async () => {
-		const [daos, proposals, accounts] = await Promise.all([
-			app.daos(),
-			app.proposals(),
-			app.accounts()
-		]);
-		return {
-			daos: daos.length,
-			openProposals: proposals.filter((p) => !p.outcome).length,
-			votesCast: proposals.reduce((n, p) => n + p.ballots.length, 0),
-			members: accounts.length
-		};
-	})
-);
+export const stats = query.live(() => live(index.keys.all, () => app.stats()));
 
-/** The DAOs a party belongs to, with their open proposal count. */
+const daoSummary = (d: app.Dao) => ({
+	...d,
+	members: app.memberCount(d.id),
+	proposals: app.proposalsOf(d.id).length,
+	openProposals: app.openCount(d.id)
+});
+
+/** The DAOs a party belongs to. */
 export const myDaos = query.live(partyId, (party) =>
-	live(async () => {
+	live(index.keys.party(party), () => {
 		session.required(party);
-		const [daos, proposals] = await Promise.all([app.daos(), app.proposals()]);
-		return daos
-			.filter((d) => d.members.includes(party))
-			.map((d) => ({
-				...d,
-				openProposals: proposals.filter((p) => p.daoId === d.id && !p.outcome).length
-			}));
+		return app.daosOf(party).map(daoSummary);
 	})
 );
 
+const memberOnly = (daoId: string) => {
+	const me = session.required();
+	if (!app.isMember(daoId, me)) throw error(403, 'Only members can see this DAO');
+	return me;
+};
+
+/** A DAO with its counts and the caller's standing in it. No lists: those are paged below. */
 export const dao = query.live(contractId, (id) =>
-	live(async () => {
-		const me = session.required();
-		const [found, proposals, names] = await Promise.all([
-			app.daoById(id),
-			app.proposals(),
-			app.accounts()
-		]);
-		if (!found.members.includes(me)) throw error(403, 'Only members can see this DAO');
+	live(index.keys.dao(id), () => {
+		const me = memberOnly(id);
+		const d = app.daoById(id);
+		const membership = app.memberOf(id, me)!;
+		return { ...daoSummary(d), me: { admin: d.admin === me, membership: membership.contractId } };
+	})
+);
+
+export const daoMembers = query.live(
+	v.object({ id: contractId, ...paging, q: v.optional(v.pipe(v.string(), v.maxLength(100)), '') }),
+	({ id, offset, limit, q }) =>
+		live(index.keys.dao(id), () => {
+			memberOnly(id);
+			return app.membersOf(id, offset, limit, q);
+		})
+);
+
+export const daoProposals = query.live(
+	v.object({ id: contractId, ...paging, status: v.optional(v.picklist(['open', 'closed'])) }),
+	({ id, offset, limit, status }) =>
+		live(index.keys.dao(id), () => {
+			memberOnly(id);
+			return app.proposalPage(id, offset, limit, status);
+		})
+);
+
+/** Member contract ids, for issuing voting rights in batches. */
+export const memberCids = query(contractId, (id) => {
+	memberOnly(id);
+	return app.memberCids(id);
+});
+
+const proposalOnly = (p: app.Proposal) => {
+	const me = session.required();
+	if (!app.isMember(p.daoId, me) && p.proposer !== me)
+		throw error(403, 'Only members can see this proposal');
+	return me;
+};
+
+/** A proposal with its tally and the caller's standing: a right to vote, a ballot cast, or neither. */
+export const proposal = query.live(contractId, (id) =>
+	live(index.keys.proposal(id), () => {
+		const p = app.proposalById(id);
+		const me = proposalOnly(p);
+		const right = app.rightOf(id, me);
+		const ballot = app.ballotOf(id, me);
 		return {
-			...found,
-			proposals: proposals.filter((p) => p.daoId === found.id),
-			names: Object.fromEntries(names.map((a) => [a.party, a.name]))
+			...p,
+			cast: app.ballotCount(id),
+			me: { right: right?.contractId ?? null, vote: ballot?.vote ?? null }
 		};
 	})
 );
 
-export const proposal = query.live(contractId, (id) =>
-	live(async () => {
-		const me = session.required();
-		const [found, names] = await Promise.all([app.proposalById(id), app.accounts()]);
-		if (!found.members.includes(me)) {
-			// A proposal keeps the members it was opened with; someone who joined the DAO later is
-			// not among them, on the ledger or here. Say which of the two this is.
-			const joinedLater = await app.daoById(found.daoId).then(
-				(d) => d.members.includes(me),
-				() => false
-			);
-			throw error(
-				403,
-				joinedLater
-					? 'This proposal was opened before you joined the DAO. Only the members it was opened with can see and vote on it; the next proposal will include you.'
-					: 'Only members can see this proposal'
-			);
-		}
-		// The DAO's admin may cancel. Proposals from before 0.1.4 do not carry it, and a proposal
-		// can outlive a deleted DAO, so this may be absent.
-		const admin =
-			found.admin ??
-			(await app.daoById(found.daoId).then(
-				(d) => d.admin,
-				() => null
-			));
-		return { ...found, admin, names: Object.fromEntries(names.map((a) => [a.party, a.name])) };
-	})
+export const proposalBallots = query.live(
+	v.object({ id: contractId, ...paging, q: v.optional(v.pipe(v.string(), v.maxLength(100)), '') }),
+	({ id, offset, limit, q }) =>
+		live(index.keys.proposal(id), () => {
+			proposalOnly(app.proposalById(id));
+			return app.ballotPage(id, offset, limit, q);
+		})
 );
 
 // ---- Writes: prepare here, sign in the browser, execute here ------------------------------
@@ -232,93 +239,26 @@ export const prepareCreateDao = command(
 		party: partyId,
 		daoName: text(60),
 		description: v.pipe(v.string(), v.maxLength(2000)),
-		members: v.pipe(v.array(partyId), v.maxLength(50)),
 		id: v.pipe(v.string(), v.uuid())
 	}),
-	async ({ party, daoName, description, members, id }) => {
+	async ({ party, daoName, description, id }) => {
 		session.required(party);
-		const account = await app.accountOf(party);
-		const known = await app.accounts();
-		for (const m of members) {
-			if (!known.some((a) => a.party === m))
-				throw error(404, `${m} is not registered with the app`);
-		}
-		if ((await app.daos()).some((d) => d.id === id)) throw error(409, 'That DAO id is taken');
-
+		const account = app.accountOf(party);
+		if (index.daos.has(id)) throw error(409, 'That DAO id is taken');
 		return participant.prepare(
 			party,
 			exercise(Main.Account.templateId, account.contractId, 'Account_CreateDAO', {
 				daoName,
 				description,
-				members,
 				id
-			})
-		);
-	}
-);
-
-export const prepareCreateProposal = command(
-	v.object({
-		party: partyId,
-		dao: contractId,
-		proposer: partyId,
-		title: text(120),
-		description: v.pipe(v.string(), v.maxLength(5000)),
-		closesAt: v.pipe(v.string(), v.isoTimestamp()),
-		id: v.pipe(v.string(), v.uuid())
-	}),
-	async ({ party, dao, proposer, title, description, closesAt, id }) => {
-		session.required(party);
-		if (proposer !== party) throw error(400, 'The proposer must be you');
-		const found = await app.daoById(dao);
-		if (!found.members.includes(party)) throw error(403, 'Only members can propose');
-
-		// The browser picks the deadline and the id so it can check them before signing; the
-		// server only keeps them within bounds and unique.
-		const days = (new Date(closesAt).getTime() - Date.now()) / 86_400_000;
-		if (!(days > 0.5 && days <= 31)) throw error(400, 'The voting period must be 1 to 30 days');
-		if ((await app.proposals()).some((p) => p.id === id))
-			throw error(409, 'That proposal id is taken');
-
-		return participant.prepare(
-			party,
-			exercise(Main.DAO.templateId, dao, 'DAO_CreateProposal', {
-				proposer,
-				title,
-				description,
-				closesAt,
-				id
-			})
-		);
-	}
-);
-
-/** The browser names the contract it saw; if a vote replaced it meanwhile, say so. */
-async function currentProposal(contractId: string) {
-	const found = (await app.proposals()).find((p) => p.contractId === contractId);
-	if (!found)
-		throw error(409, 'This proposal changed while you were looking at it — reload and try again');
-	return found;
-}
-
-export const prepareVote = command(
-	v.object({ party: partyId, contractId, vote: v.picklist(['Yes', 'No']) }),
-	async ({ party, contractId, vote }) => {
-		session.required(party);
-		const current = await currentProposal(contractId);
-		return participant.prepare(
-			party,
-			exercise(Main.Proposal.templateId, current.contractId, 'Proposal_Vote', {
-				voter: party,
-				vote
 			})
 		);
 	}
 );
 
 /** The DAO contract the browser saw, if it is still the current one and the caller is admin. */
-async function adminOf(contractId: string, party: string) {
-	const found = await app.currentDao(contractId);
+function adminOf(contractId: string, party: string) {
+	const found = app.currentDao(contractId);
 	if (found.admin !== party) throw error(403, 'Only the admin can do this');
 	return found;
 }
@@ -328,20 +268,14 @@ export const prepareUpdateDao = command(
 		party: partyId,
 		dao: contractId,
 		daoName: text(60),
-		description: v.pipe(v.string(), v.maxLength(2000)),
-		members: v.pipe(v.array(partyId), v.maxLength(50))
+		description: v.pipe(v.string(), v.maxLength(2000))
 	}),
-	async ({ party, dao, daoName, description, members }) => {
+	async ({ party, dao, daoName, description }) => {
 		session.required(party);
-		await adminOf(dao, party);
-		const known = await app.accounts();
-		for (const m of members) {
-			if (!known.some((a) => a.party === m))
-				throw error(404, `${m} is not registered with the app`);
-		}
+		adminOf(dao, party);
 		return participant.prepare(
 			party,
-			exercise(Main.DAO.templateId, dao, 'DAO_Update', { daoName, description, members })
+			exercise(Main.DAO.templateId, dao, 'DAO_Update', { daoName, description })
 		);
 	}
 );
@@ -351,73 +285,160 @@ export const prepareArchiveDao = command(
 	v.object({ party: partyId, dao: contractId }),
 	async ({ party, dao }) => {
 		session.required(party);
-		const found = await adminOf(dao, party);
-		const open = (await app.proposals()).filter((p) => p.daoId === found.id && !p.outcome);
-		if (open.length > 0) throw error(409, 'Close or cancel the open proposals first');
+		const found = adminOf(dao, party);
+		if (app.openCount(found.id) > 0) throw error(409, 'Close or cancel the open proposals first');
 		return participant.prepare(party, exercise(Main.DAO.templateId, dao, 'DAO_Archive', {}));
+	}
+);
+
+/** A batch of new members: registered parties that are not members yet. */
+export const prepareAddMembers = command(
+	v.object({
+		party: partyId,
+		dao: contractId,
+		parties: v.pipe(v.array(partyId), v.minLength(1), v.maxLength(BATCH))
+	}),
+	async ({ party, dao, parties }) => {
+		session.required(party);
+		const found = adminOf(dao, party);
+		for (const p of parties) {
+			if (!app.isRegistered(p)) throw error(404, `${p} is not registered with the app`);
+			if (app.isMember(found.id, p)) throw error(409, `${p} is already a member`);
+		}
+		return participant.prepare(
+			party,
+			exercise(Main.DAO.templateId, dao, 'DAO_AddMembers', { parties })
+		);
+	}
+);
+
+export const prepareRemoveMembers = command(
+	v.object({
+		party: partyId,
+		dao: contractId,
+		members: v.pipe(v.array(contractId), v.minLength(1), v.maxLength(BATCH))
+	}),
+	async ({ party, dao, members }) => {
+		session.required(party);
+		adminOf(dao, party);
+		return participant.prepare(
+			party,
+			exercise(Main.DAO.templateId, dao, 'DAO_RemoveMembers', { members })
+		);
+	}
+);
+
+export const prepareCreateProposal = command(
+	v.object({
+		party: partyId,
+		dao: contractId,
+		title: text(120),
+		description: v.pipe(v.string(), v.maxLength(5000)),
+		closesAt: v.pipe(v.string(), v.isoTimestamp()),
+		pid: v.pipe(v.string(), v.uuid())
+	}),
+	async ({ party, dao, title, description, closesAt, pid }) => {
+		session.required(party);
+		const found = app.currentDao(dao);
+		const membership = app.memberOf(found.id, party);
+		if (!membership) throw error(403, 'Only members can propose');
+		// The browser picks the deadline and the id so it can check them before signing; the
+		// server only keeps them within bounds and unique.
+		const days = (new Date(closesAt).getTime() - Date.now()) / 86_400_000;
+		if (!(days > 0.5 && days <= 31)) throw error(400, 'The voting period must be 1 to 30 days');
+		if (index.proposals.has(pid)) throw error(409, 'That proposal id is taken');
+		return participant.prepare(
+			party,
+			exercise(Main.DAO.templateId, dao, 'DAO_CreateProposal', {
+				proposer: party,
+				membership: membership.contractId,
+				title,
+				description,
+				closesAt,
+				pid
+			})
+		);
+	}
+);
+
+/** The proposal contract the browser saw, if still current and the caller is its proposer. */
+function proposerOf(contractId: string, party: string) {
+	const current = app.currentProposal(contractId);
+	if (current.proposer !== party) throw error(403, 'Only the proposer can do this');
+	return current;
+}
+
+export const prepareIssueRights = command(
+	v.object({
+		party: partyId,
+		proposal: contractId,
+		members: v.pipe(v.array(contractId), v.minLength(1), v.maxLength(BATCH))
+	}),
+	async ({ party, proposal, members }) => {
+		session.required(party);
+		const current = proposerOf(proposal, party);
+		if (current.ready) throw error(409, 'Voting has opened');
+		return participant.prepare(
+			party,
+			exercise(Main.Proposal.templateId, proposal, 'Proposal_IssueRights', { members })
+		);
+	}
+);
+
+export const prepareReady = command(
+	v.object({ party: partyId, proposal: contractId }),
+	async ({ party, proposal }) => {
+		session.required(party);
+		const current = proposerOf(proposal, party);
+		if (current.ready) throw error(409, 'Voting has opened');
+		return participant.prepare(
+			party,
+			exercise(Main.Proposal.templateId, proposal, 'Proposal_Ready', {})
+		);
 	}
 );
 
 export const prepareUpdateProposal = command(
 	v.object({
 		party: partyId,
-		contractId,
+		proposal: contractId,
 		title: text(120),
 		description: v.pipe(v.string(), v.maxLength(5000))
 	}),
-	async ({ party, contractId, title, description }) => {
+	async ({ party, proposal, title, description }) => {
 		session.required(party);
-		const current = await currentProposal(contractId);
-		if (current.proposer !== party) throw error(403, 'Only the proposer can edit');
-		if (current.ballots.length > 0) throw error(409, 'Voting has started');
+		const current = proposerOf(proposal, party);
+		if (current.ready) throw error(409, 'Voting has opened; the text is fixed');
 		return participant.prepare(
 			party,
-			exercise(Main.Proposal.templateId, current.contractId, 'Proposal_Update', {
-				title,
-				description
-			})
+			exercise(Main.Proposal.templateId, proposal, 'Proposal_Update', { title, description })
 		);
 	}
 );
 
 export const prepareCancelProposal = command(
-	v.object({ party: partyId, contractId }),
-	async ({ party, contractId }) => {
+	v.object({ party: partyId, proposal: contractId }),
+	async ({ party, proposal }) => {
 		session.required(party);
-		const current = await currentProposal(contractId);
+		const current = app.currentProposal(proposal);
 		if (current.outcome) throw error(409, 'Already settled');
-		if (current.proposer !== party) {
-			const admin =
-				current.admin ??
-				(await app.daoById(current.daoId).then(
-					(d) => d.admin,
-					() => null
-				));
-			if (admin !== party) throw error(403, 'Only the proposer or the DAO admin can cancel');
-		}
+		if (current.proposer !== party && current.admin !== party)
+			throw error(403, 'Only the proposer or the DAO admin can cancel');
 		return participant.prepare(
 			party,
-			exercise(Main.Proposal.templateId, current.contractId, 'Proposal_Cancel', {
-				canceller: party
-			})
+			exercise(Main.Proposal.templateId, proposal, 'Proposal_Cancel', { canceller: party })
 		);
 	}
 );
 
-/** After the deadline any member records the outcome the ballots already decided. */
-export const prepareCloseProposal = command(
-	v.object({ party: partyId, contractId }),
-	async ({ party, contractId }) => {
+/** A ballot spends the voting right the browser was shown. */
+export const prepareVote = command(
+	v.object({ party: partyId, right: contractId, vote: v.picklist(['Yes', 'No']) }),
+	async ({ party, right, vote }) => {
 		session.required(party);
-		const current = await currentProposal(contractId);
-		if (!current.members.includes(party)) throw error(403, 'Only members can close');
-		if (current.outcome) throw error(409, 'Already settled');
-		if (new Date(current.closesAt).getTime() > Date.now()) throw error(409, 'Still open');
 		return participant.prepare(
 			party,
-			exercise(Main.Proposal.templateId, current.contractId, 'Proposal_Close', {
-				closer: party
-			})
+			exercise(Main.VoteRight.templateId, right, 'VoteRight_Cast', { vote })
 		);
 	}
 );

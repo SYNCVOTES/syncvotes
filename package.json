@@ -11,12 +11,11 @@
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"lint": "prettier --check . && eslint .",
 		"format": "prettier --write .",
-		"daml:build": "cd daml && rm -rf .daml/dist && dpm build",
-		"daml:codegen": "pnpm daml:build && rm -rf daml.js && dpm codegen-js daml/.daml/dist/*.dar -o daml.js"
+		"daml:codegen": "docker --context syncvotes-testnet build --target dar -t syncvotes-dar . && id=$(docker --context syncvotes-testnet create syncvotes-dar) && rm -rf daml.js daml/.daml/dist && docker --context syncvotes-testnet cp $id:/app/daml/.daml/dist daml/.daml/dist && docker --context syncvotes-testnet cp $id:/app/daml.js daml.js && docker --context syncvotes-testnet rm $id >/dev/null"
 	},
 	"dependencies": {
 		"@canton-network/wallet-sdk": "^1.5.0",
-		"@daml.js/model": "workspace:@daml.js/syncvotes-governance-0.1.4@*",
+		"@daml.js/model": "workspace:@daml.js/syncvotes-dao-0.2.0@*",
 		"@daml/types": "3.5.2"
 	},
 	"devDependencies": {

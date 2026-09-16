@@ -14,6 +14,8 @@
 	import Field from '$lib/components/field.svelte';
 	import FormActions from '$lib/components/form-actions.svelte';
 	import QueryError from '$lib/components/query-error.svelte';
+	import SigningProgress from '$lib/components/signing-progress.svelte';
+	import { fmt } from '$lib/format';
 
 	const id = $derived(page.params.id!);
 	const dao = $derived(store.who ? remote.dao(id) : null);
@@ -23,22 +25,29 @@
 	let days = $state(7);
 	const period = $derived(Math.round(Number(days) || 0));
 	const periodOk = $derived(period >= 1 && period <= 30);
-	const member = $derived(
-		dao?.current ? dao.current.members.includes(store.who?.party ?? '') : null
-	);
+	let progress = $state({ done: 0, total: 0, what: '' });
 
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
-		if (!periodOk) return;
-		const ok = await flow.act((signer, who) =>
-			actions.createProposal(signer, who, {
-				dao: dao!.current!.contractId,
-				title,
-				description,
-				days: period
-			})
-		);
-		if (ok) await goto(`/daos/${id}`);
+		const d = dao?.current;
+		if (!d || !periodOk) return;
+		let pid = '';
+		const ok = await flow.act(async (signer, who) => {
+			pid = await actions.createProposal(
+				signer,
+				who,
+				{
+					dao: d.contractId,
+					daoId: d.id,
+					membership: d.me.membership,
+					title,
+					description,
+					days: period
+				},
+				(done, total) => (progress = { done, total, what: 'Opening the vote' })
+			);
+		});
+		if (ok) await goto(`/proposals/${pid}`);
 	}
 </script>
 
@@ -48,18 +57,17 @@
 	<PageHeader
 		eyebrow="New proposal"
 		title="Propose"
-		description="Every member gets one vote, Yes or No. The proposal passes when a majority of all members voted Yes, and can be closed as soon as that is settled."
+		description="Every member gets one vote, Yes or No. The proposal passes when a majority of all members voted Yes, fails when that can no longer happen, and is decided by the ballots cast once the deadline passes."
 	/>
 
 	{#if !store.who}
 		<ConnectPrompt what="propose" />
 	{:else if dao?.error}
 		<QueryError error={dao.error} refresh={() => dao?.reconnect()} />
-	{:else if member === false}
-		<p class="text-[13px] text-ink-dim">Only members can propose.</p>
 	{:else}
 		<form class="space-y-8" onsubmit={submit}>
 			<Problem message={store.problem} />
+			<SigningProgress {...progress} />
 
 			<FormSection>
 				<Field label="Title" id="title">
@@ -82,6 +90,15 @@
 					<Input id="days" type="number" min={1} max={30} class="w-32" bind:value={days} />
 				</Field>
 			</FormSection>
+
+			{#if dao?.ready}
+				<p class="font-mono text-xs text-ink-dim">
+					Opening the vote issues a voting right to each of the {fmt(dao.current.members)} members — {Math.ceil(
+						dao.current.members / actions.BATCH
+					) + 2}
+					transactions, signed one after another without further prompts.
+				</p>
+			{/if}
 
 			<FormActions
 				label="Create proposal"

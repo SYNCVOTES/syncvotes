@@ -15,16 +15,17 @@
 	import Phrase from '$lib/components/phrase.svelte';
 	import WalletSources from '$lib/components/wallet-sources.svelte';
 	import { normaliseName, nameProblem } from '$lib/names';
+	import { hintOf } from '$lib/format';
 
 	let phraseInput = $state('');
 	let savedPhrase = $state(false);
-	let nameInput = $state('');
+	let hintInput = $state('');
 	let password = $state('');
 
 	const screen = $derived(store.screen);
 	const selectedWallet = $derived(store.wallets.find((w) => w.id === store.selected) ?? null);
-	const chosenName = $derived(normaliseName(nameInput));
-	const nameIssue = $derived(nameInput.trim() ? nameProblem(chosenName) : null);
+	const chosenHint = $derived(normaliseName(hintInput));
+	const hintIssue = $derived(hintInput.trim() ? nameProblem(chosenHint) : null);
 	let passkeys = $state(false);
 	$effect(() => {
 		wallet.passkeysAvailable().then((ok) => (passkeys = ok));
@@ -96,32 +97,32 @@
 				</div>
 			</Panel>
 		</form>
-	{:else if screen.at === 'name'}
+	{:else if screen.at === 'hint'}
 		<form
 			onsubmit={(e) => {
 				e.preventDefault();
-				flow.confirmName(nameInput);
+				flow.confirmHint(chosenHint);
 			}}
 		>
 			<Panel padding="lg" class="space-y-5">
-				<h2 class="eyebrow">Pick a name</h2>
+				<h2 class="eyebrow">Name your party</h2>
 				<p class="text-sm text-ink-mid">
-					Others add you to DAOs by this name. Your party will be
-					<code class="text-xs break-all">{screen.topology.partyId}</code>
-					<PartyId party={screen.topology.partyId} class="align-middle [&>span]:hidden" />
+					A party id is a label of your choosing, two colons, and the fingerprint of your key. The
+					label is how people recognise you; the fingerprint is what makes you you. It cannot be
+					changed later.
 				</p>
 				<div class="flex gap-3">
-					<Input placeholder="e.g. alice" class="flex-1" maxlength={40} bind:value={nameInput} />
-					<Button type="submit" disabled={store.busy || !nameInput.trim() || nameIssue !== null}>
+					<Input placeholder="e.g. alice" class="flex-1" maxlength={40} bind:value={hintInput} />
+					<Button type="submit" disabled={store.busy || !hintInput.trim() || hintIssue !== null}>
 						{store.busy ? 'Creating party…' : 'Create party'}
 					</Button>
 				</div>
-				{#if nameInput.trim()}
-					<p class="font-mono text-xs {nameIssue ? 'text-red' : 'text-ink-dim'}">
-						{#if nameIssue}{nameIssue}{:else if chosenName !== nameInput.trim()}
-							Registered as <span class="text-ink">{chosenName}</span> — lower-case letters, digits and
-							dashes only.
-						{:else}Registered as <span class="text-ink">{chosenName}</span>.{/if}
+				{#if hintInput.trim()}
+					<p class="font-mono text-xs {hintIssue ? 'text-red' : 'text-ink-dim'}">
+						{#if hintIssue}{hintIssue}{:else}
+							Your party will be
+							<code class="break-all text-ink">{chosenHint}::{screen.fingerprint}</code>
+						{/if}
 					</p>
 				{/if}
 			</Panel>
@@ -178,7 +179,7 @@
 			<Panel>
 				<div class="flex items-start justify-between gap-4">
 					<KeyValue label="Signed in as">
-						<div class="font-display text-2xl font-bold">{screen.who.name}</div>
+						<div class="font-display text-2xl font-bold">{hintOf(screen.who.party)}</div>
 					</KeyValue>
 					<span class="flex items-center gap-2 font-mono text-xs text-green">
 						<span class="size-2 rounded-full bg-green"></span> unlocked

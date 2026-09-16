@@ -1,14 +1,20 @@
 <script lang="ts">
 	import Copy from '@lucide/svelte/icons/copy';
 	import Check from '@lucide/svelte/icons/check';
+	import { hintOf } from '$lib/format';
 
 	/**
-	 * A party id, shortened, with the full one a click away. Everywhere a party appears it can
-	 * be copied — that is how people add each other and check who signed what.
+	 * A party, as it is named everywhere: the hint it chose, then enough of its fingerprint to
+	 * tell it from another party with the same hint, and the full id a click away. Copying is
+	 * how people add each other and check who signed what.
 	 */
-	let { party, class: className = '' }: { party: string; class?: string } = $props();
+	let {
+		party,
+		size = 'sm',
+		class: className = ''
+	}: { party: string; size?: 'sm' | 'md'; class?: string } = $props();
 
-	const short = $derived(`${party.split('::')[0]}::${party.split('::')[1]?.slice(0, 8) ?? ''}…`);
+	const short = $derived(party.split('::')[1]?.slice(0, 8) ?? '');
 	let copied = $state(false);
 
 	async function copy() {
@@ -22,11 +28,18 @@
 	}
 </script>
 
-<span class="inline-flex min-w-0 items-center gap-1.5 font-mono text-xs text-ink-dim {className}">
-	<span class="truncate" title={party}>{short}</span>
+<span
+	class="inline-flex min-w-0 items-center gap-1.5 font-mono {size === 'md'
+		? 'text-sm'
+		: 'text-xs'} {className}"
+	title={party}
+>
+	<span class="truncate">
+		<span class="text-ink">{hintOf(party)}</span><span class="text-ink-dim"> · {short}</span>
+	</span>
 	<button
 		type="button"
-		class="shrink-0 transition-colors hover:text-orange {copied ? 'text-green' : ''}"
+		class="shrink-0 text-ink-dim transition-colors hover:text-orange {copied ? 'text-green' : ''}"
 		aria-label={copied ? 'Copied' : 'Copy party id'}
 		title={copied ? 'Copied' : 'Copy party id'}
 		onclick={copy}

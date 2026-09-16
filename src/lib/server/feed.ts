@@ -1,27 +1,37 @@
-import { Main } from '@daml.js/model';
-import { operatorParty, sdk } from './participant';
+import { operatorParty, sdk, activeContracts } from './participant';
+import * as index from './index';
 
 /**
- * One subscription to the ledger for the whole server: the operator observes every Account, DAO
- * and Proposal, so a single update stream over the participant's websocket sees every change
- * this app can show. Live queries wait on it and re-read when it fires — nothing polls.
+ * One subscription to the ledger for the whole server. The operator observes every contract of
+ * the app's templates, so the update stream is everything the index needs: created and archived
+ * events applied in order, one `commit` per transaction. Startup reads the active contracts
+ * first, then follows the stream from the offset it read them at.
  *
  * The SDK's stream ends when the socket does; this reconnects from the last offset it saw.
  */
 
-const TEMPLATES = [Main.Account.templateId, Main.DAO.templateId, Main.Proposal.templateId];
+type Event =
+	| {
+			CreatedEvent: {
+				value: { contractId: string; templateId: string; createArgument: Record<string, unknown> };
+			};
+	  }
+	| { ArchivedEvent: { value: { contractId: string } } };
+type Update = { update?: { Transaction?: { value?: { offset?: number; events?: Event[] } } } };
 
-let waiters = new Set<() => void>();
 let started = false;
 
-function fire() {
-	const batch = waiters;
-	waiters = new Set();
-	for (const wake of batch) wake();
+async function bootstrap(): Promise<number> {
+	const ledger = await sdk();
+	const offset = await ledger.ledger.ledgerEnd();
+	for (const templateId of index.TEMPLATES) {
+		const contracts = await activeContracts<Record<string, unknown>>(operatorParty(), templateId);
+		for (const c of contracts)
+			index.created({ contractId: c.contractId, templateId, createArgument: c.payload });
+	}
+	index.commit();
+	return offset;
 }
-
-/** Resolves the next time the ledger changes something this app shows. */
-export const nextChange = () => new Promise<void>((resolve) => waiters.add(resolve));
 
 export function startFeed(): void {
 	if (started) return;
@@ -31,18 +41,22 @@ export function startFeed(): void {
 		let offset: number | undefined;
 		for (;;) {
 			try {
+				offset ??= await bootstrap();
 				const ledger = await sdk();
-				offset ??= await ledger.ledger.ledgerEnd();
 				for await (const update of ledger.events.updates({
 					partyId: operatorParty(),
-					templateIds: TEMPLATES,
+					templateIds: index.TEMPLATES,
 					beginOffset: offset,
 					verbose: false
 				})) {
-					const seen = (update as { update?: { Transaction?: { value?: { offset?: number } } } })
-						.update?.Transaction?.value?.offset;
-					if (seen) offset = seen;
-					fire();
+					const tx = (update as Update).update?.Transaction?.value;
+					if (!tx) continue;
+					for (const e of tx.events ?? []) {
+						if ('CreatedEvent' in e) index.created(e.CreatedEvent.value);
+						else if ('ArchivedEvent' in e) index.archived(e.ArchivedEvent.value.contractId);
+					}
+					index.commit();
+					if (tx.offset) offset = tx.offset;
 				}
 				console.warn('Ledger update stream ended; reconnecting');
 			} catch (e) {
@@ -55,3 +69,6 @@ export function startFeed(): void {
 		}
 	})();
 }
+
+/** Resolves the next time anything under `key` changes. */
+export const nextChange = index.nextChange;

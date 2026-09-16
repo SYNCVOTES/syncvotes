@@ -1,7 +1,7 @@
 sdk-version: 3.5.7
-name: syncvotes-governance
+name: syncvotes-dao
 source: src
-version: 0.1.4
+version: 0.2.0
 dependencies:
   - daml-prim
   - daml-stdlib

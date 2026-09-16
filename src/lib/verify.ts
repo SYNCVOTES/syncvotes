@@ -33,18 +33,21 @@ const CONFIRMATION = 2;
 const EC_CURVE25519 = 1;
 
 /** The package every user action must live in; a same-named choice elsewhere is refused. */
-const PACKAGE_NAME = 'syncvotes-governance';
+const PACKAGE_NAME = 'syncvotes-dao';
 
 /** The only choices a user is ever asked to sign, and the template each lives on. */
 export const CHOICES: Record<string, string> = {
 	Account_CreateDAO: 'Main:Account',
-	DAO_CreateProposal: 'Main:DAO',
 	DAO_Update: 'Main:DAO',
 	DAO_Archive: 'Main:DAO',
-	Proposal_Vote: 'Main:Proposal',
-	Proposal_Close: 'Main:Proposal',
+	DAO_AddMembers: 'Main:DAO',
+	DAO_RemoveMembers: 'Main:DAO',
+	DAO_CreateProposal: 'Main:DAO',
 	Proposal_Update: 'Main:Proposal',
-	Proposal_Cancel: 'Main:Proposal'
+	Proposal_IssueRights: 'Main:Proposal',
+	Proposal_Ready: 'Main:Proposal',
+	Proposal_Cancel: 'Main:Proposal',
+	VoteRight_Cast: 'Main:VoteRight'
 };
 
 // ---- Sign-up: the party topology --------------------------------------------------------

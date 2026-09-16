@@ -16,3 +16,13 @@ export const shortParty = (party: string) =>
 /** "Sep 15, 2026" */
 export const dateOf = (iso: string) =>
 	new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+/** The hint a party id carries: the part before the double colon. */
+export const hintOf = (party: string) => party.split('::')[0];
+
+/** "alice · 1220ab12" — how a party is named on screen: its hint, and enough fingerprint to tell twins apart. */
+export const label = (party: string) =>
+	`${hintOf(party)} · ${party.split('::')[1]?.slice(0, 8) ?? ''}`;
+
+/** 12,345 */
+export const fmt = (n: number) => n.toLocaleString('en-US');

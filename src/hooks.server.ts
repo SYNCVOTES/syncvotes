@@ -4,6 +4,7 @@ import type { HandleValidationError, HandleServerError, ServerInit } from '@svel
 import { packageId } from '@daml.js/model';
 import { sdk } from '$lib/server/participant';
 import { startFeed } from '$lib/server/feed';
+import { startTally } from '$lib/server/tally';
 
 /**
  * The app ships with the Daml package it was built against and makes sure the participant has it
@@ -29,6 +30,7 @@ export const init: ServerInit = async () => {
 	await (await sdk()).ledger.dar.upload(await readFile(dar), packageId);
 	console.log(`Daml package ${packageId.slice(0, 8)}… is on the participant (${dar})`);
 	startFeed();
+	startTally();
 };
 
 /** An unexpected error still tells the user what happened; there is nothing secret in these. */
