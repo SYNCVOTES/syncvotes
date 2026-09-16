@@ -5,7 +5,8 @@ export function relative(iso: string, now = Date.now()): string {
 	const d = Math.floor(abs / 86_400_000);
 	const h = Math.floor((abs % 86_400_000) / 3_600_000);
 	const m = Math.floor((abs % 3_600_000) / 60_000);
-	const span = d > 0 ? `${d}d ${h}h` : h > 0 ? `${h}h ${m}m` : `${Math.max(m, 1)}m`;
+	if (abs < 60_000) return diff > 0 ? 'in under a minute' : 'just now';
+	const span = d > 0 ? `${d}d ${h}h` : h > 0 ? `${h}h ${m}m` : `${m}m`;
 	return diff > 0 ? `in ${span}` : `${span} ago`;
 }
 

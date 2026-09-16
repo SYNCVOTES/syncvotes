@@ -3,11 +3,12 @@
 	import { goto } from '$app/navigation';
 	import * as remote from '$lib/api.remote';
 	import * as actions from '$lib/actions';
-	import { store, flow, describe } from '$lib/wallet-store.svelte';
+	import { store, flow } from '$lib/wallet-store.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import Page from '$lib/components/page.svelte';
 	import StatusBadge from '$lib/components/status-badge.svelte';
 	import Problem from '$lib/components/problem.svelte';
+	import QueryError from '$lib/components/query-error.svelte';
 	import UnlockForm from '$lib/components/unlock-form.svelte';
 	import ConnectPrompt from '$lib/components/connect-prompt.svelte';
 	import PartyId from '$lib/components/party-id.svelte';
@@ -31,6 +32,8 @@
 	const vote = (contractId: string, choice: 'Yes' | 'No') =>
 		flow.act((s, w) => actions.vote(s, w, contractId, choice));
 
+	const close = (contractId: string) => flow.act((s, w) => actions.closeProposal(s, w, contractId));
+
 	async function cancel(contractId: string, dao: string) {
 		const ok = await flow.act((s, w) => actions.cancelProposal(s, w, contractId));
 		if (ok) await goto(`/daos/${dao}`);
@@ -47,7 +50,7 @@
 	{#if !proposal}
 		<ConnectPrompt what="see this proposal" />
 	{:else if proposal.error}
-		<Problem message={describe(proposal.error)} />
+		<QueryError error={proposal.error} refresh={() => proposal.reconnect()} />
 	{:else if !proposal.ready}
 		<Skeleton />
 	{:else}
@@ -94,7 +97,7 @@
 
 		<div class="grid gap-8 lg:grid-cols-[1fr_320px]">
 			<section class="space-y-8">
-				<Panel class="text-sm leading-relaxed whitespace-pre-wrap">
+				<Panel class="text-sm leading-relaxed [overflow-wrap:anywhere] whitespace-pre-wrap">
 					{p.description || 'No description.'}
 				</Panel>
 
@@ -122,7 +125,20 @@
 				{#if outcome}
 					<Note>
 						{p.outcome ? 'Settled as' : 'Ended as'}
-						<span class={outcome === 'Passed' ? 'text-green' : 'text-red'}>{outcome}</span>.
+						<span class={outcome === 'Passed' ? 'text-green' : 'text-red'}>{outcome}</span
+						>{p.outcome ? '.' : ' — not recorded on the ledger yet.'}
+						{#if !p.outcome && member}
+							<div class="mt-3">
+								<Button
+									size="sm"
+									variant="accent"
+									disabled={store.busy}
+									onclick={() => close(p.contractId)}
+								>
+									Close proposal
+								</Button>
+							</div>
+						{/if}
 					</Note>
 				{/if}
 				{#if canCancel}

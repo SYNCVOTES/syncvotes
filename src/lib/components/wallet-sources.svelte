@@ -8,6 +8,7 @@
 
 	/** Every key kept on this device: select another, add one, or forget one. */
 	const screen = $derived(store.screen);
+	let forgetting = $state<string | null>(null);
 </script>
 
 <Panel padding="lg" class="space-y-4">
@@ -36,14 +37,21 @@
 				{:else}
 					<Button variant="accent" size="sm" onclick={() => flow.select(w.id)}>Select</Button>
 				{/if}
-				<Button
-					variant="ghost"
-					size="sm"
-					aria-label="Forget {w.name || 'this key'}"
-					onclick={() => flow.forget(w.id)}
-				>
-					Forget
-				</Button>
+				{#if forgetting === w.id}
+					<Button variant="destructive" size="sm" onclick={() => flow.forget(w.id)}
+						>Yes, forget</Button
+					>
+					<Button variant="ghost" size="sm" onclick={() => (forgetting = null)}>Keep</Button>
+				{:else}
+					<Button
+						variant="ghost"
+						size="sm"
+						aria-label="Forget {w.name || 'this key'}"
+						onclick={() => (forgetting = w.id)}
+					>
+						Forget
+					</Button>
+				{/if}
 			</li>
 		{/each}
 	</ul>

@@ -265,5 +265,6 @@
 		text-transform: uppercase;
 		letter-spacing: -0.02em;
 		line-height: 0.95;
+		overflow-wrap: anywhere;
 	}
 }

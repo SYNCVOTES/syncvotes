@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import * as remote from '$lib/api.remote';
-	import { store, describe } from '$lib/wallet-store.svelte';
+	import { store } from '$lib/wallet-store.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
 	import Page from '$lib/components/page.svelte';
 	import StatusBadge from '$lib/components/status-badge.svelte';
-	import Problem from '$lib/components/problem.svelte';
+	import QueryError from '$lib/components/query-error.svelte';
 	import UnlockForm from '$lib/components/unlock-form.svelte';
 	import ConnectPrompt from '$lib/components/connect-prompt.svelte';
 	import PartyId from '$lib/components/party-id.svelte';
@@ -35,7 +35,7 @@
 	{#if !dao}
 		<ConnectPrompt what="see this DAO" />
 	{:else if dao.error}
-		<Problem message={describe(dao.error)} />
+		<QueryError error={dao.error} refresh={() => dao.reconnect()} />
 	{:else if !dao.ready}
 		<Skeleton />
 	{:else}
@@ -54,7 +54,9 @@
 						{#if admin}<Badge variant="amber">You are admin</Badge>
 						{:else if member}<Badge variant="green">Member</Badge>{/if}
 					</div>
-					<p class="mt-4 max-w-[600px] text-sm leading-relaxed text-ink-mid">
+					<p
+						class="mt-4 max-w-[600px] text-sm leading-relaxed [overflow-wrap:anywhere] text-ink-mid"
+					>
 						{d.description || 'No description provided.'}
 					</p>
 				</div>

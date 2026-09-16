@@ -34,8 +34,11 @@ async function* live<T>(load: () => Promise<T>): AsyncGenerator<T> {
 				yield value;
 			}
 		} catch (e) {
-			// Gone (a 404) is a value too; anything else surfaces once and the stream keeps watching.
-			if (last === '') throw e;
+			// Access gone (401/403/404) ends the stream with that error, so a page never keeps
+			// showing a snapshot of something it may no longer see. A transient failure after a
+			// first value is swallowed and the stream keeps watching.
+			const status = (e as { status?: number }).status;
+			if (last === '' || status === 401 || status === 403 || status === 404) throw e;
 		}
 		await nextChange();
 	}
@@ -124,14 +127,16 @@ export const sessionEnd = command(() => session.end());
 
 /** One registered party, by name or party id — what a member chip checks itself against. */
 export const member = query(v.pipe(v.string(), v.trim(), v.maxLength(300)), async (token) => {
+	session.required();
 	const found = (await app.accounts()).find((a) => a.party === token || a.name === token);
 	return found ? { party: found.party, name: found.name } : null;
 });
 
-/** The directory: every registered name, for picking members. */
-export const directory = query(async () =>
-	(await app.accounts()).map(({ party, name }) => ({ party, name }))
-);
+/** The directory: every registered name. For signed-in users; the identity graph is not public. */
+export const directory = query(async () => {
+	session.required();
+	return (await app.accounts()).map(({ party, name }) => ({ party, name }));
+});
 
 // ---- Reads -------------------------------------------------------------------------------
 
@@ -394,6 +399,24 @@ export const prepareCancelProposal = command(
 			party,
 			exercise(Main.Proposal.templateId, current.contractId, 'Proposal_Cancel', {
 				canceller: party
+			})
+		);
+	}
+);
+
+/** After the deadline any member records the outcome the ballots already decided. */
+export const prepareCloseProposal = command(
+	v.object({ party: partyId, contractId }),
+	async ({ party, contractId }) => {
+		session.required(party);
+		const current = await currentProposal(contractId);
+		if (!current.members.includes(party)) throw error(403, 'Only members can close');
+		if (current.outcome) throw error(409, 'Already settled');
+		if (new Date(current.closesAt).getTime() > Date.now()) throw error(409, 'Still open');
+		return participant.prepare(
+			party,
+			exercise(Main.Proposal.templateId, current.contractId, 'Proposal_Close', {
+				closer: party
 			})
 		);
 	}

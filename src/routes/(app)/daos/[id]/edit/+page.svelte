@@ -3,13 +3,14 @@
 	import { page } from '$app/state';
 	import * as remote from '$lib/api.remote';
 	import * as actions from '$lib/actions';
-	import { store, flow, describe } from '$lib/wallet-store.svelte';
+	import { store, flow } from '$lib/wallet-store.svelte';
 	import { Input } from '$lib/components/ui/input';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import Page from '$lib/components/page.svelte';
 	import PageHeader from '$lib/components/page-header.svelte';
 	import ConnectPrompt from '$lib/components/connect-prompt.svelte';
 	import Problem from '$lib/components/problem.svelte';
+	import QueryError from '$lib/components/query-error.svelte';
 	import Skeleton from '$lib/components/skeleton.svelte';
 	import FormSection from '$lib/components/form-section.svelte';
 	import Field from '$lib/components/field.svelte';
@@ -67,7 +68,7 @@
 	{#if !dao}
 		<ConnectPrompt what="edit this DAO" />
 	{:else if dao.error}
-		<Problem message={describe(dao.error)} />
+		<QueryError error={dao.error} refresh={() => dao.reconnect()} />
 	{:else if !dao.ready}
 		<Skeleton height="h-64" />
 	{:else if dao.current.admin !== me}

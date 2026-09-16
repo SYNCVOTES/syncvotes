@@ -36,8 +36,14 @@
 		>
 	</div>
 
-	<div class="mb-2 font-display text-[17px] leading-tight font-bold tracking-[-0.01em]">{name}</div>
-	<div class="mb-[22px] line-clamp-3 flex-1 text-[12.5px] leading-relaxed text-ink-mid">
+	<div
+		class="mb-2 line-clamp-2 font-display text-[17px] leading-tight font-bold tracking-[-0.01em] [overflow-wrap:anywhere]"
+	>
+		{name}
+	</div>
+	<div
+		class="mb-[22px] line-clamp-3 flex-1 text-[12.5px] leading-relaxed [overflow-wrap:anywhere] text-ink-mid"
+	>
 		{description || 'No description provided.'}
 	</div>
 

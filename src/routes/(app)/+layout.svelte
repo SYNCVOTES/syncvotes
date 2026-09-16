@@ -28,7 +28,7 @@
 		{@render children()}
 	</main>
 	<SiteFooter
-		nav={[...nav, { href: '/#feed', label: 'How it works' }]}
+		nav={[...nav, { href: '/#moves', label: 'How it works' }]}
 		{links}
 		github={GITHUB}
 		x={X}

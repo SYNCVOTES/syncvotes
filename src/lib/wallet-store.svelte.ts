@@ -76,11 +76,32 @@ export function boot() {
 	offer(wallet.activeWallet());
 }
 
+const status = (error: unknown) => (error as { status?: number })?.status;
+
+/**
+ * The read session lives on the server and can be gone while the key is still here: a restart,
+ * another tab locking, a cookie that expired. Signing a fresh challenge is all it takes.
+ */
+async function reconnect(): Promise<boolean> {
+	if (screen.at !== 'home') return false;
+	try {
+		await actions.openSession(screen.signer, screen.who);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
 async function run(action: () => Promise<void>) {
 	busy = true;
 	problem = null;
 	try {
-		await action();
+		try {
+			await action();
+		} catch (error) {
+			if (status(error) === 401 && (await reconnect())) await action();
+			else throw error;
+		}
 	} catch (error) {
 		if (error instanceof wallet.LockedError) {
 			lock();
@@ -229,6 +250,9 @@ export const flow = {
 		if (target === selected) lock();
 		else refresh();
 	},
+
+	/** Re-signs the read session with the unlocked key; false if there is no key to sign with. */
+	reconnect,
 
 	/** Signs a ledger action with the unlocked key; the page passes what to do. */
 	act(action: (signer: wallet.Signer, who: actions.Identity) => Promise<void>) {

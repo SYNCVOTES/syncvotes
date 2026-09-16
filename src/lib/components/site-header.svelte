@@ -27,9 +27,9 @@
 	<div class="flex items-center gap-2.5">
 		<ThemeToggle />
 		<NetworkPill />
-		<Button href="/wallet" variant="accent" size="sm">
-			{#if store.who}<span class="size-2 rounded-full bg-green"></span>{/if}
-			{walletLabel}
+		<Button href="/wallet" variant="accent" size="sm" class="max-w-[180px]">
+			{#if store.who}<span class="size-2 shrink-0 rounded-full bg-green"></span>{/if}
+			<span class="truncate">{walletLabel}</span>
 		</Button>
 	</div>
 

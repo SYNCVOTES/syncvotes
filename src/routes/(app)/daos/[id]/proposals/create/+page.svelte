@@ -13,6 +13,7 @@
 	import FormSection from '$lib/components/form-section.svelte';
 	import Field from '$lib/components/field.svelte';
 	import FormActions from '$lib/components/form-actions.svelte';
+	import QueryError from '$lib/components/query-error.svelte';
 
 	const id = $derived(page.params.id!);
 	const dao = $derived(store.who ? remote.dao(id) : null);
@@ -20,10 +21,15 @@
 	let title = $state('');
 	let description = $state('');
 	let days = $state(7);
+	const period = $derived(Math.round(Number(days) || 0));
+	const periodOk = $derived(period >= 1 && period <= 30);
+	const member = $derived(
+		dao?.current ? dao.current.members.includes(store.who?.party ?? '') : null
+	);
 
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
-		const period = Math.min(30, Math.max(1, Math.round(Number(days) || 0)));
+		if (!periodOk) return;
 		const ok = await flow.act((signer, who) =>
 			actions.createProposal(signer, who, {
 				dao: dao!.current!.contractId,
@@ -47,6 +53,10 @@
 
 	{#if !store.who}
 		<ConnectPrompt what="propose" />
+	{:else if dao?.error}
+		<QueryError error={dao.error} refresh={() => dao?.reconnect()} />
+	{:else if member === false}
+		<p class="text-[13px] text-ink-dim">Only members can propose.</p>
 	{:else}
 		<form class="space-y-8" onsubmit={submit}>
 			<Problem message={store.problem} />
@@ -64,7 +74,11 @@
 						bind:value={description}
 					/>
 				</Field>
-				<Field label="Voting period (days)" id="days">
+				<Field
+					label="Voting period (days)"
+					id="days"
+					hint={periodOk ? '1 to 30 days.' : 'The voting period must be 1 to 30 days.'}
+				>
 					<Input id="days" type="number" min={1} max={30} class="w-32" bind:value={days} />
 				</Field>
 			</FormSection>
@@ -72,7 +86,7 @@
 			<FormActions
 				label="Create proposal"
 				busy={store.busy}
-				disabled={title.trim().length < 2 || !dao?.ready}
+				disabled={title.trim().length < 2 || !dao?.ready || !periodOk}
 				cancelHref="/daos/{id}"
 			/>
 		</form>

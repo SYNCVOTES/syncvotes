@@ -14,6 +14,7 @@
 	import KeyValue from '$lib/components/key-value.svelte';
 	import Phrase from '$lib/components/phrase.svelte';
 	import WalletSources from '$lib/components/wallet-sources.svelte';
+	import { normaliseName, nameProblem } from '$lib/names';
 
 	let phraseInput = $state('');
 	let savedPhrase = $state(false);
@@ -22,6 +23,8 @@
 
 	const screen = $derived(store.screen);
 	const selectedWallet = $derived(store.wallets.find((w) => w.id === store.selected) ?? null);
+	const chosenName = $derived(normaliseName(nameInput));
+	const nameIssue = $derived(nameInput.trim() ? nameProblem(chosenName) : null);
 	let passkeys = $state(false);
 	$effect(() => {
 		wallet.passkeysAvailable().then((ok) => (passkeys = ok));
@@ -108,19 +111,28 @@
 					<PartyId party={screen.topology.partyId} class="align-middle [&>span]:hidden" />
 				</p>
 				<div class="flex gap-3">
-					<Input placeholder="e.g. alice" class="flex-1" bind:value={nameInput} />
-					<Button type="submit" disabled={store.busy || nameInput.trim().length < 2}>
+					<Input placeholder="e.g. alice" class="flex-1" maxlength={40} bind:value={nameInput} />
+					<Button type="submit" disabled={store.busy || !nameInput.trim() || nameIssue !== null}>
 						{store.busy ? 'Creating party…' : 'Create party'}
 					</Button>
 				</div>
+				{#if nameInput.trim()}
+					<p class="font-mono text-xs {nameIssue ? 'text-red' : 'text-ink-dim'}">
+						{#if nameIssue}{nameIssue}{:else if chosenName !== nameInput.trim()}
+							Registered as <span class="text-ink">{chosenName}</span> — lower-case letters, digits and
+							dashes only.
+						{:else}Registered as <span class="text-ink">{chosenName}</span>.{/if}
+					</p>
+				{/if}
 			</Panel>
 		</form>
 	{:else if screen.at === 'protect'}
 		<Panel padding="lg" class="space-y-5">
 			<h2 class="eyebrow">Keep the key on this device?</h2>
 			<p class="text-sm text-ink-mid">
-				It is stored encrypted, and unlocked with Touch ID or a password each visit. Without this
-				you will need the recovery phrase every time.
+				It is stored encrypted, and unlocked with Touch ID or a password each visit. Until you
+				choose, the key exists only in this tab: reloading or closing it means restoring from the
+				phrase.
 			</p>
 			{#if passkeys}
 				<Button disabled={store.busy} onclick={flow.protectWithPasskey}

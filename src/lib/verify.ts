@@ -42,6 +42,7 @@ export const CHOICES: Record<string, string> = {
 	DAO_Update: 'Main:DAO',
 	DAO_Archive: 'Main:DAO',
 	Proposal_Vote: 'Main:Proposal',
+	Proposal_Close: 'Main:Proposal',
 	Proposal_Update: 'Main:Proposal',
 	Proposal_Cancel: 'Main:Proposal'
 };

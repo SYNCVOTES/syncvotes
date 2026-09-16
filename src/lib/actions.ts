@@ -64,7 +64,8 @@ export async function createDao(
 	const members = input.members;
 	// The DAO's identity is decided here, so it can be checked here.
 	const id = crypto.randomUUID();
-	const args = { daoName: input.name, description: input.description, members, id };
+	// The server trims names and titles before preparing; sign the same bytes it prepares.
+	const args = { daoName: input.name.trim(), description: input.description, members, id };
 	const prepared = await remote.prepareCreateDao({ party: who.party, ...args });
 	await sign(s, who, 'Account_CreateDAO', who.account, args, prepared);
 }
@@ -79,7 +80,7 @@ export async function createProposal(
 	const closesAt = new Date(Date.now() + input.days * 86_400_000).toISOString();
 	const args = {
 		proposer: who.party,
-		title: input.title,
+		title: input.title.trim(),
 		description: input.description,
 		closesAt,
 		id
@@ -107,7 +108,7 @@ export async function updateDao(
 	input: { name: string; description: string; members: string[] }
 ): Promise<void> {
 	const members = input.members;
-	const args = { daoName: input.name, description: input.description, members };
+	const args = { daoName: input.name.trim(), description: input.description, members };
 	const prepared = await remote.prepareUpdateDao({ party: who.party, dao, ...args });
 	await sign(s, who, 'DAO_Update', dao, args, prepared);
 }
@@ -123,8 +124,9 @@ export async function updateProposal(
 	contractId: string,
 	input: { title: string; description: string }
 ): Promise<void> {
-	const prepared = await remote.prepareUpdateProposal({ party: who.party, contractId, ...input });
-	await sign(s, who, 'Proposal_Update', contractId, input, prepared);
+	const args = { title: input.title.trim(), description: input.description };
+	const prepared = await remote.prepareUpdateProposal({ party: who.party, contractId, ...args });
+	await sign(s, who, 'Proposal_Update', contractId, args, prepared);
 }
 
 export async function cancelProposal(s: Signer, who: Identity, contractId: string) {
@@ -143,3 +145,10 @@ export async function openSession(s: Signer, who: Identity): Promise<void> {
 }
 
 export const closeSession = () => remote.sessionEnd().catch(() => {});
+
+/** Records the outcome of a proposal whose deadline has passed. Any member may. */
+export async function closeProposal(s: Signer, who: Identity, contractId: string) {
+	const args = { closer: who.party };
+	const prepared = await remote.prepareCloseProposal({ party: who.party, contractId });
+	await sign(s, who, 'Proposal_Close', contractId, args, prepared);
+}

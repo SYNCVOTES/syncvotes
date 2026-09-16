@@ -2,6 +2,7 @@ import { error } from '@sveltejs/kit';
 import { Main } from '@daml.js/model';
 import { activeContracts, operatorParty, providerParty, submitAsProvider } from './participant';
 import { PARTY_HINT } from '../party';
+import { normaliseName as normalise, nameProblem } from '../names';
 
 export { PARTY_HINT };
 
@@ -60,17 +61,12 @@ export async function accountOf(party: string): Promise<Account> {
 	return account;
 }
 
-/** Names are what users type to reach each other, so keep them short and unambiguous. */
+/** The name rule from `names.ts`, applied where it counts. */
 export function normaliseName(input: unknown): string {
 	if (typeof input !== 'string') throw error(400, 'Name is required');
-
-	const name = input
-		.trim()
-		.toLowerCase()
-		.replace(/[^a-z0-9-]/g, '-')
-		.replace(/-+/g, '-');
-	if (name.length < 2 || name.length > 30) throw error(400, 'Name must be 2-30 characters');
-
+	const name = normalise(input);
+	const problem = nameProblem(name);
+	if (problem) throw error(400, problem);
 	return name;
 }
 

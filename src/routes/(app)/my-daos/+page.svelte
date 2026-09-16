@@ -1,13 +1,13 @@
 <script lang="ts">
 	import * as remote from '$lib/api.remote';
-	import { store, describe } from '$lib/wallet-store.svelte';
+	import { store } from '$lib/wallet-store.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import Page from '$lib/components/page.svelte';
 	import PageHeader from '$lib/components/page-header.svelte';
 	import ConnectPrompt from '$lib/components/connect-prompt.svelte';
 	import DaoCard from '$lib/components/dao-card.svelte';
 	import Stat from '$lib/components/stat.svelte';
-	import Problem from '$lib/components/problem.svelte';
+	import QueryError from '$lib/components/query-error.svelte';
 	import Skeleton from '$lib/components/skeleton.svelte';
 	import EmptyState from '$lib/components/empty-state.svelte';
 	import Plus from '@lucide/svelte/icons/plus';
@@ -33,7 +33,7 @@
 	{#if !who || !daos}
 		<ConnectPrompt />
 	{:else if daos.error}
-		<Problem message={describe(daos.error)} />
+		<QueryError error={daos.error} refresh={() => daos.reconnect()} />
 	{:else if !daos.ready}
 		<div class="grid gap-3 md:grid-cols-3">
 			{#each [1, 2, 3] as i (i)}<Skeleton height="h-24" />{/each}
