@@ -56,21 +56,29 @@ export async function sign(s: Signer, who: Identity, intent: Intent, prepared: P
 	await remote.execute({ ...prepared, signature: s.sign(prepared.preparedTransactionHash) });
 }
 
-const batches = <T>(items: T[], size: number): T[][] =>
-	Array.from({ length: Math.ceil(items.length / size) }, (_, i) =>
-		items.slice(i * size, (i + 1) * size)
-	);
-
-/** Members join and leave a batch at a time; each batch is its own signed transaction. */
+/**
+ * Members join and leave a batch at a time, each batch its own signed transaction on the DAO
+ * contract of the moment. A batch replaces that contract, so the next one waits for the live
+ * query to show the replacement before it is prepared.
+ */
 async function inBatches<T extends Plain>(
 	items: T[],
+	daoId: string,
 	progress: Progress | undefined,
-	each: (batch: T[]) => Promise<void>
+	each: (batch: T[], daoContractId: string) => Promise<void>
 ) {
-	const all = batches(items, BATCH);
+	const all = Array.from({ length: Math.ceil(items.length / BATCH) }, (_, i) =>
+		items.slice(i * BATCH, (i + 1) * BATCH)
+	);
+	let consumed: string | undefined;
 	for (const [i, batch] of all.entries()) {
 		progress?.(i, all.length);
-		await each(batch);
+		for await (const dao of remote.dao(daoId)) {
+			if (dao.contractId === consumed) continue;
+			await each(batch, dao.contractId);
+			consumed = dao.contractId;
+			break;
+		}
 	}
 	progress?.(all.length, all.length);
 }
@@ -86,7 +94,6 @@ export async function archiveDao(
 	await sign(s, who, { choice: 'DAO_Archive', contractId: dao.contractId, args: {} }, prepared);
 }
 
-/** Each batch replaces the DAO contract, so the current one is looked up again in between. */
 export const addMembers = (
 	s: Signer,
 	who: Identity,
@@ -94,15 +101,10 @@ export const addMembers = (
 	parties: string[],
 	progress?: Progress
 ) =>
-	inBatches(parties, progress, async (batch) => {
-		const { contractId } = await remote.dao(daoId);
+	inBatches(parties, daoId, progress, async (batch, contractId) => {
 		const prepared = await remote.prepareAddMembers({ dao: daoId, parties: batch });
-		await sign(
-			s,
-			who,
-			{ choice: 'DAO_AddMembers', contractId, args: { parties: batch } },
-			prepared
-		);
+		const intent = { choice: 'DAO_AddMembers', contractId, args: { parties: batch } };
+		await sign(s, who, intent, prepared);
 	});
 
 export const removeMembers = (
@@ -112,15 +114,10 @@ export const removeMembers = (
 	memberCids: string[],
 	progress?: Progress
 ) =>
-	inBatches(memberCids, progress, async (batch) => {
-		const { contractId } = await remote.dao(daoId);
+	inBatches(memberCids, daoId, progress, async (batch, contractId) => {
 		const prepared = await remote.prepareRemoveMembers({ dao: daoId, memberCids: batch });
-		await sign(
-			s,
-			who,
-			{ choice: 'DAO_RemoveMembers', contractId, args: { memberCids: batch } },
-			prepared
-		);
+		const intent = { choice: 'DAO_RemoveMembers', contractId, args: { memberCids: batch } };
+		await sign(s, who, intent, prepared);
 	});
 
 // ---- Proposals ----------------------------------------------------------------------------
