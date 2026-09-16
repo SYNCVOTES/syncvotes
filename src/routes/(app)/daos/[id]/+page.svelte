@@ -90,22 +90,32 @@
 				{:else}
 					<List>
 						{#each d.proposals as p (p.contractId)}
-							<ListItem href="/proposals/{p.id}" padding="md">
+							{@const included = me !== null && p.members.includes(me)}
+							<!-- A proposal keeps the members it was opened with; one opened before you joined is not yours to open. -->
+							<ListItem
+								href={included ? `/proposals/${p.id}` : undefined}
+								padding="md"
+								class={included ? '' : 'flex items-center gap-4 opacity-60'}
+							>
 								<div class="min-w-0 flex-1">
 									<div class="truncate font-display text-[15px] font-bold">{p.title}</div>
 									<div class="mt-1 font-mono text-xs text-ink-dim">
 										by {nameOf(p.proposer)} · {p.ballots.length}
 										{p.ballots.length === 1 ? 'vote' : 'votes'} · {p.outcome
 											? 'closed'
-											: `closes ${relative(p.closesAt)}`}
+											: `closes ${relative(p.closesAt)}`}{included
+											? ''
+											: ' · opened before you joined'}
 									</div>
 								</div>
 								<StatusBadge outcome={p.outcome} closesAt={p.closesAt} />
-								<ArrowRight
-									size={16}
-									class="text-ink-dim transition-all group-hover:translate-x-0.5 group-hover:text-orange"
-									aria-hidden="true"
-								/>
+								{#if included}
+									<ArrowRight
+										size={16}
+										class="text-ink-dim transition-all group-hover:translate-x-0.5 group-hover:text-orange"
+										aria-hidden="true"
+									/>
+								{/if}
 							</ListItem>
 						{/each}
 					</List>

@@ -181,7 +181,20 @@ export const proposal = query.live(contractId, (id) =>
 	live(async () => {
 		const me = session.required();
 		const [found, names] = await Promise.all([app.proposalById(id), app.accounts()]);
-		if (!found.members.includes(me)) throw error(403, 'Only members can see this proposal');
+		if (!found.members.includes(me)) {
+			// A proposal keeps the members it was opened with; someone who joined the DAO later is
+			// not among them, on the ledger or here. Say which of the two this is.
+			const joinedLater = await app.daoById(found.daoId).then(
+				(d) => d.members.includes(me),
+				() => false
+			);
+			throw error(
+				403,
+				joinedLater
+					? 'This proposal was opened before you joined the DAO. Only the members it was opened with can see and vote on it; the next proposal will include you.'
+					: 'Only members can see this proposal'
+			);
+		}
 		// The DAO's admin may cancel. Proposals from before 0.1.4 do not carry it, and a proposal
 		// can outlive a deleted DAO, so this may be absent.
 		const admin =
