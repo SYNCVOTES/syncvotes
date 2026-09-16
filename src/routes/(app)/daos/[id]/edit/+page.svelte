@@ -77,7 +77,9 @@
 		<ConnectPrompt what="edit this DAO" />
 	{:else if dao.error}
 		<Problem message={describe(dao.error)} />
-	{:else if dao.ready && dao.current.admin !== me}
+	{:else if !dao.ready}
+		<div class="h-64 animate-pulse border border-border bg-surface"></div>
+	{:else if dao.current.admin !== me}
 		<p class="text-[13px] text-ink-dim">Only the admin can edit this DAO.</p>
 	{:else}
 		<form class="space-y-8" onsubmit={save}>

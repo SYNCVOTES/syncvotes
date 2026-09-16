@@ -56,9 +56,11 @@
 		<ConnectPrompt what="edit this proposal" />
 	{:else if proposal.error}
 		<Problem message={describe(proposal.error)} />
-	{:else if proposal.ready && proposal.current.proposer !== me}
+	{:else if !proposal.ready}
+		<div class="h-64 animate-pulse border border-border bg-surface"></div>
+	{:else if proposal.current.proposer !== me}
 		<p class="text-[13px] text-ink-dim">Only the proposer can edit.</p>
-	{:else if proposal.ready && proposal.current.ballots.length > 0}
+	{:else if proposal.current.ballots.length > 0}
 		<p class="text-[13px] text-ink-dim">Voting has started; the text is fixed now.</p>
 	{:else}
 		<form class="space-y-8" onsubmit={save}>
