@@ -12,13 +12,11 @@ import {
 } from '$app/env/private';
 
 /**
- * The server's side of the ledger, through the Canton wallet SDK. It holds the participant
- * credentials and does everything the user's key cannot: reads the ACS, prepares transactions,
- * forwards signed ones, and signs as the provider where the model needs it.
- *
- * User parties are external: hosted here, so our package is available and this participant
- * confirms for them — which is what earns traffic rewards — but signed only by a key the user
- * holds. Nothing in this file can act for a user on its own.
+ * The participant, through the Canton wallet SDK: party allocation, the active contracts, the
+ * update stream, and the two halves of a user transaction (prepare here, execute here, sign in
+ * the browser in between). User parties are external: hosted on this participant so the app's
+ * package is available to them, but signable only by a key the user holds. The app's ledger
+ * user has no rights on user parties, so nothing in this file can act for a user on its own.
  */
 
 function required(name: string, value: string | undefined): string {
@@ -29,7 +27,6 @@ function required(name: string, value: string | undefined): string {
 export const providerParty = () => required('PROVIDER_PARTY', PROVIDER_PARTY);
 export const operatorParty = () => required('OPERATOR_PARTY', OPERATOR_PARTY);
 
-/** OAuth2 client credentials against the identity provider; the ledger user is the token's `sub`. */
 const auth = () =>
 	({
 		method: 'client_credentials',
@@ -42,10 +39,7 @@ const auth = () =>
 		}
 	}) as const;
 
-/**
- * The SDK logs the whole token response every time it fetches one. Only its warnings and errors
- * get through here, and only as a message — never the context they came with.
- */
+// The SDK logs whole token responses at info level; only warnings and errors get through.
 const logAdapter = {
 	log(level: string, ctx: { error?: unknown; err?: unknown }, message?: string) {
 		if (level !== 'warn' && level !== 'error') return;
@@ -58,17 +52,13 @@ const logAdapter = {
 async function create() {
 	const url = required('LEDGER_API_URL', LEDGER_API_URL);
 	const base = await SDK.create({ ledgerClientUrl: url, auth: auth(), logAdapter });
-	// The update stream rides the same JSON API over a websocket.
 	return base.extend({ events: { websocketURL: url.replace(/^http/, 'ws'), auth: auth() } });
 }
 
 type Sdk = Awaited<ReturnType<typeof create>>;
 let instance: Promise<Sdk> | undefined;
 
-/** One SDK for the process. */
-export function sdk(): Promise<Sdk> {
-	return (instance ??= create());
-}
+export const sdk = (): Promise<Sdk> => (instance ??= create());
 
 export type Created = {
 	contractId: string;
@@ -77,9 +67,8 @@ export type Created = {
 };
 
 /**
- * Every active contract of these templates as `party` sees them, at `offset`, streamed. The JSON
- * API's list endpoint stops at a couple of hundred elements; its websocket has no such limit, so
- * that is what a full index is built from. The token is the SDK's own.
+ * Every active contract of these templates as `party` sees them at `offset`. The JSON API's
+ * list endpoint stops at a couple of hundred contracts; its websocket streams them all.
  */
 export async function streamActiveContracts(
 	party: string,
@@ -88,12 +77,12 @@ export async function streamActiveContracts(
 	onContract: (c: Created) => void
 ): Promise<void> {
 	const ledger = await sdk();
-	const provider = (
+	const tokens = (
 		ledger.events as unknown as {
 			websocketClient: { accessTokenProvider: { getAccessToken(): Promise<string> } };
 		}
 	).websocketClient.accessTokenProvider;
-	const token = await provider.getAccessToken();
+	const token = await tokens.getAccessToken();
 	const url =
 		required('LEDGER_API_URL', LEDGER_API_URL).replace(/^http/, 'ws') +
 		'/v2/state/active-contracts';
@@ -135,12 +124,13 @@ export async function streamActiveContracts(
 
 export type Commands = Parameters<Sdk['ledger']['internal']['submit']>[0]['commands'];
 
-/** Submits as the provider — the one local party, used only to create accounts. */
-export async function submitAsProvider(commands: Commands, commandId: string) {
+/** The provider's own writes: an Account for a new party, and counting ballots. */
+export async function submitAsProvider(commands: Commands, commandId: string): Promise<string> {
 	try {
-		return await (
+		const { updateId } = await (
 			await sdk()
 		).ledger.internal.submit({ commands, actAs: [providerParty()], commandId });
+		return updateId;
 	} catch (e) {
 		ledgerError(e);
 	}
@@ -156,37 +146,36 @@ export type Topology = {
 };
 
 /**
- * Asks the participant to lay out the party for this key: the party id, and the hash the key has
- * to sign for the party to exist. Nothing is committed — it is also how a returning key finds out
- * which party it is.
+ * The party this key would be under this hint, and the hash the key has to sign for it to
+ * exist. Nothing is committed: this is also how a returning key learns which party it is.
  */
-export async function generateTopology(hint: string, publicKey: string): Promise<Topology> {
+export async function partyTopology(hint: string, publicKey: string): Promise<Topology> {
 	return (await sdk()).party.external.create(publicKey, { partyHint: hint }).topology();
 }
 
 /**
- * Creates the party. The topology is generated again — it is a pure function of hint and key —
- * and the hash is compared to the one the client signed, so a signature can only ever commit
+ * Creates the party. The topology is a pure function of hint and key, so it is generated
+ * again and its hash compared with the one the key signed: a signature can only ever commit
  * what the key actually saw.
  */
-export async function allocateExternal(
+export async function allocateParty(
 	hint: string,
 	publicKey: string,
 	signedMultiHash: string,
 	signature: string
 ): Promise<Topology> {
 	const creation = (await sdk()).party.external.create(publicKey, { partyHint: hint });
-
 	const { multiHash } = await creation.topology();
 	if (multiHash !== signedMultiHash) {
 		throw error(409, 'The party topology changed since it was signed — sign in again');
 	}
-
-	// The backend user gets no rights on the party itself. Reading and executing come from the
-	// participant-wide rights it was set up with (README, "Authentication"); a `CanActAs` it
-	// does not hold is one it cannot misuse.
+	// The app's ledger user gets no rights on the party itself: reading and executing come from
+	// the participant-wide rights it was set up with, and a CanActAs it does not hold is one it
+	// cannot misuse.
 	return creation.execute(signature, { grantUserRights: false });
 }
+
+// ---- User transactions --------------------------------------------------------------------
 
 export type Prepared = {
 	preparedTransaction: string;
@@ -195,41 +184,19 @@ export type Prepared = {
 };
 
 /**
- * What this server prepared, by hash, for a little while. Execution is only ever offered for
- * these: a caller cannot hand in a transaction of their own making and have it submitted, so
- * every rule the prepare functions enforce actually holds.
+ * Hashes this server prepared, for a while. Only these are ever executed, so a caller cannot
+ * hand in a transaction of their own making and skip the rules the prepare functions enforce.
  */
 const prepared = new Map<string, { party: string; at: number }>();
 const PREPARED_TTL = 10 * 60 * 1000;
-
-function remember(hash: string, party: string) {
-	const now = Date.now();
-	for (const [key, entry] of prepared) if (now - entry.at > PREPARED_TTL) prepared.delete(key);
-	prepared.set(hash, { party, at: now });
-}
-
-/**
- * The SDK throws the ledger's rejection as an Error with the reason in its message; that reason
- * is what the user needs to see ("Already voted", "The deadline has passed"). A contract that
- * changed between prepare and execute is the one case worth naming on its own.
- */
-function ledgerError(e: unknown): never {
-	if (typeof e === 'object' && e !== null && 'status' in e && 'body' in e) throw e;
-	const message = e instanceof Error ? e.message : String(e);
-	if (/CONTRACT_NOT_ACTIVE|INACTIVE_CONTRACT|LOCKED_CONTRACT|CONTRACT_NOT_FOUND/.test(message)) {
-		throw error(409, 'This changed while you were looking at it — reload and try again');
-	}
-	const reason = message.match(
-		/DAML_INTERPRETATION_ERROR[^:]*: [^\n]*?Error: ([^\n"]{1,200})/
-	)?.[1];
-	throw error(400, reason ?? message.slice(0, 300));
-}
 
 /** Step one of a user transaction: the participant builds it and hands back the hash to sign. */
 export async function prepare(party: string, commands: unknown[]): Promise<Prepared> {
 	try {
 		const { response } = await (await sdk()).ledger.prepare({ partyId: party, commands }).toJSON();
-		remember(response.preparedTransactionHash, party);
+		const now = Date.now();
+		for (const [hash, p] of prepared) if (now - p.at > PREPARED_TTL) prepared.delete(hash);
+		prepared.set(response.preparedTransactionHash, { party, at: now });
 		return response;
 	} catch (e) {
 		ledgerError(e);
@@ -237,21 +204,38 @@ export async function prepare(party: string, commands: unknown[]): Promise<Prepa
 }
 
 /**
- * Step two: the signed hash goes back and the participant submits. The SDK takes the signing key
- * fingerprint from the party id — for an external party the namespace is its own key.
+ * Step two: the signed hash comes back and the participant submits. Resolves with the id of
+ * the resulting transaction once the ledger has accepted it.
  */
-export async function execute(party: string, tx: Prepared, signature: string): Promise<void> {
+export async function execute(party: string, tx: Prepared, signature: string): Promise<string> {
 	const known = prepared.get(tx.preparedTransactionHash);
 	if (!known || known.party !== party) throw error(400, 'Nothing was prepared for this signature');
 	prepared.delete(tx.preparedTransactionHash);
-
 	try {
 		const ledger = (await sdk()).ledger;
-		await ledger.execute(
-			ledger.fromSignature(tx as Parameters<typeof ledger.fromSignature>[0], signature),
-			{ partyId: party }
+		const signed = ledger.fromSignature(
+			tx as Parameters<typeof ledger.fromSignature>[0],
+			signature
 		);
+		const { updateId } = await ledger.execute(signed, { partyId: party });
+		return updateId;
 	} catch (e) {
 		ledgerError(e);
 	}
+}
+
+/**
+ * The ledger's rejection, as the user should read it: the Daml assertion that failed ("Already
+ * voted", "The deadline has passed"), or that the contract changed under them.
+ */
+function ledgerError(e: unknown): never {
+	if (typeof e === 'object' && e !== null && 'status' in e && 'body' in e) throw e;
+	const message = e instanceof Error ? e.message : String(e);
+	if (/CONTRACT_NOT_ACTIVE|INACTIVE_CONTRACT|LOCKED_CONTRACT|CONTRACT_NOT_FOUND/.test(message)) {
+		error(409, 'This changed while you were looking at it — reload and try again');
+	}
+	const reason = message.match(
+		/DAML_INTERPRETATION_ERROR[^:]*: [^\n]*?Error: ([^\n"]{1,200})/
+	)?.[1];
+	error(400, reason ?? message.slice(0, 300));
 }

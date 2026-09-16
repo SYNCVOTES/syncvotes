@@ -16,28 +16,26 @@
 	import Field from '$lib/components/field.svelte';
 	import FormActions from '$lib/components/form-actions.svelte';
 	import QueryError from '$lib/components/query-error.svelte';
-	import SigningProgress from '$lib/components/signing-progress.svelte';
 	import { fmt } from '$lib/format';
 
 	const id = $derived(page.params.id!);
 	const dao = $derived(store.who ? remote.dao(id) : null);
-	let progress = $state({ done: 0, total: 0, what: '' });
 
-	// Three steps: the proposal (this form), a voting right for every member in batches, then
-	// opening the vote — all signed in turn, no prompt in between.
+	// Two signatures in a row: the proposal, then opening the vote on it.
 	const f = remote.createProposalForm;
-	const enhanced = signedForm(f, schema, async (r) => {
-		const ok = await flow.act((s, w) =>
-			actions.openVoting(
-				s,
-				w,
-				r.pid,
-				r.daoId,
-				(done, total) => (progress = { done, total, what: 'Opening the vote' })
-			)
-		);
-		if (ok) await goto(`/proposals/${r.pid}`);
-	});
+	const enhanced = signedForm(
+		f,
+		schema,
+		({ title, description }, { pid, membership, closesAt }) => ({
+			choice: 'DAO_CreateProposal',
+			contractId: dao!.current!.contractId,
+			args: { proposer: store.who!.party, membership, pid, title, description, closesAt }
+		}),
+		async ({ pid }) => {
+			const ok = await flow.act((s, w) => actions.openProposal(s, w, pid));
+			if (ok) await goto(`/proposals/${pid}`);
+		}
+	);
 
 	// A week is the usual voting period; the field starts there.
 	$effect(() => {
@@ -61,8 +59,7 @@
 	{:else}
 		<form {...enhanced} class="space-y-8">
 			<Problem message={store.problem} />
-			<SigningProgress {...progress} />
-			{#if dao?.ready}<input {...f.fields.dao.as('hidden', dao.current.contractId)} />{/if}
+			<input {...f.fields.dao.as('hidden', id)} />
 
 			<FormSection>
 				<Field label="Title" id="title" issues={f.fields.title.issues()}>
@@ -94,9 +91,8 @@
 
 			{#if dao?.ready}
 				<p class="font-mono text-xs text-ink-dim">
-					Opening the vote issues a voting right to each of the {fmt(dao.current.members)} members —
-					{Math.ceil(dao.current.members / actions.RIGHTS_BATCH) + 2} transactions, signed one after another
-					without further prompts.
+					The vote opens for the {fmt(dao.current.members)} current members: two transactions, signed
+					one after another.
 				</p>
 			{/if}
 

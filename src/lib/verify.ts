@@ -6,7 +6,7 @@ import {
 } from '@canton-network/core-tx-visualizer';
 import { BinaryReader, WireType } from '@protobuf-ts/runtime';
 import type { Value } from '@canton-network/core-ledger-proto';
-import { packageId } from '@daml.js/model';
+import { Main, packageId } from '@daml.js/model';
 import { fromBase64, toBase64 } from './wallet';
 
 /**
@@ -33,21 +33,20 @@ const CONFIRMATION = 2;
 const EC_CURVE25519 = 1;
 
 /** The package every user action must live in; a same-named choice elsewhere is refused. */
-const PACKAGE_NAME = 'syncvotes-dao';
+const PACKAGE_NAME = Main.Account.templateId.slice(1).split(':')[0];
 
 /** The only choices a user is ever asked to sign, and the template each lives on. */
-export const CHOICES: Record<string, string> = {
+const CHOICES: Record<string, string> = {
 	Account_CreateDAO: 'Main:Account',
 	DAO_Update: 'Main:DAO',
 	DAO_Archive: 'Main:DAO',
 	DAO_AddMembers: 'Main:DAO',
 	DAO_RemoveMembers: 'Main:DAO',
 	DAO_CreateProposal: 'Main:DAO',
+	Member_Vote: 'Main:Member',
 	Proposal_Update: 'Main:Proposal',
-	Proposal_IssueRights: 'Main:Proposal',
-	Proposal_Ready: 'Main:Proposal',
-	Proposal_Cancel: 'Main:Proposal',
-	VoteRight_Cast: 'Main:VoteRight'
+	Proposal_Open: 'Main:Proposal',
+	Proposal_Cancel: 'Main:Proposal'
 };
 
 // ---- Sign-up: the party topology --------------------------------------------------------

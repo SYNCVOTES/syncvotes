@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { NETWORK } from '$lib/network';
+	import { NETWORK } from '$app/env/public';
 </script>
 
 <!-- The network, as a pill like everything else on that row: one dot, one word. -->

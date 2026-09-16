@@ -21,7 +21,6 @@
 	import LoadMore from '$lib/components/load-more.svelte';
 	import SearchInput from '$lib/components/search-input.svelte';
 	import DangerZone from '$lib/components/danger-zone.svelte';
-	import SigningProgress from '$lib/components/signing-progress.svelte';
 	import { relative, dateOf } from '$lib/format';
 
 	const id = $derived(page.params.id!);
@@ -31,25 +30,12 @@
 	let q = $state('');
 	let limit = $state(20);
 	const ballots = $derived(me ? remote.proposalBallots({ id, offset: 0, limit, q }) : null);
-	let progress = $state({ done: 0, total: 0, what: '' });
 
-	// The stream brings the new contract the moment the vote lands; nothing to refresh by hand.
-	const vote = (right: string, choice: 'Yes' | 'No') =>
-		flow.act((s, w) => actions.vote(s, w, right, choice));
-
-	const open = (daoId: string) =>
-		flow.act((s, w) =>
-			actions.openVoting(
-				s,
-				w,
-				id,
-				daoId,
-				(done, total) => (progress = { done, total, what: 'Opening the vote' })
-			)
-		);
-
-	async function cancel(contractId: string, daoId: string) {
-		const ok = await flow.act((s, w) => actions.cancelProposal(s, w, contractId));
+	// Every write lands on this page through the live query; nothing to refresh by hand.
+	const vote = (choice: 'Yes' | 'No') => flow.act((s, w) => actions.vote(s, w, id, choice));
+	const open = () => flow.act((s, w) => actions.openProposal(s, w, id));
+	async function cancel(daoId: string) {
+		const ok = await flow.act((s, w) => actions.cancelProposal(s, w, id));
 		if (ok) await goto(`/daos/${daoId}`);
 	}
 </script>
@@ -72,15 +58,14 @@
 		{@const needed = Math.floor(p.eligible / 2) + 1}
 		{@const ended = new Date(p.closesAt).getTime() < Date.now()}
 		{@const mine = me === p.proposer}
-		{@const canCancel = !p.outcome && (mine || me === p.admin)}
 
 		<div class="mb-8">
 			<div class="mb-3 flex items-center gap-3">
-				<StatusBadge outcome={p.outcome} closesAt={p.closesAt} ready={p.ready} />
+				<StatusBadge outcome={p.outcome} closesAt={p.closesAt} opened={!!p.openedAt} />
 				<span class="font-mono text-xs text-ink-dim">
 					{p.outcome
 						? 'closed'
-						: !p.ready
+						: !p.openedAt
 							? 'voting not open yet'
 							: ended
 								? `ended ${relative(p.closesAt)}`
@@ -96,14 +81,13 @@
 						<span>· {dateOf(p.createdAt)} ({relative(p.createdAt)})</span>
 					</p>
 				</div>
-				{#if mine && !p.ready}
+				{#if mine && !p.openedAt}
 					<Button href="/proposals/{id}/edit" variant="outline" size="sm">Edit</Button>
 				{/if}
 			</div>
 		</div>
 
 		<Problem message={store.problem} />
-		<SigningProgress {...progress} />
 
 		<div class="grid gap-8 lg:grid-cols-[1fr_320px]">
 			<section class="space-y-8">
@@ -156,14 +140,12 @@
 			<aside class="space-y-6">
 				<Tally yes={p.yes} no={p.no} total={p.eligible} {needed} cast={p.cast} />
 
-				{#if !p.ready}
+				{#if !p.openedAt}
 					<Note mono={false}>
 						{#if mine}
-							Voting has not opened: rights still have to be issued to the members.
+							Voting has not opened yet.
 							<div class="mt-3">
-								<Button size="sm" disabled={store.busy} onclick={() => open(p.daoId)}
-									>Open the vote</Button
-								>
+								<Button size="sm" disabled={store.busy} onclick={open}>Open the vote</Button>
 							</div>
 						{:else}
 							The proposer has not opened the vote yet.
@@ -179,18 +161,18 @@
 					<Note>The deadline has passed; the last ballots are being counted.</Note>
 				{/if}
 
-				{#if canCancel}
+				{#if !p.outcome && (mine || me === p.admin)}
 					<DangerZone
 						compact
 						text={mine ? 'Withdraw your proposal.' : 'As admin you can withdraw this proposal.'}
 						action="Cancel proposal"
 						confirm="Yes, withdraw"
 						busy={store.busy}
-						onconfirm={() => cancel(p.contractId, p.daoId)}
+						onconfirm={() => cancel(p.daoId)}
 					/>
 				{/if}
 
-				{#if p.ready && !p.outcome && !ended}
+				{#if p.openedAt && !p.outcome && !ended}
 					{#if store.screen.at === 'locked'}
 						<Panel padding="sm" class="space-y-3">
 							<p class="text-[13px] text-ink-dim">Unlock your wallet to vote.</p>
@@ -202,13 +184,11 @@
 								>{p.me.vote}</span
 							>.</Note
 						>
-					{:else if p.me.right}
-						{@const right = p.me.right}
+					{:else if p.me.mayVote}
 						<Panel padding="sm" class="grid grid-cols-2 gap-3">
-							<Button variant="accent" disabled={store.busy} onclick={() => vote(right, 'Yes')}
-								>Yes</Button
+							<Button variant="accent" disabled={store.busy} onclick={() => vote('Yes')}>Yes</Button
 							>
-							<Button variant="destructive" disabled={store.busy} onclick={() => vote(right, 'No')}
+							<Button variant="destructive" disabled={store.busy} onclick={() => vote('No')}
 								>No</Button
 							>
 						</Panel>

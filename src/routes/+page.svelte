@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import * as remote from '$lib/api.remote';
-	import { NETWORK } from '$lib/network';
+	import { NETWORK } from '$app/env/public';
 	import { startField } from './field';
 	import ArrowUpRight from '@lucide/svelte/icons/arrow-up-right';
 	import LandingNav from '$lib/components/landing-nav.svelte';

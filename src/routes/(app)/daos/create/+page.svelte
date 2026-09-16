@@ -15,7 +15,16 @@
 	import FormActions from '$lib/components/form-actions.svelte';
 
 	const f = remote.createDaoForm;
-	const enhanced = signedForm(f, schema, (r) => goto(`/daos/${r.id}/members`));
+	const enhanced = signedForm(
+		f,
+		schema,
+		({ daoName, description }, { id }) => ({
+			choice: 'Account_CreateDAO',
+			contractId: store.who!.account,
+			args: { id, daoName, description }
+		}),
+		({ id }) => goto(`/daos/${id}/members`)
+	);
 </script>
 
 <svelte:head><title>Create DAO — SyncVotes</title></svelte:head>

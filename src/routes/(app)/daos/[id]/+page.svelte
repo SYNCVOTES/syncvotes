@@ -120,12 +120,12 @@
 										)} counted of
 										{fmt(p.eligible)} · {p.outcome
 											? 'closed'
-											: !p.ready
+											: !p.openedAt
 												? 'not open yet'
 												: `closes ${relative(p.closesAt)}`}
 									</div>
 								</div>
-								<StatusBadge outcome={p.outcome} closesAt={p.closesAt} ready={p.ready} />
+								<StatusBadge outcome={p.outcome} closesAt={p.closesAt} opened={!!p.openedAt} />
 								<ArrowRight
 									size={16}
 									class="text-ink-dim transition-all group-hover:translate-x-0.5 group-hover:text-orange"

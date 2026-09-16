@@ -30,18 +30,18 @@ export const votingDays = v.pipe(
 	v.minValue(1, 'At least one day'),
 	v.maxValue(30, 'At most thirty days')
 );
-export const contractId = v.pipe(v.string(), v.nonEmpty());
+export const id = v.pipe(v.string(), v.nonEmpty());
 
 export const createDaoForm = v.object({ daoName, description: daoDescription });
-export const updateDaoForm = v.object({ dao: contractId, daoName, description: daoDescription });
+export const updateDaoForm = v.object({ dao: id, daoName, description: daoDescription });
 export const createProposalForm = v.object({
-	dao: contractId,
+	dao: id,
 	title: proposalTitle,
 	description: proposalDescription,
 	days: votingDays
 });
 export const updateProposalForm = v.object({
-	proposal: contractId,
+	proposal: id,
 	title: proposalTitle,
 	description: proposalDescription
 });

@@ -20,8 +20,7 @@
 	import DangerZone from '$lib/components/danger-zone.svelte';
 
 	const id = $derived(page.params.id!);
-	const me = $derived(store.who?.party ?? null);
-	const dao = $derived(me ? remote.dao(id) : null);
+	const dao = $derived(store.who ? remote.dao(id) : null);
 
 	const f = remote.updateDaoForm;
 	let loaded = $state(false);
@@ -34,12 +33,21 @@
 		loaded = true;
 	});
 
-	const enhanced = signedForm(f, schema, () => goto(`/daos/${id}`));
+	const enhanced = signedForm(
+		f,
+		schema,
+		({ daoName, description }) => ({
+			choice: 'DAO_Update',
+			contractId: dao!.current!.contractId,
+			args: { daoName, description }
+		}),
+		() => goto(`/daos/${id}`)
+	);
 
 	async function remove() {
-		const contractId = dao?.current?.contractId;
-		if (!contractId) return;
-		const ok = await flow.act((signer, who) => actions.archiveDao(signer, who, contractId));
+		const current = dao?.current;
+		if (!current) return;
+		const ok = await flow.act((s, w) => actions.archiveDao(s, w, current));
 		if (ok) await goto('/my-daos');
 	}
 </script>
@@ -64,7 +72,7 @@
 	{:else}
 		<form {...enhanced} class="space-y-8">
 			<Problem message={store.problem} />
-			<input {...f.fields.dao.as('hidden', dao.current.contractId)} />
+			<input {...f.fields.dao.as('hidden', id)} />
 
 			<FormSection title="Basic information">
 				<Field label="Name" id="daoName" issues={f.fields.daoName.issues()}>

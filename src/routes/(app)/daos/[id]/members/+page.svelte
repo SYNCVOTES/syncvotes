@@ -36,20 +36,13 @@
 	const track = (what: string) => (done: number, total: number) =>
 		(progress = { done, total, what });
 
-	async function add(parties: string[]) {
-		const contractId = dao?.current?.contractId;
-		if (!contractId) return false;
-		return flow.act((s, w) =>
-			actions.addMembers(s, w, contractId, parties, track('Adding members'))
-		);
-	}
+	const add = (parties: string[]) =>
+		flow.act((s, w) => actions.addMembers(s, w, id, parties, track('Adding members')));
 
 	async function remove() {
-		const contractId = dao?.current?.contractId;
-		if (!contractId || selected.size === 0) return;
 		const cids = [...selected];
 		const ok = await flow.act((s, w) =>
-			actions.removeMembers(s, w, contractId, cids, track('Removing members'))
+			actions.removeMembers(s, w, id, cids, track('Removing members'))
 		);
 		if (ok) selected.clear();
 	}

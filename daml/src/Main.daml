@@ -3,22 +3,17 @@ module Main where
 import DA.Action (foldlA)
 import DA.Foldable (forA_)
 import DA.List (dedup)
-import DA.Optional (isNone)
+import DA.Optional (isNone, isSome, optional)
 
--- The model rests on one idea: every contract a user acts on already carries the app
--- provider's signature, so the provider confirms every transaction — which is what CIP-0104
--- pays traffic rewards for — while the user's own key is the only one that ever signs a
--- submission. The provider's authority enters once, when the account is created, and every
--- later contract inherits it through the choice that creates it.
+-- Every contract a user acts on carries the app provider's signature, so the provider confirms
+-- every transaction (which is what earns traffic rewards) while the user's own key is the only
+-- one that ever signs a submission. The provider's authority enters once, with the Account, and
+-- every later contract inherits it through the choice that creates it.
 --
--- Two provider-side parties, per the Featured App Coupon Guidance on separating concerns: the
--- provider holds the FeaturedAppRight and signs; the operator is the backend's own party, an
--- observer that reads and never earns.
---
--- Built for large DAOs: membership is one contract per member, a ballot is one contract per
--- vote, and a proposal holds counters, not lists. Nothing a member does touches a contract
--- another member is touching, so thousands can vote at once; the provider counts ballots in
--- batches and records the outcome.
+-- Built for large DAOs: a member's vote touches only that member's own contract, so thousands
+-- can vote at once, and a proposal holds counters rather than lists. The provider counts the
+-- ballots in batches; the ledger checks each one it is handed, so the provider can delay a
+-- result but never change it.
 
 data Vote = Yes | No
   deriving (Eq, Show)
@@ -26,8 +21,8 @@ data Vote = Yes | No
 data Outcome = Passed | Failed
   deriving (Eq, Show)
 
--- | A party's standing with the app, and the door through which it creates DAOs. Created by
--- the provider once per party; there is no name — the party id carries its own label.
+-- | A party's standing with the app: created by the provider once per party, and the door
+-- through which the party creates DAOs.
 template Account
   with
     provider : Party
@@ -39,30 +34,30 @@ template Account
 
     nonconsuming choice Account_CreateDAO : ContractId DAO
       with
+        id : Text
         daoName : Text
         description : Text
-        -- A stable handle: every edit replaces the contract.
-        id : Text
       controller user
       do
         now <- getTime
-        dao <- create DAO with
-          provider; operator; admin = user; name = daoName; description; id; createdAt = now
-        -- The admin is the first member.
-        create Member with provider; operator; admin = user; daoId = id; party = user; since = now
-        return dao
+        create Member with
+          provider; operator; admin = user; daoId = id; party = user; since = now; voted = []
+        create DAO with
+          provider; operator; admin = user; id; name = daoName; description; createdAt = now
+          members = 1
 
--- | A DAO: who runs it and what it is called. Membership lives in `Member` contracts, so a DAO
--- of ten thousand is the same size as a DAO of three.
+-- | A DAO: who runs it, what it is called, and how many members it has. The members themselves
+-- are `Member` contracts, so a DAO of ten thousand is as small as a DAO of three.
 template DAO
   with
     provider : Party
     operator : Party
     admin : Party
+    id : Text
     name : Text
     description : Text
-    id : Text
     createdAt : Time
+    members : Int
   where
     signatory admin, provider
     observer operator
@@ -76,54 +71,56 @@ template DAO
       controller admin
       do create this with name = daoName; description
 
-    -- Deleting a DAO archives its contract; the app refuses this while proposals are open.
     choice DAO_Archive : ()
       controller admin
       do pure ()
 
-    -- Members join in batches; the app splits a long list into transactions of a few hundred.
-    nonconsuming choice DAO_AddMembers : [ContractId Member]
+    choice DAO_AddMembers : ContractId DAO
       with
         parties : [Party]
       controller admin
       do
         now <- getTime
-        forA (dedup parties) \party ->
-          create Member with provider; operator; admin; daoId = id; party; since = now
+        let new = dedup parties
+        forA_ new \party ->
+          create Member with provider; operator; admin; daoId = id; party; since = now; voted = []
+        create this with members = members + length new
 
-    nonconsuming choice DAO_RemoveMembers : ()
+    choice DAO_RemoveMembers : ContractId DAO
       with
-        members : [ContractId Member]
+        memberCids : [ContractId Member]
       controller admin
       do
-        forA_ members \m -> do
-          member <- fetch m
+        forA_ memberCids \cid -> do
+          member <- fetch cid
           assertMsg "Not a member of this DAO" (member.daoId == id)
           assertMsg "The admin stays a member" (member.party /= admin)
-          archive m
+          archive cid
+        create this with members = members - length memberCids
 
-    -- Any member proposes; the proposal starts with no voters and no votes. The proposer then
-    -- issues a voting right to every member (`Proposal_IssueRights`) and opens it.
+    -- A proposal starts as a draft: the text can still change, and nobody can vote until the
+    -- proposer opens it.
     nonconsuming choice DAO_CreateProposal : ContractId Proposal
       with
         proposer : Party
         membership : ContractId Member
+        pid : Text
         title : Text
         description : Text
         closesAt : Time
-        pid : Text
       controller proposer
       do
         member <- fetch membership
         assertMsg "Only members can propose" (member.daoId == id && member.party == proposer)
         now <- getTime
-        assertMsg "The voting deadline must be in the future" (closesAt > now)
+        assertMsg "The deadline must be in the future" (closesAt > now)
         create Proposal with
-          provider; operator; daoId = id; daoName = name; admin; proposer; title; description
-          closesAt; id = pid; createdAt = now; eligible = 0; ready = False; yes = 0; no = 0
+          provider; operator; daoId = id; daoName = name; admin; proposer; id = pid; title
+          description; createdAt = now; closesAt; openedAt = None; eligible = 0; yes = 0; no = 0
           outcome = None
 
--- | One party's membership of one DAO. Created and removed only through the DAO's choices.
+-- | One party's membership of one DAO, and that party's ballot box: voting replaces it with a
+-- copy that remembers the proposal, which is what makes a second ballot impossible.
 template Member
   with
     provider : Party
@@ -132,14 +129,30 @@ template Member
     daoId : Text
     party : Party
     since : Time
+    voted : [Text]
   where
     signatory admin, provider
     observer party, operator
 
--- | A proposal counts; it does not list. `eligible` is how many voting rights were issued,
--- `yes` and `no` how many ballots the provider has counted so far. It passes when yes reaches
--- a majority of eligible, fails when no makes that impossible, and is decided by what was cast
--- once the deadline has passed.
+    -- Nothing here reads the proposal, so a vote never waits on the count or on other voters.
+    -- Whether the ballot is valid for its proposal (right DAO, member in time, before the
+    -- deadline) is checked when the provider counts it.
+    choice Member_Vote : ContractId Ballot
+      with
+        proposalId : Text
+        vote : Vote
+      controller party
+      do
+        assertMsg "Already voted" (proposalId `notElem` voted)
+        now <- getTime
+        create this with voted = proposalId :: voted
+        create Ballot with
+          provider; operator; daoId; proposalId; voter = party; since; vote
+          castAt = now; counted = False
+
+-- | A proposal counts; it does not list. Opening it fixes the electorate: every member at that
+-- moment, and only they. It passes once yes reaches a majority of them, fails once no makes
+-- that impossible, and is decided by the ballots cast when the deadline has passed.
 template Proposal
   with
     provider : Party
@@ -148,13 +161,13 @@ template Proposal
     daoName : Text
     admin : Party
     proposer : Party
+    id : Text
     title : Text
     description : Text
-    closesAt : Time
-    id : Text
     createdAt : Time
+    closesAt : Time
+    openedAt : Optional Time
     eligible : Int
-    ready : Bool
     yes : Int
     no : Int
     outcome : Optional Outcome
@@ -164,38 +177,26 @@ template Proposal
 
     ensure title /= ""
 
-    -- The text can change until voting opens.
     choice Proposal_Update : ContractId Proposal
       with
         title : Text
         description : Text
       controller proposer
       do
-        assertMsg "Voting has opened" (not ready)
+        assertMsg "Voting has opened" (isNone openedAt)
         create this with title; description
 
-    -- A voting right per member, a few hundred per transaction. Each right is checked
-    -- against the member's contract, so only this DAO's members ever get one.
-    choice Proposal_IssueRights : ContractId Proposal
+    choice Proposal_Open : ContractId Proposal
       with
-        members : [ContractId Member]
+        dao : ContractId DAO
       controller proposer
       do
-        assertMsg "Voting has opened" (not ready)
-        forA_ members \m -> do
-          member <- fetch m
-          assertMsg "Not a member of this DAO" (member.daoId == daoId)
-          create VoteRight with provider; operator; proposalId = id; voter = member.party; closesAt
-        create this with eligible = eligible + length members
+        assertMsg "Voting has opened" (isNone openedAt)
+        found <- fetch dao
+        assertMsg "Not this proposal's DAO" (found.id == daoId)
+        now <- getTime
+        create this with openedAt = Some now; eligible = found.members
 
-    -- Rights issued: voting opens, and the bar to pass is fixed.
-    choice Proposal_Ready : ContractId Proposal
-      controller proposer
-      do
-        assertMsg "Nobody to vote" (eligible > 0)
-        create this with ready = True
-
-    -- The proposer, or the DAO's admin, withdraws an unsettled proposal.
     choice Proposal_Cancel : ()
       with
         canceller : Party
@@ -205,22 +206,19 @@ template Proposal
         assertMsg "Only the proposer or the DAO admin can cancel"
           (canceller == proposer || canceller == admin)
 
-    -- The provider counts a batch of ballots into the tally. A ballot is consumed as it is
-    -- counted, so none counts twice, and the ballots themselves say which way they went, so
-    -- the provider cannot tilt the count — only delay it. `final` says the deadline has passed
-    -- and these are the last ballots there are; the ledger takes that on the provider's word,
-    -- since it cannot see what has not been counted.
+    -- `final` says the deadline has passed and these are the last ballots there are: the one
+    -- thing the ledger takes on the provider's word, since it cannot see what was not handed in.
     choice Proposal_Tally : ContractId Proposal
       with
         ballots : [ContractId Ballot]
         final : Bool
       controller provider
       do
-        assertMsg "Voting has not opened" ready
+        assertMsg "Voting has not opened" (isSome openedAt)
         assertMsg "Already settled" (isNone outcome)
         (y, n) <- foldlA
-          (\(y, n) b -> do
-            vote <- exercise b Ballot_Count with proposalId = id
+          (\(y, n) cid -> do
+            vote <- exercise cid Ballot_Count with proposal = this
             pure (if vote == Yes then (y + 1, n) else (y, n + 1)))
           (yes, no) ballots
         now <- getTime
@@ -232,60 +230,32 @@ template Proposal
               | otherwise = None
         create this with yes = y; no = n; outcome = decided
 
--- | The right to cast one ballot on one proposal. Held by the member, spent by voting; the
--- provider's signature on it is what lets the ballot carry the provider's signature too.
-template VoteRight
-  with
-    provider : Party
-    operator : Party
-    proposalId : Text
-    voter : Party
-    closesAt : Time
-  where
-    signatory provider
-    observer voter, operator
-
-    choice VoteRight_Cast : ContractId Ballot
-      with
-        vote : Vote
-      controller voter
-      do
-        now <- getTime
-        assertMsg "The deadline has passed" (now < closesAt)
-        create Ballot with provider; operator; proposalId; voter; vote; castAt = now
-
--- | One vote. Signed by the voter and the provider. Counting consumes it and leaves a
--- `CountedBallot` in its place, so the record of who voted how outlives the count.
+-- | One vote. Signed by the voter and the provider; `since` is copied from the voter's
+-- membership, so the count can tell whether they were a member when the vote opened. Counting
+-- marks it rather than removing it, so who voted how stays on the ledger.
 template Ballot
   with
     provider : Party
     operator : Party
+    daoId : Text
     proposalId : Text
     voter : Party
+    since : Time
     vote : Vote
     castAt : Time
+    counted : Bool
   where
     signatory voter, provider
     observer operator
 
     choice Ballot_Count : Vote
       with
-        proposalId : Text
+        proposal : Proposal
       controller provider
       do
-        assertMsg "A ballot for another proposal" (proposalId == this.proposalId)
-        create CountedBallot with provider; operator; proposalId; voter; vote; castAt
+        assertMsg "Already counted" (not counted)
+        assertMsg "A ballot for another proposal" (proposalId == proposal.id && daoId == proposal.daoId)
+        assertMsg "Cast after the deadline" (castAt < proposal.closesAt)
+        assertMsg "Joined after the vote opened" (optional False (since <=) proposal.openedAt)
+        create this with counted = True
         pure vote
-
--- | A ballot the provider has counted. Never consumed; the audit trail of a proposal.
-template CountedBallot
-  with
-    provider : Party
-    operator : Party
-    proposalId : Text
-    voter : Party
-    vote : Vote
-    castAt : Time
-  where
-    signatory voter, provider
-    observer operator

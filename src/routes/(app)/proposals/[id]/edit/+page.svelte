@@ -18,8 +18,7 @@
 	import FormActions from '$lib/components/form-actions.svelte';
 
 	const id = $derived(page.params.id!);
-	const me = $derived(store.who?.party ?? null);
-	const proposal = $derived(me ? remote.proposal(id) : null);
+	const proposal = $derived(store.who ? remote.proposal(id) : null);
 
 	const f = remote.updateProposalForm;
 	let loaded = $state(false);
@@ -31,7 +30,16 @@
 		loaded = true;
 	});
 
-	const enhanced = signedForm(f, schema, () => goto(`/proposals/${id}`));
+	const enhanced = signedForm(
+		f,
+		schema,
+		({ title, description }) => ({
+			choice: 'Proposal_Update',
+			contractId: proposal!.current!.contractId,
+			args: { title, description }
+		}),
+		() => goto(`/proposals/${id}`)
+	);
 </script>
 
 <svelte:head><title>Edit proposal — SyncVotes</title></svelte:head>
@@ -52,14 +60,14 @@
 		<QueryError error={proposal.error} refresh={() => proposal?.reconnect()} />
 	{:else if !proposal.ready}
 		<Skeleton height="h-64" />
-	{:else if proposal.current.proposer !== me}
+	{:else if proposal.current.proposer !== store.who?.party}
 		<p class="text-[13px] text-ink-dim">Only the proposer can edit.</p>
-	{:else if proposal.current.ready}
+	{:else if proposal.current.openedAt}
 		<p class="text-[13px] text-ink-dim">Voting has opened; the text is fixed now.</p>
 	{:else}
 		<form {...enhanced} class="space-y-8">
 			<Problem message={store.problem} />
-			<input {...f.fields.proposal.as('hidden', proposal.current.contractId)} />
+			<input {...f.fields.proposal.as('hidden', id)} />
 			<FormSection>
 				<Field label="Title" id="title" issues={f.fields.title.issues()}>
 					<Input {...f.fields.title.as('text')} id="title" maxlength={120} />

@@ -1,47 +1,51 @@
 import { Main } from '@daml.js/model';
 import { submitAsProvider } from './participant';
-import * as index from './index';
-import { uncounted } from './app';
+import * as ledger from './ledger';
 
 /**
- * The provider's one job after a vote: count. Each open proposal with uncounted ballots gets a
- * `Proposal_Tally` of up to a batch of them; after the deadline the last batch is marked final
- * and decides the outcome. One count at a time per proposal, since each replaces the contract.
- * The ledger checks every ballot it is handed, so this can only delay a result, never change it.
+ * The provider's one job after a vote: count. Every open proposal with uncounted ballots gets a
+ * `Proposal_Tally` of a batch of them; after the deadline the batch that empties the queue is
+ * final and decides the outcome. One count at a time per proposal, since each replaces the
+ * contract. The ledger checks every ballot it is handed, so this can only delay a result.
  */
 
 const BATCH = 200;
-const inFlight = new Set<string>();
-const queued = new Set<string>();
+const counting = new Set<string>();
+const again = new Set<string>();
 
-export function startTally(): void {
-	// Anything that changes a proposal or lands a ballot is a reason to look again.
+export function start(): void {
 	void (async () => {
 		for (;;) {
-			await index.nextChange(index.keys.all);
-			for (const p of index.proposals.values()) void consider(p.id);
+			await ledger.nextChange(ledger.keys.all);
+			for (const id of ledger.proposals.keys()) void count(id);
 		}
 	})();
-	// Deadlines pass without a ledger event.
+	// A deadline passes without a ledger event.
 	setInterval(() => {
-		for (const p of index.proposals.values()) void consider(p.id);
+		for (const id of ledger.proposals.keys()) void count(id);
 	}, 30_000);
 }
 
-async function consider(id: string) {
-	if (inFlight.has(id)) {
-		queued.add(id);
+/** Ballots the count can accept: cast by members of the time, before the deadline, oldest first. */
+const countable = (p: ledger.Proposal) =>
+	[...(ledger.ballots.get(p.id)?.values() ?? [])]
+		.filter((b) => !b.counted && b.daoId === p.daoId && ledger.eligible(p, b))
+		.sort((a, b) => ledger.time(a.castAt) - ledger.time(b.castAt))
+		.slice(0, BATCH);
+
+async function count(id: string) {
+	if (counting.has(id)) {
+		again.add(id);
 		return;
 	}
-	const p = index.proposals.get(id);
-	if (!p || !p.ready || p.outcome) return;
-	const batch = uncounted(id, BATCH);
-	const overdue = new Date(p.closesAt).getTime() <= Date.now();
+	const p = ledger.proposals.get(id);
+	if (!p || !p.openedAt || p.outcome) return;
+	const batch = countable(p);
+	const overdue = ledger.time(p.closesAt) <= Date.now();
 	if (batch.length === 0 && !overdue) return;
-	// After the deadline no ballot can be cast, so the batch that empties the queue is final.
 	const final = overdue && batch.length < BATCH;
 
-	inFlight.add(id);
+	counting.add(id);
 	try {
 		await submitAsProvider(
 			[
@@ -58,9 +62,9 @@ async function consider(id: string) {
 		);
 	} catch (e) {
 		console.warn(`Tally of ${id} failed; retrying later:`, e instanceof Error ? e.message : e);
-		queued.add(id);
+		again.add(id);
 	} finally {
-		inFlight.delete(id);
+		counting.delete(id);
 	}
-	if (queued.delete(id)) setTimeout(() => void consider(id), 1500);
+	if (again.delete(id)) setTimeout(() => void count(id), 1500);
 }
