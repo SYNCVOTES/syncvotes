@@ -72,7 +72,7 @@
 					<Input id="title" maxlength={120} bind:value={title} />
 				</Field>
 				<Field label="Description" id="description">
-					<Textarea id="description" rows={8} bind:value={description} />
+					<Textarea id="description" rows={8} maxlength={5000} bind:value={description} />
 				</Field>
 			</FormSection>
 			<FormActions

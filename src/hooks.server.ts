@@ -1,6 +1,6 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { HandleServerError, ServerInit } from '@sveltejs/kit';
+import type { HandleValidationError, HandleServerError, ServerInit } from '@sveltejs/kit';
 import { packageId } from '@daml.js/model';
 import { sdk } from '$lib/server/participant';
 import { startFeed } from '$lib/server/feed';
@@ -34,4 +34,23 @@ export const init: ServerInit = async () => {
 /** An unexpected error still tells the user what happened; there is nothing secret in these. */
 export const handleError: HandleServerError = ({ error }) => ({
 	message: error instanceof Error ? error.message : 'Something went wrong'
+});
+
+/**
+ * A remote function's argument failed its schema. SvelteKit would answer "Bad Request"; say
+ * which field and why — a pasted description over the limit is the usual case.
+ */
+export const handleValidationError: HandleValidationError = ({ issues }) => ({
+	message: issues
+		.map((issue) => {
+			const field = issue.path
+				?.map((p) => (typeof p === 'object' ? String(p.key) : String(p)))
+				.join('.');
+			const name = field ? field[0].toUpperCase() + field.slice(1) : 'Input';
+			const tooLong = issue.message.match(/Expected <=(\d+) but received (\d+)/);
+			return tooLong
+				? `${name} is too long: ${tooLong[2]} characters, at most ${tooLong[1]} allowed`
+				: `${name}: ${issue.message}`;
+		})
+		.join('; ')
 });

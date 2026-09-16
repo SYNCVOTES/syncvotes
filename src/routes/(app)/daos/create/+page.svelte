@@ -55,6 +55,7 @@
 					<Textarea
 						id="description"
 						rows={4}
+						maxlength={2000}
 						placeholder="Governs protocol upgrades and technical parameters..."
 						bind:value={description}
 					/>

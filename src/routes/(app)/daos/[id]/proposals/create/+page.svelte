@@ -59,6 +59,7 @@
 					<Textarea
 						id="description"
 						rows={6}
+						maxlength={5000}
 						placeholder="What is being decided, and why."
 						bind:value={description}
 					/>
