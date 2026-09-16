@@ -49,13 +49,16 @@
 		timer = setTimeout(check, 150);
 	}
 
-	async function check() {
+	// A query travels in the URL, so a pasted thousand is checked forty ids at a time.
+	const CHUNK = 40;
+	function check() {
 		const batch = pending.splice(0);
-		if (batch.length === 0) return;
-		try {
-			Object.assign(status, await remote.checkMembers({ dao, parties: batch }));
-		} catch {
-			for (const t of batch) status[t] = 'unknown';
+		for (let i = 0; i < batch.length; i += CHUNK) {
+			const chunk = batch.slice(i, i + CHUNK);
+			remote.checkMembers({ dao, parties: chunk }).then(
+				(checked) => Object.assign(status, checked),
+				() => chunk.forEach((t) => (status[t] = 'unknown'))
+			);
 		}
 	}
 

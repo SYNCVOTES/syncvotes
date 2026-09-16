@@ -242,7 +242,7 @@ type MemberCheck = 'addable' | 'already' | 'unknown';
 
 /** Whether each of these party ids can be added: registered and not a member yet. */
 export const checkMembers = query(
-	v.object({ dao: contractId, parties: v.pipe(v.array(partyId), v.maxLength(2000)) }),
+	v.object({ dao: contractId, parties: v.pipe(v.array(partyId), v.maxLength(100)) }),
 	({ dao, parties }): Record<string, MemberCheck> => {
 		memberOnly(dao);
 		const check = (p: string): MemberCheck =>
