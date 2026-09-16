@@ -49,3 +49,7 @@
       forget confirm, propose gate, period check
 - [ ] names are unique only app-side (no contract keys on LF 2.2): two simultaneous registrations
       of one name can both land
+- [x] text forms are SvelteKit remote forms with per-field validation (lib/schemas.ts, preflight
+      in the browser, re-check on the server, then sign); members as chips again; dead code and
+      the single-key migration removed; auto-lock and hint modules named for what they are
+- [ ] passkey e2e (passkey.mjs) still drives the 0.1 flow; port to lib2 when touching passkeys

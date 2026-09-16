@@ -153,6 +153,8 @@ submissions.
 | `src/lib/auto-lock.ts`           | Disposes the signer after 15 quiet minutes or on `pagehide`                                   |
 | `src/lib/wallet-store.svelte.ts` | The wallet as one rune store: onboarding screens, signer, identity                            |
 | `src/lib/verify.ts`              | Recomputes hashes and inspects transactions before anything is signed                         |
+| `src/lib/schemas.ts`             | One valibot schema per field; the browser preflights forms with it, the server re-checks      |
+| `src/lib/forms.ts`               | signedForm(): submit, take the prepared transaction, sign it, go on                           |
 | `src/lib/actions.ts`             | What the browser does: call the API, verify, sign, call again                                 |
 | `src/lib/api.remote.ts`          | The server API as remote functions: reads, prepares, execute                                  |
 | `src/lib/server/participant.ts`  | The wallet SDK, wrapped: topology, allocation, ACS, prepare and execute                       |
