@@ -2,8 +2,8 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import * as remote from '$lib/api.remote';
-	import * as actions from '$lib/actions';
-	import { store, flow, describe } from '$lib/wallet-store.svelte';
+	import { store } from '$lib/wallet-store.svelte';
+	import { signedForm } from '$lib/forms';
 	import { updateProposalForm as schema } from '$lib/schemas';
 	import { Input } from '$lib/components/ui/input';
 	import { Textarea } from '$lib/components/ui/textarea';
@@ -31,18 +31,7 @@
 		loaded = true;
 	});
 
-	const enhanced = f.preflight(schema).enhance(async ({ submit }) => {
-		try {
-			await submit();
-		} catch (e) {
-			store.problem = describe(e);
-			return;
-		}
-		const r = f.result;
-		if (!r) return;
-		const ok = await flow.act((s, w) => actions.signPrepared(s, w, r));
-		if (ok) await goto(`/proposals/${id}`);
-	});
+	const enhanced = signedForm(f, schema, () => goto(`/proposals/${id}`));
 </script>
 
 <svelte:head><title>Edit proposal — SyncVotes</title></svelte:head>

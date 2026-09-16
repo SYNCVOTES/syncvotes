@@ -3,7 +3,8 @@
 	import { page } from '$app/state';
 	import * as remote from '$lib/api.remote';
 	import * as actions from '$lib/actions';
-	import { store, flow, describe } from '$lib/wallet-store.svelte';
+	import { store, flow } from '$lib/wallet-store.svelte';
+	import { signedForm } from '$lib/forms';
 	import { createProposalForm as schema } from '$lib/schemas';
 	import { Input } from '$lib/components/ui/input';
 	import { Textarea } from '$lib/components/ui/textarea';
@@ -22,34 +23,25 @@
 	const dao = $derived(store.who ? remote.dao(id) : null);
 	let progress = $state({ done: 0, total: 0, what: '' });
 
-	// A week is the usual voting period; the field starts there.
-	$effect(() => {
-		if (f.fields.days.value() === undefined) f.fields.days.set(7);
-	});
-
 	// Three steps: the proposal (this form), a voting right for every member in batches, then
 	// opening the vote — all signed in turn, no prompt in between.
 	const f = remote.createProposalForm;
-	const enhanced = f.preflight(schema).enhance(async ({ submit }) => {
-		try {
-			await submit();
-		} catch (e) {
-			store.problem = describe(e);
-			return;
-		}
-		const r = f.result;
-		if (!r) return;
-		const ok = await flow.act(async (s, w) => {
-			await actions.signPrepared(s, w, r);
-			await actions.openVoting(
+	const enhanced = signedForm(f, schema, async (r) => {
+		const ok = await flow.act((s, w) =>
+			actions.openVoting(
 				s,
 				w,
 				r.pid,
 				r.daoId,
 				(done, total) => (progress = { done, total, what: 'Opening the vote' })
-			);
-		});
+			)
+		);
 		if (ok) await goto(`/proposals/${r.pid}`);
+	});
+
+	// A week is the usual voting period; the field starts there.
+	$effect(() => {
+		if (f.fields.days.value() === undefined) f.fields.days.set(7);
 	});
 </script>
 
