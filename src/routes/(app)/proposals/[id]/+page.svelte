@@ -58,7 +58,8 @@
 		{@const needed = Math.floor(n / 2) + 1}
 		{@const ended = new Date(p.closesAt).getTime() < Date.now()}
 		{@const member = me !== null && p.members.includes(me)}
-		{@const voted = me !== null && p.ballots.some((b) => b.voter === me)}
+		{@const myBallot = p.ballots.find((b) => b.voter === me) ?? null}
+		{@const voted = myBallot !== null}
 		{@const outcome = p.outcome ?? (ended ? (yes >= needed ? 'Passed' : 'Failed') : null)}
 		{@const mine = me !== null && me === p.proposer}
 		{@const canCancel = !p.outcome && (mine || (me !== null && me === p.admin))}
@@ -148,7 +149,11 @@
 				{:else if !member}
 					<Note mono={false}>Only members can vote.</Note>
 				{:else if voted}
-					<Note>You voted.</Note>
+					<Note>
+						You voted <span class={myBallot?.vote === 'Yes' ? 'text-green' : 'text-red'}
+							>{myBallot?.vote}</span
+						>.
+					</Note>
 				{:else}
 					<Panel padding="sm" class="grid grid-cols-2 gap-3">
 						<Button variant="accent" disabled={store.busy} onclick={() => vote(p.contractId, 'Yes')}
