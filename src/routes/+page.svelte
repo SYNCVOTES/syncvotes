@@ -470,13 +470,13 @@
 					style="transition-delay: {i * 0.12}s"
 				>
 					<div class="{tag} text-orange">{w.tag}</div>
-					<h3 class="font-display text-[clamp(24px,2.4vw,34px)] leading-[1.05] font-bold tracking-[-0.02em] uppercase">
+					<h3
+						class="font-display text-[clamp(24px,2.4vw,34px)] leading-[1.05] font-bold tracking-[-0.02em] uppercase"
+					>
 						{w.title}
 					</h3>
 					<p class="max-w-[440px] font-mono text-sm leading-[1.75] text-ink-mid">{w.body}</p>
 				</div>
-			{/each}
-		</div>
 			{/each}
 		</div>
 		<a class="{btn} mt-12" href="/daos/create"
@@ -493,10 +493,14 @@
 					class="{reveal} grid grid-cols-[72px_1fr] gap-6 border-b border-border py-9 md:grid-cols-[96px_1fr]"
 					style="transition-delay: {i * 0.1}s"
 				>
-					<span class="font-editorial text-[56px] leading-none text-orange italic md:text-[72px]">0{i + 1}</span>
+					<span class="font-editorial text-[56px] leading-none text-orange italic md:text-[72px]"
+						>0{i + 1}</span
+					>
 					<div>
 						<div class={tag}>{h.tag}</div>
-						<h3 class="mt-2 font-display text-[24px] leading-[1.1] font-bold tracking-[-0.02em] uppercase">
+						<h3
+							class="mt-2 font-display text-[24px] leading-[1.1] font-bold tracking-[-0.02em] uppercase"
+						>
 							{h.title}
 						</h3>
 						<p class="mt-3 max-w-[420px] font-mono text-sm leading-[1.75] text-ink-mid">{h.body}</p>
@@ -504,8 +508,6 @@
 				</li>
 			{/each}
 		</ol>
-			{/each}
-		</div>
 		<p class="{reveal} mt-10 font-mono text-[13px] tracking-[0.06em] text-ink-dim">
 			Open source, Daml and SvelteKit —
 			<a
