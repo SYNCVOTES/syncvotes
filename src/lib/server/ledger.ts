@@ -25,7 +25,6 @@ export type Proposal = {
 	contractId: string;
 	id: string;
 	daoId: string;
-	daoName: string;
 	admin: string;
 	proposer: string;
 	title: string;
@@ -171,7 +170,6 @@ function created({ contractId, templateId, createArgument: a }: Created) {
 				contractId,
 				id: text(a.id),
 				daoId: text(a.daoId),
-				daoName: text(a.daoName),
 				admin: text(a.admin),
 				proposer: text(a.proposer),
 				title: text(a.title),

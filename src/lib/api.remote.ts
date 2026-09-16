@@ -280,7 +280,7 @@ export const proposal = query.live(contractId, (id) =>
 		const mine = me && ledger.ballots.get(id)?.get(me.party);
 		return {
 			...p,
-			daoContractId: ledger.daos.get(p.daoId)?.contractId ?? null,
+			daoName: ledger.daos.get(p.daoId)?.name ?? null,
 			cast: ledger.ballots.get(id)?.size ?? 0,
 			me: { membership: me?.contractId ?? null, vote: mine?.vote ?? null, mayVote: mayVote(p, me) }
 		};
@@ -355,16 +355,15 @@ export const createProposalForm = form(
 	schemas.createProposalForm,
 	async ({ dao, title, description, days }) => {
 		const party = session.required();
-		const { contractId } = daoOf(dao);
 		const membership = memberOnly(dao).contractId;
 		const pid = crypto.randomUUID();
 		const closesAt = new Date(Date.now() + days * 86_400_000).toISOString();
-		const args = { proposer: party, membership, pid, title, description, closesAt };
+		const args = { pid, title, description, closesAt };
 		return {
 			pid,
 			membership,
 			closesAt,
-			prepared: await prepare(party, Main.DAO, contractId, 'DAO_CreateProposal', args)
+			prepared: await prepare(party, Main.Member, membership, 'Member_Propose', args)
 		};
 	}
 );
@@ -417,11 +416,29 @@ export const prepareRemoveMembers = command(
 );
 
 /** Opens the vote: the electorate is fixed to the DAO's members as of now. */
-export const prepareOpenProposal = command(contractId, (proposalId) => {
+/**
+ * Opens the vote on a draft. The provider signs this one: the electorate is the DAO's member
+ * count, and the DAO contract is the admin's and the provider's to read, not a member's. The
+ * proposer asks; the ledger takes the count off the DAO contract itself.
+ */
+export const openProposal = command(contractId, async (proposalId) => {
 	const party = session.required();
 	const { contractId, daoId } = draftOf(proposalId, party);
 	const dao = daoOf(daoId).contractId;
-	return prepare(party, Main.Proposal, contractId, 'Proposal_Open', { dao });
+	const updateId = await participant.submitAsProvider(
+		[
+			{
+				ExerciseCommand: {
+					templateId: Main.Proposal.templateId,
+					contractId,
+					choice: 'Proposal_Open',
+					choiceArgument: { dao }
+				}
+			}
+		],
+		`open-${proposalId}`
+	);
+	await ledger.applied(updateId);
 });
 
 export const prepareCancelProposal = command(contractId, (proposalId) => {

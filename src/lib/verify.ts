@@ -42,10 +42,9 @@ const CHOICES: Record<string, string> = {
 	DAO_Archive: 'Main:DAO',
 	DAO_AddMembers: 'Main:DAO',
 	DAO_RemoveMembers: 'Main:DAO',
-	DAO_CreateProposal: 'Main:DAO',
+	Member_Propose: 'Main:Member',
 	Member_Vote: 'Main:Member',
 	Proposal_Update: 'Main:Proposal',
-	Proposal_Open: 'Main:Proposal',
 	Proposal_Cancel: 'Main:Proposal'
 };
 

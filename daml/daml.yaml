@@ -1,5 +1,5 @@
 sdk-version: 3.5.7
-name: syncvotes-vote
+name: syncvotes-ballots
 source: src
 version: 0.3.0
 dependencies:

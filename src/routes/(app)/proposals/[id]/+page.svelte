@@ -33,7 +33,7 @@
 
 	// Every write lands on this page through the live query; nothing to refresh by hand.
 	const vote = (choice: 'Yes' | 'No') => flow.act((s, w) => actions.vote(s, w, id, choice));
-	const open = () => flow.act((s, w) => actions.openProposal(s, w, id));
+	const open = () => flow.act(() => actions.openProposal(id));
 	async function cancel(daoId: string) {
 		const ok = await flow.act((s, w) => actions.cancelProposal(s, w, id));
 		if (ok) await goto(`/daos/${daoId}`);
@@ -44,7 +44,7 @@
 
 <Page
 	back={proposal?.current
-		? { href: `/daos/${proposal.current.daoId}`, label: proposal.current.daoName }
+		? { href: `/daos/${proposal.current.daoId}`, label: proposal.current.daoName ?? 'DAO' }
 		: undefined}
 >
 	{#if !proposal}

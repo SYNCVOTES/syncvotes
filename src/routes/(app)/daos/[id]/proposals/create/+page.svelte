@@ -21,18 +21,18 @@
 	const id = $derived(page.params.id!);
 	const dao = $derived(store.who ? remote.dao(id) : null);
 
-	// Two signatures in a row: the proposal, then opening the vote on it.
+	// One signature — the proposal, from the member's own contract — then the vote is opened.
 	const f = remote.createProposalForm;
 	const enhanced = signedForm(
 		f,
 		schema,
 		({ title, description }, { pid, membership, closesAt }) => ({
-			choice: 'DAO_CreateProposal',
-			contractId: dao!.current!.contractId,
-			args: { proposer: store.who!.party, membership, pid, title, description, closesAt }
+			choice: 'Member_Propose',
+			contractId: membership,
+			args: { pid, title, description, closesAt }
 		}),
 		async ({ pid }) => {
-			const ok = await flow.act((s, w) => actions.openProposal(s, w, pid));
+			const ok = await flow.act(() => actions.openProposal(pid));
 			if (ok) await goto(`/proposals/${pid}`);
 		}
 	);

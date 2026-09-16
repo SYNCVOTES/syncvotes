@@ -230,7 +230,16 @@ export async function execute(party: string, tx: Prepared, signature: string): P
  */
 function ledgerError(e: unknown): never {
 	if (typeof e === 'object' && e !== null && 'status' in e && 'body' in e) throw e;
-	const message = e instanceof Error ? e.message : String(e);
+	const message =
+		e instanceof Error
+			? e.message
+			: typeof e === 'object' && e !== null
+				? String(
+						(e as { message?: unknown; cause?: unknown }).message ??
+							(e as { cause?: unknown }).cause ??
+							JSON.stringify(e)
+					)
+				: String(e);
 	if (/CONTRACT_NOT_ACTIVE|INACTIVE_CONTRACT|LOCKED_CONTRACT|CONTRACT_NOT_FOUND/.test(message)) {
 		error(409, 'This changed while you were looking at it — reload and try again');
 	}

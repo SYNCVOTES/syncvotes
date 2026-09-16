@@ -98,29 +98,10 @@ template DAO
           archive cid
         create this with members = members - length memberCids
 
-    -- A proposal starts as a draft: the text can still change, and nobody can vote until the
-    -- proposer opens it.
-    nonconsuming choice DAO_CreateProposal : ContractId Proposal
-      with
-        proposer : Party
-        membership : ContractId Member
-        pid : Text
-        title : Text
-        description : Text
-        closesAt : Time
-      controller proposer
-      do
-        member <- fetch membership
-        assertMsg "Only members can propose" (member.daoId == id && member.party == proposer)
-        now <- getTime
-        assertMsg "The deadline must be in the future" (closesAt > now)
-        create Proposal with
-          provider; operator; daoId = id; daoName = name; admin; proposer; id = pid; title
-          description; createdAt = now; closesAt; openedAt = None; eligible = 0; yes = 0; no = 0
-          outcome = None
-
--- | One party's membership of one DAO, and that party's ballot box: voting replaces it with a
--- copy that remembers the proposal, which is what makes a second ballot impossible.
+-- | One party's membership of one DAO: the door through which the member proposes, and their
+-- ballot box — voting replaces it with a copy that remembers the proposal, which is what makes
+-- a second ballot impossible. A member sees this contract and nothing of the DAO's own, so
+-- everything a member does starts here.
 template Member
   with
     provider : Party
@@ -133,6 +114,23 @@ template Member
   where
     signatory admin, provider
     observer party, operator
+
+    -- A proposal starts as a draft: the text can still change, and nobody can vote until the
+    -- provider opens it at the proposer's request.
+    nonconsuming choice Member_Propose : ContractId Proposal
+      with
+        pid : Text
+        title : Text
+        description : Text
+        closesAt : Time
+      controller party
+      do
+        now <- getTime
+        assertMsg "The deadline must be in the future" (closesAt > now)
+        create Proposal with
+          provider; operator; daoId; admin; proposer = party; id = pid; title; description
+          createdAt = now; closesAt; openedAt = None; eligible = 0; yes = 0; no = 0
+          outcome = None
 
     -- Nothing here reads the proposal, so a vote never waits on the count or on other voters.
     -- Whether the ballot is valid for its proposal (right DAO, member in time, before the
@@ -158,7 +156,6 @@ template Proposal
     provider : Party
     operator : Party
     daoId : Text
-    daoName : Text
     admin : Party
     proposer : Party
     id : Text
@@ -186,10 +183,13 @@ template Proposal
         assertMsg "Voting has opened" (isNone openedAt)
         create this with title; description
 
+    -- Opening fixes the electorate from the DAO's member count. The provider does it, at the
+    -- proposer's request, because the DAO contract is the admin's and the provider's to see —
+    -- a member cannot read it — and the count comes off the ledger either way.
     choice Proposal_Open : ContractId Proposal
       with
         dao : ContractId DAO
-      controller proposer
+      controller provider
       do
         assertMsg "Voting has opened" (isNone openedAt)
         found <- fetch dao
