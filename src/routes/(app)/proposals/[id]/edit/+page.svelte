@@ -14,15 +14,15 @@
 	import BackLink from '$lib/components/app/back-link.svelte';
 
 	const id = $derived(page.params.id!);
-	const proposal = $derived(remote.proposal(id));
 	const me = $derived(store.who?.party ?? null);
+	const proposal = $derived(me ? remote.proposal(id) : null);
 
 	let title = $state('');
 	let description = $state('');
 	let loaded = $state(false);
 
 	$effect(() => {
-		const p = proposal.current;
+		const p = proposal?.current;
 		if (!p || loaded) return;
 		title = p.title;
 		description = p.description;
@@ -31,7 +31,7 @@
 
 	async function save(event: SubmitEvent) {
 		event.preventDefault();
-		const contractId = proposal.current?.contractId;
+		const contractId = proposal?.current?.contractId;
 		if (!contractId) return;
 		const ok = await flow.act((signer, who) =>
 			actions.updateProposal(signer, who, contractId, { title, description })
@@ -43,7 +43,7 @@
 <svelte:head><title>Edit proposal — SyncVotes</title></svelte:head>
 
 <div class="mx-auto max-w-[760px] px-6 py-12 md:px-10">
-	<BackLink href="/proposals/{id}" label={proposal.current?.title ?? 'Proposal'} />
+	<BackLink href="/proposals/{id}" label={proposal?.current?.title ?? 'Proposal'} />
 	<div class="mt-6">
 		<PageHeader
 			eyebrow="Settings"
@@ -52,10 +52,10 @@
 		/>
 	</div>
 
-	{#if proposal.error}
-		<Problem message={describe(proposal.error)} />
-	{:else if !store.who}
+	{#if !proposal}
 		<ConnectPrompt what="edit this proposal" />
+	{:else if proposal.error}
+		<Problem message={describe(proposal.error)} />
 	{:else if proposal.ready && proposal.current.proposer !== me}
 		<p class="text-[13px] text-ink-dim">Only the proposer can edit.</p>
 	{:else if proposal.ready && proposal.current.ballots.length > 0}

@@ -142,3 +142,14 @@ export async function cancelProposal(s: Signer, who: Identity, contractId: strin
 	const prepared = await remote.prepareCancelProposal({ party: who.party, contractId });
 	await sign(s, who, 'Proposal_Cancel', contractId, args, prepared);
 }
+
+/** Proves to the server that this key is the party's, so its reads open up. Once per unlock. */
+export async function openSession(s: Signer, who: Identity): Promise<void> {
+	const nonce = await remote.sessionChallenge({
+		party: who.party,
+		publicKey: toBase64(s.publicKey)
+	});
+	await remote.sessionStart({ nonce, signature: s.sign(nonce) });
+}
+
+export const closeSession = () => remote.sessionEnd().catch(() => {});

@@ -10,13 +10,14 @@
 	import BackLink from '$lib/components/app/back-link.svelte';
 	import PartyId from '$lib/components/app/party-id.svelte';
 	import UnlockForm from '$lib/components/app/unlock-form.svelte';
+	import ConnectPrompt from '$lib/components/app/connect-prompt.svelte';
 	import { relative } from '$lib/format';
 
 	const id = $derived(page.params.id!);
-	const proposal = $derived(remote.proposal(id));
 	const me = $derived(store.who?.party ?? null);
+	const proposal = $derived(me ? remote.proposal(id) : null);
 
-	const nameOf = (party: string) => proposal.current?.names[party] ?? party.split('::')[0];
+	const nameOf = (party: string) => proposal?.current?.names[party] ?? party.split('::')[0];
 
 	// The stream brings the new contract the moment the vote lands; nothing to refresh by hand.
 	const act = (
@@ -30,10 +31,12 @@
 	}
 </script>
 
-<svelte:head><title>{proposal.current?.title ?? 'Proposal'} — SyncVotes</title></svelte:head>
+<svelte:head><title>{proposal?.current?.title ?? 'Proposal'} — SyncVotes</title></svelte:head>
 
 <div class="mx-auto max-w-[900px] px-6 py-12 md:px-10">
-	{#if proposal.error}
+	{#if !proposal}
+		<ConnectPrompt what="see this proposal" />
+	{:else if proposal.error}
 		<Problem message={describe(proposal.error)} />
 	{:else if !proposal.ready}
 		<div class="h-40 animate-pulse border border-border bg-surface"></div>

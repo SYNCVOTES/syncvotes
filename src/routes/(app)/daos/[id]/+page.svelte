@@ -7,6 +7,7 @@
 	import StatusBadge from '$lib/components/app/status-badge.svelte';
 	import Problem from '$lib/components/app/problem.svelte';
 	import UnlockForm from '$lib/components/app/unlock-form.svelte';
+	import ConnectPrompt from '$lib/components/app/connect-prompt.svelte';
 	import BackLink from '$lib/components/app/back-link.svelte';
 	import PartyId from '$lib/components/app/party-id.svelte';
 	import Plus from '@lucide/svelte/icons/plus';
@@ -14,16 +15,18 @@
 	import { relative, dateOf } from '$lib/format';
 	import { NETWORK } from '$lib/network';
 
-	const dao = $derived(remote.dao(page.params.id!));
 	const me = $derived(store.who?.party ?? null);
+	const dao = $derived(me ? remote.dao(page.params.id!) : null);
 
-	const nameOf = (party: string) => dao.current?.names[party] ?? party.split('::')[0];
+	const nameOf = (party: string) => dao?.current?.names[party] ?? party.split('::')[0];
 </script>
 
-<svelte:head><title>{dao.current?.name ?? 'DAO'} — SyncVotes</title></svelte:head>
+<svelte:head><title>{dao?.current?.name ?? 'DAO'} — SyncVotes</title></svelte:head>
 
 <div class="mx-auto max-w-[1120px] px-6 py-12 md:px-10">
-	{#if dao.error}
+	{#if !dao}
+		<ConnectPrompt what="see this DAO" />
+	{:else if dao.error}
 		<Problem message={describe(dao.error)} />
 	{:else if !dao.ready}
 		<div class="h-40 animate-pulse border border-border bg-surface"></div>

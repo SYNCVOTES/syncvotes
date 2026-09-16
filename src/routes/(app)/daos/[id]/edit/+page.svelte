@@ -14,8 +14,8 @@
 	import BackLink from '$lib/components/app/back-link.svelte';
 
 	const id = $derived(page.params.id!);
-	const dao = $derived(remote.dao(id));
 	const me = $derived(store.who?.party ?? null);
+	const dao = $derived(me ? remote.dao(id) : null);
 
 	let name = $state('');
 	let description = $state('');
@@ -25,7 +25,7 @@
 
 	// Fill the form once from the live query; later updates must not overwrite what is typed.
 	$effect(() => {
-		const d = dao.current;
+		const d = dao?.current;
 		if (!d || loaded) return;
 		name = d.name;
 		description = d.description;
@@ -45,7 +45,7 @@
 
 	async function save(event: SubmitEvent) {
 		event.preventDefault();
-		const contractId = dao.current?.contractId;
+		const contractId = dao?.current?.contractId;
 		if (!contractId) return;
 		const ok = await flow.act((signer, who) =>
 			actions.updateDao(signer, who, contractId, { name, description, members })
@@ -54,17 +54,17 @@
 	}
 
 	async function remove() {
-		const contractId = dao.current?.contractId;
+		const contractId = dao?.current?.contractId;
 		if (!contractId) return;
 		const ok = await flow.act((signer, who) => actions.archiveDao(signer, who, contractId));
 		if (ok) await goto('/my-daos');
 	}
 </script>
 
-<svelte:head><title>Edit {dao.current?.name ?? 'DAO'} — SyncVotes</title></svelte:head>
+<svelte:head><title>Edit {dao?.current?.name ?? 'DAO'} — SyncVotes</title></svelte:head>
 
 <div class="mx-auto max-w-[760px] px-6 py-12 md:px-10">
-	<BackLink href="/daos/{id}" label={dao.current?.name ?? 'DAO'} />
+	<BackLink href="/daos/{id}" label={dao?.current?.name ?? 'DAO'} />
 	<div class="mt-6">
 		<PageHeader
 			eyebrow="Settings"
@@ -73,10 +73,10 @@
 		/>
 	</div>
 
-	{#if dao.error}
-		<Problem message={describe(dao.error)} />
-	{:else if !store.who}
+	{#if !dao}
 		<ConnectPrompt what="edit this DAO" />
+	{:else if dao.error}
+		<Problem message={describe(dao.error)} />
 	{:else if dao.ready && dao.current.admin !== me}
 		<p class="text-[13px] text-ink-dim">Only the admin can edit this DAO.</p>
 	{:else}

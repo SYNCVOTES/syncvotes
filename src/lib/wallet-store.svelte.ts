@@ -105,6 +105,8 @@ export function describe(error: unknown): string {
 }
 
 async function enter(signer: wallet.Signer, who: actions.Identity) {
+	// The read session first, so the pages that open next are allowed to read.
+	await actions.openSession(signer, who);
 	screen = { at: 'home', signer, who };
 	session.start(signer, lock);
 }
@@ -242,7 +244,10 @@ export const flow = {
 
 /** Disposes whatever signer the current screen holds and shows the way back in. */
 export function lock() {
-	if ('signer' in screen) screen.signer.dispose();
+	if ('signer' in screen) {
+		screen.signer.dispose();
+		void actions.closeSession();
+	}
 	session.lock();
 	offer(selected);
 }

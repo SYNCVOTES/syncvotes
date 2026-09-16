@@ -126,7 +126,7 @@
 	const grid =
 		'group/grid grid grid-cols-3 gap-px border border-border bg-border max-[900px]:grid-cols-1';
 	const card =
-		'group/card relative translate-y-10 overflow-hidden bg-background px-9 pt-11 pb-13 opacity-0 transition-[opacity,translate,background-color] duration-800 ease-[cubic-bezier(0.2,0.8,0.2,1)] group-[.in]/grid:translate-y-0 group-[.in]/grid:opacity-100 hover:bg-surface motion-reduce:translate-y-0 motion-reduce:opacity-100 [&:nth-child(2)]:delay-150 [&:nth-child(3)]:delay-300 [&:nth-child(4)]:delay-450';
+		'group/card relative translate-y-10 overflow-hidden bg-background px-9 pt-11 pb-13 opacity-0 transition-[opacity,translate,background-color] duration-800 ease-[cubic-bezier(0.2,0.8,0.2,1)] group-[.in]/grid:translate-y-0 group-[.in]/grid:opacity-100 hover:bg-surface motion-reduce:translate-y-0 motion-reduce:opacity-100 [&:nth-child(2)]:delay-150 [&:nth-child(3)]:delay-300';
 	const body = 'mt-4 max-w-[320px] font-mono text-sm leading-[1.75] text-ink-mid';
 	const navLink = 'opacity-65 transition-opacity hover:opacity-100';
 	const drawerLink =
@@ -337,7 +337,7 @@
 	>
 		<canvas id="field" bind:this={canvas} class="absolute inset-0 h-full w-full"></canvas>
 		<div
-			class="hero-copy absolute top-[clamp(400px,46vh,500px)] left-edge z-5 max-w-[min(1100px,calc(100vw-var(--spacing-edge)-40px))] max-sm:inset-x-6 max-sm:top-[clamp(420px,52vh,470px)] max-sm:max-w-none min-[1400px]:top-[var(--hero-copy-top,clamp(88px,calc(50vh-260px),calc(100vh-560px)))] min-[3300px]:left-[max(40px,calc((100vw-2400px)/2))] [@media(min-width:901px)_and_(max-height:860px)]:top-[clamp(300px,46vh,380px)]"
+			class="hero-copy absolute top-[clamp(400px,46vh,500px)] left-edge z-5 max-w-[min(1100px,calc(100vw-var(--spacing-edge)-40px))] max-sm:inset-x-6 max-sm:top-[clamp(420px,52vh,470px)] max-sm:max-w-none min-[1400px]:top-[var(--hero-copy-top,clamp(88px,calc(50vh-260px),calc(100vh-560px)))] min-[3300px]:left-[max(40px,calc((100vw-2400px)/2))] [@media(min-width:901px)_and_(max-width:1399px)_and_(max-height:860px)]:top-[clamp(300px,46vh,380px)]"
 		>
 			<h1
 				class="font-display text-[clamp(44px,min(6.4vw,10vh),100px)] leading-[1.02] font-extrabold tracking-[-0.03em] uppercase max-sm:text-[clamp(20px,calc((100vw-52px)/10.8),44px)] [@media(min-width:901px)_and_(max-height:860px)]:text-[clamp(44px,6.6vh,76px)]"
@@ -463,15 +463,20 @@
 				and members reach the members and the validator that hosts them — nobody else.
 			</p>
 		</div>
-		<div class={grid}>
-			{#each WHO as w (w.tag)}
-				<div class={card}>
-					<div class={tag}>{w.tag}</div>
-					<h3 class="mt-[22px] font-display text-[26px] font-bold tracking-[-0.02em] uppercase">
+		<div class="border-t border-border">
+			{#each WHO as w, i (w.tag)}
+				<div
+					class="{reveal} grid gap-4 border-b border-border py-9 md:grid-cols-[200px_1fr_1fr] md:gap-10 md:py-11"
+					style="transition-delay: {i * 0.12}s"
+				>
+					<div class="{tag} text-orange">{w.tag}</div>
+					<h3 class="font-display text-[clamp(24px,2.4vw,34px)] leading-[1.05] font-bold tracking-[-0.02em] uppercase">
 						{w.title}
 					</h3>
-					<p class={body}>{w.body}</p>
+					<p class="max-w-[440px] font-mono text-sm leading-[1.75] text-ink-mid">{w.body}</p>
 				</div>
+			{/each}
+		</div>
 			{/each}
 		</div>
 		<a class="{btn} mt-12" href="/daos/create"
@@ -482,15 +487,23 @@
 	<section id="hood" class="border-t border-border px-edge pt-[120px] pb-[140px]">
 		<div class="{tag} mb-[18px]">// Under the hood</div>
 		<h2 class="{h2} {reveal}">What actually runs</h2>
-		<div class="{grid} mt-12 grid-cols-4 max-[1100px]:grid-cols-2 max-[640px]:grid-cols-1">
-			{#each HOOD as h (h.tag)}
-				<div class="{card} px-7 pt-9 pb-11">
-					<div class={tag}>{h.tag}</div>
-					<h3 class="mt-[22px] font-display text-[24px] font-bold tracking-[-0.02em] uppercase">
-						{h.title}
-					</h3>
-					<p class={body}>{h.body}</p>
-				</div>
+		<ol class="mt-12 grid gap-x-16 border-t border-border lg:grid-cols-2">
+			{#each HOOD as h, i (h.tag)}
+				<li
+					class="{reveal} grid grid-cols-[72px_1fr] gap-6 border-b border-border py-9 md:grid-cols-[96px_1fr]"
+					style="transition-delay: {i * 0.1}s"
+				>
+					<span class="font-editorial text-[56px] leading-none text-orange italic md:text-[72px]">0{i + 1}</span>
+					<div>
+						<div class={tag}>{h.tag}</div>
+						<h3 class="mt-2 font-display text-[24px] leading-[1.1] font-bold tracking-[-0.02em] uppercase">
+							{h.title}
+						</h3>
+						<p class="mt-3 max-w-[420px] font-mono text-sm leading-[1.75] text-ink-mid">{h.body}</p>
+					</div>
+				</li>
+			{/each}
+		</ol>
 			{/each}
 		</div>
 		<p class="{reveal} mt-10 font-mono text-[13px] tracking-[0.06em] text-ink-dim">

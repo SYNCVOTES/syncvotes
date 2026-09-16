@@ -14,7 +14,7 @@
 	import BackLink from '$lib/components/app/back-link.svelte';
 
 	const id = $derived(page.params.id!);
-	const dao = $derived(remote.dao(id));
+	const dao = $derived(store.who ? remote.dao(id) : null);
 
 	let title = $state('');
 	let description = $state('');
@@ -25,7 +25,7 @@
 		const period = Math.min(30, Math.max(1, Math.round(Number(days) || 0)));
 		const ok = await flow.act((signer, who) =>
 			actions.createProposal(signer, who, {
-				dao: dao.current!.contractId,
+				dao: dao!.current!.contractId,
 				title,
 				description,
 				days: period
@@ -38,7 +38,7 @@
 <svelte:head><title>New proposal — SyncVotes</title></svelte:head>
 
 <div class="mx-auto max-w-[760px] px-6 py-12 md:px-10">
-	<BackLink href="/daos/{id}" label={dao.current?.name ?? 'DAO'} />
+	<BackLink href="/daos/{id}" label={dao?.current?.name ?? 'DAO'} />
 	<div class="mt-6">
 		<PageHeader
 			eyebrow="New proposal"

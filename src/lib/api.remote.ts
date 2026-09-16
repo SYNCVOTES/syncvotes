@@ -6,15 +6,17 @@ import { Main } from '@daml.js/model';
 import * as participant from './server/participant';
 import * as app from './server/app';
 import { nextChange } from './server/feed';
+import * as session from './server/session';
 
 /**
  * The server's API, as remote functions: the page calls these like local functions, SvelteKit
  * does the transport. Everything here runs on the server with the participant credentials; the
  * user's key stays in the browser and only ever contributes signatures.
  *
- * Reads are open: a DAO is private to the network — only its members, the provider and the
- * operator hold it — and this app is the operator. Writes are transactions the ledger accepts
- * only with the acting party's own signature.
+ * Reads of a party's DAOs need a read session — a challenge signed by that party's key, once
+ * per unlock (`server/session.ts`); the app is the operator and sees every DAO, so it is the app
+ * that keeps them to their members. Writes are transactions the ledger accepts only with the
+ * acting party's own signature.
  *
  * Reads are live: each is a stream that sends its value, then sends it again whenever the ledger
  * feed reports a change and the value differs. Nothing on the client polls or refreshes.
@@ -104,6 +106,22 @@ export const enrol = command(
 	}
 );
 
+// ---- Read session ------------------------------------------------------------------------
+
+/** Step one: bytes for the key to sign. */
+export const sessionChallenge = command(
+	v.object({ party: partyId, publicKey: base64 }),
+	({ party, publicKey }) => session.challenge(party, publicKey)
+);
+
+/** Step two: the signature comes back; the reply sets the session cookie. */
+export const sessionStart = command(
+	v.object({ nonce: base64, signature: base64 }),
+	({ nonce, signature }) => session.start(nonce, signature)
+);
+
+export const sessionEnd = command(() => session.end());
+
 /** The directory: every registered name, for picking members. */
 export const directory = query(async () =>
 	(await app.accounts()).map(({ party, name }) => ({ party, name }))
@@ -131,6 +149,7 @@ export const stats = query.live(() =>
 /** The DAOs a party belongs to, with their open proposal count. */
 export const myDaos = query.live(partyId, (party) =>
 	live(async () => {
+		session.required(party);
 		const [daos, proposals] = await Promise.all([app.daos(), app.proposals()]);
 		return daos
 			.filter((d) => d.members.includes(party))
@@ -143,11 +162,13 @@ export const myDaos = query.live(partyId, (party) =>
 
 export const dao = query.live(contractId, (id) =>
 	live(async () => {
+		const me = session.required();
 		const [found, proposals, names] = await Promise.all([
 			app.daoById(id),
 			app.proposals(),
 			app.accounts()
 		]);
+		if (!found.members.includes(me)) throw error(403, 'Only members can see this DAO');
 		return {
 			...found,
 			proposals: proposals.filter((p) => p.daoId === found.id),
@@ -158,7 +179,9 @@ export const dao = query.live(contractId, (id) =>
 
 export const proposal = query.live(contractId, (id) =>
 	live(async () => {
+		const me = session.required();
 		const [found, names] = await Promise.all([app.proposalById(id), app.accounts()]);
+		if (!found.members.includes(me)) throw error(403, 'Only members can see this proposal');
 		// The DAO's admin may cancel. Proposals from before 0.1.4 do not carry it, and a proposal
 		// can outlive a deleted DAO, so this may be absent.
 		const admin =
@@ -189,6 +212,7 @@ export const prepareCreateDao = command(
 		id: v.pipe(v.string(), v.uuid())
 	}),
 	async ({ party, daoName, description, members, id }) => {
+		session.required(party);
 		const account = await app.accountOf(party);
 		const known = await app.accounts();
 		for (const m of members) {
@@ -220,6 +244,7 @@ export const prepareCreateProposal = command(
 		id: v.pipe(v.string(), v.uuid())
 	}),
 	async ({ party, dao, proposer, title, description, closesAt, id }) => {
+		session.required(party);
 		if (proposer !== party) throw error(400, 'The proposer must be you');
 		const found = await app.daoById(dao);
 		if (!found.members.includes(party)) throw error(403, 'Only members can propose');
@@ -255,6 +280,7 @@ async function currentProposal(contractId: string) {
 export const prepareVote = command(
 	v.object({ party: partyId, contractId, vote: v.picklist(['Yes', 'No']) }),
 	async ({ party, contractId, vote }) => {
+		session.required(party);
 		const current = await currentProposal(contractId);
 		return participant.prepare(
 			party,
@@ -282,6 +308,7 @@ export const prepareUpdateDao = command(
 		members: v.pipe(v.array(partyId), v.maxLength(50))
 	}),
 	async ({ party, dao, daoName, description, members }) => {
+		session.required(party);
 		await adminOf(dao, party);
 		const known = await app.accounts();
 		for (const m of members) {
@@ -299,6 +326,7 @@ export const prepareUpdateDao = command(
 export const prepareArchiveDao = command(
 	v.object({ party: partyId, dao: contractId }),
 	async ({ party, dao }) => {
+		session.required(party);
 		const found = await adminOf(dao, party);
 		const open = (await app.proposals()).filter((p) => p.daoId === found.id && !p.outcome);
 		if (open.length > 0) throw error(409, 'Close or cancel the open proposals first');
@@ -314,6 +342,7 @@ export const prepareUpdateProposal = command(
 		description: v.pipe(v.string(), v.maxLength(5000))
 	}),
 	async ({ party, contractId, title, description }) => {
+		session.required(party);
 		const current = await currentProposal(contractId);
 		if (current.proposer !== party) throw error(403, 'Only the proposer can edit');
 		if (current.ballots.length > 0) throw error(409, 'Voting has started');
@@ -330,6 +359,7 @@ export const prepareUpdateProposal = command(
 export const prepareCancelProposal = command(
 	v.object({ party: partyId, contractId }),
 	async ({ party, contractId }) => {
+		session.required(party);
 		const current = await currentProposal(contractId);
 		if (current.outcome) throw error(409, 'Already settled');
 		if (current.proposer !== party) {
