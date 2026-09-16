@@ -134,22 +134,23 @@ submissions.
 
 ## Layout
 
-| Path                             | What it is                                                               |
-| -------------------------------- | ------------------------------------------------------------------------ |
-| `daml/src/Main.daml`             | `Account`, `DAO`, `Proposal` — the whole model                           |
-| `daml.js/`                       | Generated bindings — never edit, regenerate with `pnpm daml:codegen`     |
-| `src/lib/wallet.ts`              | Phrase → signer closure; any number of keys encrypted at rest per device |
-| `src/lib/session.ts`             | Auto-lock: disposes the signer after 15 quiet minutes or on `pagehide`   |
-| `src/lib/wallet-store.svelte.ts` | The wallet as one rune store: onboarding screens, signer, identity       |
-| `src/lib/verify.ts`              | Recomputes hashes and inspects transactions before anything is signed    |
-| `src/lib/actions.ts`             | What the browser does: call the API, verify, sign, call again            |
-| `src/lib/api.remote.ts`          | The server API as remote functions: reads, prepares, execute             |
-| `src/lib/server/participant.ts`  | The wallet SDK, wrapped: topology, allocation, ACS, prepare and execute  |
-| `src/lib/server/app.ts`          | Accounts, DAOs and proposals as the operator sees them                   |
-| `src/routes/(app)/`              | My DAOs, DAO, Create DAO, Proposal, Create proposal, Wallet              |
-| `src/routes/+page.svelte`        | The landing (v1's Consensus Engine), Tailwind on the markup, `field.ts`  |
-| `src/lib/components/ui/`         | shadcn-svelte components, restyled to the v1 look                        |
-| `compose.yaml`                   | The compose project for the servers, Caddy config inline                 |
+| Path                             | What it is                                                                               |
+| -------------------------------- | ---------------------------------------------------------------------------------------- |
+| `daml/src/Main.daml`             | `Account`, `DAO`, `Proposal` — the whole model                                           |
+| `daml.js/`                       | Generated bindings — never edit, regenerate with `pnpm daml:codegen`                     |
+| `src/lib/wallet.ts`              | Phrase → signer closure; any number of keys encrypted at rest per device                 |
+| `src/lib/session.ts`             | Auto-lock: disposes the signer after 15 quiet minutes or on `pagehide`                   |
+| `src/lib/wallet-store.svelte.ts` | The wallet as one rune store: onboarding screens, signer, identity                       |
+| `src/lib/verify.ts`              | Recomputes hashes and inspects transactions before anything is signed                    |
+| `src/lib/actions.ts`             | What the browser does: call the API, verify, sign, call again                            |
+| `src/lib/api.remote.ts`          | The server API as remote functions: reads, prepares, execute                             |
+| `src/lib/server/participant.ts`  | The wallet SDK, wrapped: topology, allocation, ACS, prepare and execute                  |
+| `src/lib/server/app.ts`          | Accounts, DAOs and proposals as the operator sees them                                   |
+| `src/routes/(app)/`              | My DAOs, DAO, Create DAO, Proposal, Create proposal, Wallet                              |
+| `src/routes/+page.svelte`        | The landing (v1's Consensus Engine), Tailwind on the markup, `field.ts`                  |
+| `src/lib/components/ui/`         | shadcn-svelte primitives only (button, badge, input, textarea, label)                    |
+| `src/lib/components/`            | Everything built on them: page column, panels, lists, forms, header, footer, `landing-*` |
+| `compose.yaml`                   | The compose project for the servers, Caddy config inline                                 |
 
 The private key exists only inside a closure (`Signer`): the page can ask it to sign, to encrypt
 itself for storage, or to dispose — never to reveal itself. Every write is a transaction the

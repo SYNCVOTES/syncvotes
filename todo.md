@@ -41,3 +41,6 @@
       acting for the treasury only) — the user's call, script lives outside the repo
 - [x] read sessions: a DAO is readable by its members only (signed challenge per unlock, HttpOnly
       cookie, in-memory sessions); WebAuthn errors in plain words; edit pages wait for data
+- [x] pages composed from components (components/ui = shadcn primitives, components/ = everything
+      built on them, landing-* for the landing); SyncVotes favicon (SVG + PNG), the template's
+      Svelte favicon link removed from the root layout
