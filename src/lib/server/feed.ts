@@ -16,7 +16,7 @@ type Event =
 				value: { contractId: string; templateId: string; createArgument: Record<string, unknown> };
 			};
 	  }
-	| { ArchivedEvent: { value: { contractId: string } } };
+	| { ArchivedEvent: { contractId: string } };
 type Update = { update?: { Transaction?: { value?: { offset?: number; events?: Event[] } } } };
 
 let started = false;
@@ -52,8 +52,8 @@ export function startFeed(): void {
 					const tx = (update as Update).update?.Transaction?.value;
 					if (!tx) continue;
 					for (const e of tx.events ?? []) {
-						if ('CreatedEvent' in e) index.created(e.CreatedEvent.value);
-						else if ('ArchivedEvent' in e) index.archived(e.ArchivedEvent.value.contractId);
+						if ('CreatedEvent' in e) index.created(e.CreatedEvent);
+						else if ('ArchivedEvent' in e) index.archived(e.ArchivedEvent.contractId);
 					}
 					index.commit();
 					if (tx.offset) offset = tx.offset;

@@ -49,7 +49,10 @@ export async function register(party: string): Promise<index.Account> {
 		],
 		`register-${party.split('::')[1]}`
 	);
-	await index.nextChange(index.keys.all);
+	// The stream brings the new account within a moment; do not hang on it forever.
+	for (let i = 0; i < 40 && !index.accounts.has(party); i++) {
+		await Promise.race([index.nextChange(index.keys.all), new Promise((r) => setTimeout(r, 250))]);
+	}
 	return accountOf(party);
 }
 
