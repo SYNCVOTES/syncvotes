@@ -64,7 +64,7 @@
       wake-ups), app.ts folded into the remote functions, prepares take ids and the session
       party, `execute` waits for the ledger copy; remote forms verified against the submitted
       fields, not the server's reply; wallet store with one `lock()` and one `protect()`
-- [x] measured (scale.mjs, 121 members): add 120 members 9 s, create + open 9 s (was 19 s),
-      40 parallel voters 42 s with 0 failures, count within 3 s
+- [x] measured (scale.mjs, 221 members): add 220 members 13 s in two batches, create + open 13 s,
+      40 parallel voters 45 s with 0 failures, count within 3 s (121 members: 9 s, 9 s, 42 s)
 - [ ] a member's contract grows by a proposal id per vote; fine for hundreds of proposals,
       revisit past thousands (epochs, or a per-proposal receipt archived at settlement)

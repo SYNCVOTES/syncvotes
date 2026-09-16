@@ -207,10 +207,10 @@ filtered on the server (members and ballots by party id, proposals by status). A
 already up to date. Pages neither poll nor refresh; another member's vote lands on your screen
 as it lands on the ledger.
 
-Measured on TestNet with 121 members: adding 120 members is one transaction; opening a vote for
-all of them is one more; 40 members voting at once take under a minute with no conflicts; the
-provider counts them within seconds. (Numbers from the scale script, `scale.mjs`; see the commit
-that last ran it.)
+Measured on TestNet with 221 members: adding 220 members is two signed transactions, 13 seconds
+in all; creating a proposal and opening the vote for all of them is two more, 13 seconds; 40
+members voting at once take 45 seconds with no conflicts; the provider has counted them within 3
+seconds.
 
 There is no login. The key is the identity: a party id is the hint the user chose plus the key's
 fingerprint, so a registered key is recognised by its fingerprint alone, and every write carries a
