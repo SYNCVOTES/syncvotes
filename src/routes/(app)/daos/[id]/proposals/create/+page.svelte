@@ -22,6 +22,11 @@
 	const dao = $derived(store.who ? remote.dao(id) : null);
 	let progress = $state({ done: 0, total: 0, what: '' });
 
+	// A week is the usual voting period; the field starts there.
+	$effect(() => {
+		if (f.fields.days.value() === undefined) f.fields.days.set(7);
+	});
+
 	// Three steps: the proposal (this form), a voting right for every member in batches, then
 	// opening the vote — all signed in turn, no prompt in between.
 	const f = remote.createProposalForm;
