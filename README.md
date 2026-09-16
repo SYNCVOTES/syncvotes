@@ -18,8 +18,8 @@ The backend prepares each transaction, the browser signs the hash, the backend e
 on the server can act for a user — and the browser does not take the server's word for what it
 is signing: `src/lib/verify.ts` decodes the prepared transaction, recomputes the hash with the
 same code the SDK uses for offline signing, and refuses to sign unless the bytes exercise the
-asked-for choice on the app's proxy, acting as the user's party alone. The same goes for the
-party topology at sign-up.
+choice the page asked for, on the contract the page is looking at, with the arguments the page
+built, acting as the user's party alone. The same goes for the party topology at sign-up.
 
 The server talks to the participant through `@canton-network/wallet-sdk`: party topology and
 allocation, interactive submission, the ACS. Its offline-signing shape (`.topology()` to get the
@@ -43,35 +43,39 @@ the token standard's packages are on every validator, so a treasury can be paid 
 
 ### The model
 
-Seven templates in `daml/src/Main.daml`, one idea: every contract a user acts on already carries
+Five templates in `daml/src/Main.daml`, one idea: every contract a user acts on already carries
 the provider's signature, so the provider is a **confirmer** of every transaction — which is what
 CIP-0104 pays traffic rewards for — while the user's key is the only one that ever signs a
 submission. And one constraint: a DAO may have thousands of members and more proposals, so
-nothing lists and nothing a member does touches a contract another member is touching.
+nothing lists, and a member's vote touches no contract another member's vote touches.
 
 - `Account` — created by the provider once per party; the door through which it creates DAOs.
   There is no name: a party is its hint plus its key's fingerprint (`alice::1220…`), chosen when
   the party is created, and a returning key is found by the fingerprint alone.
-- `DAO` — signatory admin and provider; name, description, a stable `id`. No member list.
+- `DAO` — signatory admin and provider; name, description, a stable `id`, and a member count.
+  No member list. Adding or removing members replaces the contract, which is what keeps the
+  count honest; a proposal being created at the same instant gets "reload and try again".
 - `Member` — one per party per DAO, created and removed through the DAO's choices in batches of
-  two hundred (`DAO_AddMembers`, `DAO_RemoveMembers`).
+  two hundred. It is also that member's ballot box: `Member_Vote` replaces it with a copy that
+  remembers the proposal, so a second ballot on the same proposal is impossible, and creates a
+  `Ballot`. Nothing in that transaction reads the proposal or anyone else's contract, so a
+  thousand members can vote at once and none of them waits on the count.
 - `Proposal` — signatory proposer and provider; counters, not lists: `eligible`, `yes`, `no`,
-  `outcome`, and `ready`. The proposer issues a `VoteRight` to every member in batches of a
-  hundred (`Proposal_IssueRights`, each right checked against the member's contract) and opens
-  the vote (`Proposal_Ready`); the text can change until then. The proposer or the admin can
-  cancel until it settles.
-- `VoteRight` — one member's right to one ballot on one proposal. `VoteRight_Cast` spends it and
-  creates a `Ballot`: one small transaction, nobody can vote twice, and a thousand can vote at
-  once. A member who joined after the vote opened has no right on it.
-- `Ballot` and `CountedBallot` — the provider counts (`Proposal_Tally`, batches of two hundred),
-  consuming each `Ballot` into a `CountedBallot` so the record of who voted how survives the
-  count. The ledger checks every ballot it is handed, so the provider can delay a result, never
-  change it. It passes at a majority of eligible, fails when no makes that impossible, and after
-  the deadline the last batch is `final` and decides by what was cast — the one thing the ledger
-  takes on the provider's word, since it cannot see what has not been counted.
+  `outcome`. It starts as a draft, editable by the proposer; `Proposal_Open` reads the DAO's
+  member count into `eligible` and stamps `openedAt`. From then on the electorate is fixed: the
+  members of that moment. The proposer or the admin can cancel until it settles.
+- `Ballot` — one vote, signed by the voter and the provider, carrying the voter's `since` from
+  their membership. The provider counts (`Proposal_Tally`, batches of two hundred), and
+  `Ballot_Count` checks each ballot against the proposal it is counted into: right DAO, right
+  proposal, cast before the deadline, by a member who was one when the vote opened, not counted
+  before. A counted ballot is marked, not removed, so who voted how stays on the ledger. The
+  provider can therefore delay a result, never change it. A proposal passes at a majority of
+  eligible, fails when no makes that impossible, and after the deadline the last batch is
+  `final` and decides by what was cast — the one thing the ledger takes on the provider's word,
+  since it cannot see what was not handed in.
 
-The package is `syncvotes-dao`; it replaced `syncvotes-governance` 0.1.x, whose contracts it
-cannot upgrade in place.
+The package is `syncvotes-vote`; it replaced `syncvotes-dao` 0.2.x, where the proposer issued a
+voting right per member in batches of signed transactions before a vote could open.
 
 Two provider-side parties, as the Featured App Coupon Guidance asks (separate party concerns):
 `PROVIDER_PARTY` holds the FeaturedAppRight, signs every proxy and is the one that earns;
@@ -83,15 +87,16 @@ other network before counting on rewards there.
 ## Setup
 
 There is no local run: the only ledger this app talks to is its validator on TestNet, and the only
-way to run it is `pnpm deploy:testnet`. What runs locally is the type-checker and the linter, and for that
-`daml.js/` has to exist — it is generated and gitignored, so a fresh clone produces it before pnpm
-can resolve `@daml.js/model`. Codegen first, install second:
+way to run it is `pnpm deploy:testnet`. What runs locally is the type-checker, the linter and the
+build, and for that `daml.js/` has to exist — it is generated and gitignored, so a fresh clone
+produces it before pnpm can resolve `@daml.js/model`. Codegen first, install second:
 
 ```sh
 pnpm daml:codegen   # builds the DAR and writes daml.js/
 pnpm i
 pnpm check          # svelte-check over the whole app
 pnpm lint
+pnpm exec vite build   # what the image build runs; catches what the checker cannot
 ```
 
 ## Authentication
@@ -139,34 +144,33 @@ Codegen names its output `@daml.js/<name>-<version>` from `daml/daml.yaml` — n
 `@daml.js/model`, and everything else uses the alias or a glob. Bumping the version means editing
 `daml/daml.yaml` and that one alias line.
 
-`Main.Proposal.templateId` is `#syncvotes-governance:Main:Proposal` — the package-name-scoped id the
+`Main.Proposal.templateId` is `#syncvotes-vote:Main:Proposal` — the package-name-scoped id the
 ledger accepts in commands and ACS filters, which is what keeps a package upgrade from breaking
-submissions.
+submissions. `verify.ts` takes the package name from the same place.
 
 ## Layout
 
-| Path                             | What it is                                                                                    |
-| -------------------------------- | --------------------------------------------------------------------------------------------- |
-| `daml/src/Main.daml`             | `Account`, `DAO`, `Proposal` — the whole model                                                |
-| `daml.js/`                       | Generated bindings — never edit, regenerate with `pnpm daml:codegen`                          |
-| `src/lib/wallet.ts`              | Phrase → signer closure; any number of keys encrypted at rest per device                      |
-| `src/lib/auto-lock.ts`           | Disposes the signer after 15 quiet minutes or on `pagehide`                                   |
-| `src/lib/wallet-store.svelte.ts` | The wallet as one rune store: onboarding screens, signer, identity                            |
-| `src/lib/verify.ts`              | Recomputes hashes and inspects transactions before anything is signed                         |
-| `src/lib/schemas.ts`             | One valibot schema per field; the browser preflights forms with it, the server re-checks      |
-| `src/lib/forms.ts`               | signedForm(): submit, take the prepared transaction, sign it, go on                           |
-| `src/lib/actions.ts`             | What the browser does: call the API, verify, sign, call again                                 |
-| `src/lib/api.remote.ts`          | The server API as remote functions: reads, prepares, execute                                  |
-| `src/lib/server/participant.ts`  | The wallet SDK, wrapped: topology, allocation, ACS, prepare and execute                       |
-| `src/lib/server/index.ts`        | The operator's view of the ledger in memory, indexed per DAO/proposal/party, with change keys |
-| `src/lib/server/feed.ts`         | Streams the active contracts at startup, then the update stream, into the index               |
-| `src/lib/server/tally.ts`        | The provider's count: Proposal_Tally in batches, final after the deadline                     |
-| `src/lib/server/app.ts`          | Paged, filtered reads from the index; the one provider write (an Account)                     |
-| `src/routes/(app)/`              | My DAOs, DAO, Create DAO, Proposal, Create proposal, Wallet                                   |
-| `src/routes/+page.svelte`        | The landing (v1's Consensus Engine), Tailwind on the markup, `field.ts`                       |
-| `src/lib/components/ui/`         | shadcn-svelte primitives only (button, badge, input, textarea, label)                         |
-| `src/lib/components/`            | Everything built on them: page column, panels, lists, forms, header, footer, `landing-*`      |
-| `compose.yaml`                   | The compose project for the servers, Caddy config inline                                      |
+| Path                             | What it is                                                                               |
+| -------------------------------- | ---------------------------------------------------------------------------------------- |
+| `daml/src/Main.daml`             | `Account`, `DAO`, `Member`, `Proposal`, `Ballot` — the whole model                       |
+| `daml.js/`                       | Generated bindings — never edit, regenerate with `pnpm daml:codegen`                     |
+| `src/lib/wallet.ts`              | Phrase → signer closure; any number of keys encrypted at rest per device                 |
+| `src/lib/auto-lock.ts`           | Says when the key has been idle for 15 minutes, or the page is being left                |
+| `src/lib/wallet-store.svelte.ts` | The wallet as one rune store: onboarding screens, signer, identity                       |
+| `src/lib/verify.ts`              | Recomputes hashes and inspects transactions before anything is signed                    |
+| `src/lib/schemas.ts`             | One valibot schema per field and the batch size; browser and server check the same       |
+| `src/lib/forms.ts`               | signedForm(): submit, verify the prepared transaction against the fields, sign, go on    |
+| `src/lib/actions.ts`             | What the browser does: call the API, verify, sign, call again; member batches            |
+| `src/lib/api.remote.ts`          | The server API as remote functions: reads, forms, prepares, execute                      |
+| `src/lib/server/participant.ts`  | The wallet SDK, wrapped: topology, allocation, ACS, prepare and execute                  |
+| `src/lib/server/ledger.ts`       | The operator's copy of the ledger in memory, fed by the update stream, with wake-ups     |
+| `src/lib/server/tally.ts`        | The provider's count: Proposal_Tally in batches, final after the deadline                |
+| `src/lib/server/session.ts`      | Read sessions: a signed challenge behind an HttpOnly cookie                              |
+| `src/routes/(app)/`              | My DAOs, DAO, Create DAO, Proposal, Create proposal, Wallet                              |
+| `src/routes/+page.svelte`        | The landing (v1's Consensus Engine), Tailwind on the markup, `field.ts`                  |
+| `src/lib/components/ui/`         | shadcn-svelte primitives only (button, badge, input, textarea, label)                    |
+| `src/lib/components/`            | Everything built on them: page column, panels, lists, forms, header, footer, `landing-*` |
+| `compose.yaml`                   | The compose project for the servers, Caddy config inline                                 |
 
 The private key exists only inside a closure (`Signer`): the page can ask it to sign, to encrypt
 itself for storage, or to dispose — never to reveal itself. Every write is a transaction the
@@ -174,33 +178,39 @@ ledger will only accept with that key's signature, and the backend user is grant
 user parties, so there is no second path. Before signing, `src/lib/verify.ts` decodes what the
 server prepared and refuses anything but the asked-for choice, on the asked-for contract of this
 package, with the asked-for arguments, acting as the user alone — and at sign-up, a party in the
-key's own namespace, held by this key alone, hosted for confirmation only. The server, in turn,
+key's own namespace, held by this key alone, hosted for confirmation only. What is asked for
+comes from the page: a form's intent is built from its own fields (as the shared schema trims
+them) and the contract it is showing, never from the server's reply. The server, in turn,
 executes only transactions it prepared itself, so its own rules cannot be bypassed.
 
 Reads need a session. A DAO is private to the _network_ by construction, and this app — as
 operator — sees all of them; what keeps a DAO to its members on the way to a browser is the app.
 Once per unlock the browser signs a challenge with the party's key (`sessionChallenge` /
 `sessionStart`), the server checks the signature against the key the party id names and keeps a
-session in memory behind an HttpOnly cookie (`src/lib/server/session.ts`). The DAO, proposal and
-my-DAOs reads require that session and membership; prepares, the directory and the member lookup
-require it too. Only the landing counts and the party lookup stay open. A live query that loses
+session in memory behind an HttpOnly cookie (`src/lib/server/session.ts`). Every read and every
+prepare takes its party from that session; the DAO, proposal and my-DAOs reads require
+membership too. Only the landing counts and the party lookup stay open. A live query that loses
 access ends with that error rather than freezing a stale view; a session lost while the key is
 still unlocked (a restart, another tab locking) is re-signed on the spot and the query
-reconnected. A restart forgets sessions; the browser, still
-holding the key, signs again on its next unlock.
+reconnected. A restart forgets sessions; the browser, still holding the key, signs again on its
+next unlock.
 
-Reads are live and never touch the participant. The server keeps an in-memory index of every
-contract the operator sees — built from the JSON API's streaming active-contracts endpoint at
-startup (the list endpoint stops at two hundred elements) and kept current from the update
-stream — with change notification per DAO, proposal and party. Every read is a SvelteKit live
-query over that index: it sends its value, then sends it again whenever its key fires and the
-value changed. Lists are paged and filtered on the server (members and ballots by party id,
-proposals by status). Pages neither poll nor refresh; another member's vote lands on your screen
+Reads are live and never touch the participant. The server keeps an in-memory copy of every
+contract the operator sees (`ledger.ts`) — built from the JSON API's streaming active-contracts
+endpoint at startup (the list endpoint stops at two hundred elements) and kept current from the
+update stream. Each contract goes into the maps the pages read, together with the one closure
+that takes it out again when it is archived; a transaction wakes whoever waits on the DAO,
+proposal or party it touched. Every read is a SvelteKit live query over those maps: it sends its
+value, then sends it again whenever its key fires and the value changed. Lists are paged and
+filtered on the server (members and ballots by party id, proposals by status). A write's
+`execute` returns only once the copy holds its transaction, so the page that just signed is
+already up to date. Pages neither poll nor refresh; another member's vote lands on your screen
 as it lands on the ledger.
 
-Measured on TestNet with 121 members: adding 120 members is one 9-second transaction; opening a
-vote for all of them takes 19 seconds (two batches of rights and the opening); 40 members voting
-at once take 43 seconds with no conflicts; the provider counts them within 2 seconds.
+Measured on TestNet with 121 members: adding 120 members is one transaction; opening a vote for
+all of them is one more; 40 members voting at once take under a minute with no conflicts; the
+provider counts them within seconds. (Numbers from the scale script, `scale.mjs`; see the commit
+that last ran it.)
 
 There is no login. The key is the identity: a party id is the hint the user chose plus the key's
 fingerprint, so a registered key is recognised by its fingerprint alone, and every write carries a
@@ -252,9 +262,9 @@ idempotent by package id — so the code and the package it needs always land to
 - Canton 3.5 names the ed25519 key spec `SIGNING_KEY_SPEC_EC_CURVE25519`; the signature algorithm
   is still `SIGNING_ALGORITHM_SPEC_ED25519`.
 - The SDK submits through `interactive-submission/executeAndWait`, so by the time a command
-  returns the ACS already reflects it. (`/execute` alone returns on acceptance and the result lands
-  a few seconds later.) It also hardcodes `HASHING_SCHEME_VERSION_V2`, which is what the
-  participant returns today.
+  returns the ledger has accepted it; the update stream brings it to the in-memory copy a moment
+  later, which `execute` waits for. It also hardcodes `HASHING_SCHEME_VERSION_V2`, which is what
+  the participant returns today.
 - `@canton-network/core-tx-visualizer` is the SDK's hashing and decoding, on its own: 168 KB,
   browser-safe, and what `verify.ts` builds on. Its `validateAuthorizedPartyIds` only understands
   create nodes and throws `Unsupported` on an exercise, so the authority check is written by hand
@@ -262,9 +272,19 @@ idempotent by package id — so the code and the package it needs always land to
 - The SDK's token providers log the whole token response at info level — the self-signed one
   its JWTs, the client-credentials one Keycloak's reply. `participant.ts` gives it a log adapter
   that passes only warnings and errors, and only their message.
-- A package name and version can be uploaded once. A change that is not a valid upgrade (a new
-  non-optional field, say) needs a new version — or, as happened here, a package renamed from the
-  default `daml` to `syncvotes`. Contract keys would have enforced name uniqueness on-ledger, but
-  they need Daml-LF 2.3 and the SDK targets 2.2.
+- A package name and version can be uploaded once, and a later version under the same name must
+  be a compatible upgrade (fields can only be added, and as `Optional`). A change that is not —
+  a template dropped, a field made mandatory — needs a new package name, which is why the model
+  has been `daml`, `syncvotes`, `syncvotes-governance`, `syncvotes-dao` and now `syncvotes-vote`.
+  Contract keys would have enforced name uniqueness on-ledger, but they need Daml-LF 2.3 and the
+  SDK targets 2.2.
+- A `.remote.ts` module may export nothing but remote functions — a shared constant next to
+  them fails the build, which is why the batch size lives in `schemas.ts`.
+- The kit's `form.fields.value()` knows only the fields the user touched; `forms.ts` reads the
+  submitted values from the form element instead, so an untouched description is still part of
+  what the browser verifies.
 - `dpm codegen-js` emits CommonJS. Vite does not pre-bundle workspace-linked packages by default, so
   `optimizeDeps.include` in `vite.config.ts` is what stops the browser receiving raw CJS.
+- A member's contract grows by one proposal id per vote cast. That is the price of a vote that
+  touches nothing shared; a DAO with thousands of proposals will see its members' contracts grow
+  to tens of kilobytes, which is still one small transaction per vote.

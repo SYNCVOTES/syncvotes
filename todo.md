@@ -53,3 +53,18 @@
       in the browser, re-check on the server, then sign); members as chips again; dead code and
       the single-key migration removed; auto-lock and hint modules named for what they are
 - [ ] passkey e2e (passkey.mjs) still drives the 0.1 flow; port to lib2 when touching passkeys
+
+# 2026-09-16
+
+- [x] simpler model (`syncvotes-vote` 0.3.0): no VoteRight, no CountedBallot — a member votes
+      from their own Member contract, which remembers the proposal; the DAO counts its members
+      and `Proposal_Open` fixes the electorate in one transaction; the count checks every ballot
+      it takes (DAO, proposal, deadline, member since before opening)
+- [x] server: index.ts + feed.ts → ledger.ts (one removal closure per contract, keyed
+      wake-ups), app.ts folded into the remote functions, prepares take ids and the session
+      party, `execute` waits for the ledger copy; remote forms verified against the submitted
+      fields, not the server's reply; wallet store with one `lock()` and one `protect()`
+- [x] measured (scale.mjs, 121 members): add 120 members 9 s, create + open 9 s (was 19 s),
+      40 parallel voters 42 s with 0 failures, count within 3 s
+- [ ] a member's contract grows by a proposal id per vote; fine for hundreds of proposals,
+      revisit past thousands (epochs, or a per-proposal receipt archived at settlement)
