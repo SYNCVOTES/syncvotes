@@ -3,7 +3,8 @@
 	import { page } from '$app/state';
 	import * as remote from '$lib/api.remote';
 	import * as actions from '$lib/actions';
-	import { store, flow } from '$lib/wallet-store.svelte';
+	import { store, flow, describe } from '$lib/wallet-store.svelte';
+	import { updateProposalForm as schema } from '$lib/schemas';
 	import { Input } from '$lib/components/ui/input';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import Page from '$lib/components/page.svelte';
@@ -20,27 +21,28 @@
 	const me = $derived(store.who?.party ?? null);
 	const proposal = $derived(me ? remote.proposal(id) : null);
 
-	let title = $state('');
-	let description = $state('');
+	const f = remote.updateProposalForm;
 	let loaded = $state(false);
-
 	$effect(() => {
 		const p = proposal?.current;
 		if (!p || loaded) return;
-		title = p.title;
-		description = p.description;
+		f.fields.title.set(p.title);
+		f.fields.description.set(p.description);
 		loaded = true;
 	});
 
-	async function save(event: SubmitEvent) {
-		event.preventDefault();
-		const contractId = proposal?.current?.contractId;
-		if (!contractId) return;
-		const ok = await flow.act((signer, who) =>
-			actions.updateProposal(signer, who, contractId, { title, description })
-		);
+	const enhanced = f.preflight(schema).enhance(async ({ submit }) => {
+		try {
+			await submit();
+		} catch (e) {
+			store.problem = describe(e);
+			return;
+		}
+		const r = f.result;
+		if (!r) return;
+		const ok = await flow.act((s, w) => actions.signPrepared(s, w, r));
 		if (ok) await goto(`/proposals/${id}`);
-	}
+	});
 </script>
 
 <svelte:head><title>Edit proposal — SyncVotes</title></svelte:head>
@@ -58,7 +60,7 @@
 	{#if !proposal}
 		<ConnectPrompt what="edit this proposal" />
 	{:else if proposal.error}
-		<QueryError error={proposal.error} refresh={() => proposal.reconnect()} />
+		<QueryError error={proposal.error} refresh={() => proposal?.reconnect()} />
 	{:else if !proposal.ready}
 		<Skeleton height="h-64" />
 	{:else if proposal.current.proposer !== me}
@@ -66,20 +68,25 @@
 	{:else if proposal.current.ready}
 		<p class="text-[13px] text-ink-dim">Voting has opened; the text is fixed now.</p>
 	{:else}
-		<form class="space-y-8" onsubmit={save}>
+		<form {...enhanced} class="space-y-8">
 			<Problem message={store.problem} />
+			<input {...f.fields.proposal.as('hidden', proposal.current.contractId)} />
 			<FormSection>
-				<Field label="Title" id="title">
-					<Input id="title" maxlength={120} bind:value={title} />
+				<Field label="Title" id="title" issues={f.fields.title.issues()}>
+					<Input {...f.fields.title.as('text')} id="title" maxlength={120} />
 				</Field>
-				<Field label="Description" id="description">
-					<Textarea id="description" rows={8} maxlength={5000} bind:value={description} />
+				<Field label="Description" id="description" issues={f.fields.description.issues()}>
+					<Textarea
+						{...f.fields.description.as('text')}
+						id="description"
+						rows={8}
+						maxlength={5000}
+					/>
 				</Field>
 			</FormSection>
 			<FormActions
 				label="Save changes"
-				busy={store.busy}
-				disabled={title.trim().length < 2}
+				busy={store.busy || f.pending > 0}
 				cancelHref="/proposals/{id}"
 			/>
 		</form>

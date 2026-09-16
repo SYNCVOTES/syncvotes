@@ -78,6 +78,22 @@ async function sign(
 	});
 }
 
+/** What a remote form hands back: a prepared transaction and what it is supposed to do. */
+export type FormResult = {
+	choice: string;
+	contractId: string;
+	args: { [field: string]: Plain };
+	prepared: {
+		preparedTransaction: string;
+		preparedTransactionHash: string;
+		hashingSchemeVersion: string;
+	};
+};
+
+/** Signs what a form's server half prepared — after checking it says what the form asked. */
+export const signPrepared = (s: Signer, who: Identity, p: FormResult) =>
+	sign(s, who, p.choice, p.contractId, p.args, p.prepared);
+
 const chunks = <T>(items: T[], size: number): T[][] => {
 	const out: T[][] = [];
 	for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
@@ -85,34 +101,6 @@ const chunks = <T>(items: T[], size: number): T[][] => {
 };
 
 // ---- DAOs ---------------------------------------------------------------------------------
-
-export async function createDao(
-	s: Signer,
-	who: Identity,
-	input: { name: string; description: string }
-) {
-	// The DAO's identity is decided here, so it can be checked here.
-	const args = {
-		daoName: input.name.trim(),
-		description: input.description,
-		id: crypto.randomUUID()
-	};
-	const prepared = await remote.prepareCreateDao({ party: who.party, ...args });
-	await sign(s, who, 'Account_CreateDAO', who.account, args, prepared);
-	return args.id;
-}
-
-/** `dao` is the DAO contract as the page last saw it; an edit in between makes this fail loudly. */
-export async function updateDao(
-	s: Signer,
-	who: Identity,
-	dao: string,
-	input: { name: string; description: string }
-) {
-	const args = { daoName: input.name.trim(), description: input.description };
-	const prepared = await remote.prepareUpdateDao({ party: who.party, dao, ...args });
-	await sign(s, who, 'DAO_Update', dao, args, prepared);
-}
 
 export async function archiveDao(s: Signer, who: Identity, dao: string) {
 	const prepared = await remote.prepareArchiveDao({ party: who.party, dao });
@@ -154,44 +142,6 @@ export async function removeMembers(
 
 // ---- Proposals ----------------------------------------------------------------------------
 
-/**
- * Three steps: the proposal itself, a voting right for every member (in batches), then opening
- * the vote. The proposal exists on the ledger after step one; if the tab dies in between, the
- * proposer finds it unopened and can finish from the proposal page.
- */
-export async function createProposal(
-	s: Signer,
-	who: Identity,
-	input: {
-		dao: string;
-		daoId: string;
-		membership: string;
-		title: string;
-		description: string;
-		days: number;
-	},
-	progress?: Progress
-): Promise<string> {
-	const pid = crypto.randomUUID();
-	const closesAt = new Date(Date.now() + input.days * 86_400_000).toISOString();
-	const args = {
-		proposer: who.party,
-		membership: input.membership,
-		title: input.title.trim(),
-		description: input.description,
-		closesAt,
-		pid
-	};
-	const prepared = await remote.prepareCreateProposal({
-		party: who.party,
-		dao: input.dao,
-		...args
-	});
-	await sign(s, who, 'DAO_CreateProposal', input.dao, args, prepared);
-	await openVoting(s, who, pid, input.daoId, progress);
-	return pid;
-}
-
 /** Issues rights to every current member and opens the vote. Safe to run again if it stopped. */
 export async function openVoting(
 	s: Signer,
@@ -227,17 +177,6 @@ async function currentContract(pid: string): Promise<string> {
 		await new Promise((r) => setTimeout(r, 250));
 	}
 	throw new Error('The proposal did not appear on the ledger');
-}
-
-export async function updateProposal(
-	s: Signer,
-	who: Identity,
-	proposal: string,
-	input: { title: string; description: string }
-) {
-	const args = { title: input.title.trim(), description: input.description };
-	const prepared = await remote.prepareUpdateProposal({ party: who.party, proposal, ...args });
-	await sign(s, who, 'Proposal_Update', proposal, args, prepared);
 }
 
 export async function cancelProposal(s: Signer, who: Identity, proposal: string) {

@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import * as remote from '$lib/api.remote';
 	import * as actions from '$lib/actions';
-	import { store, flow } from '$lib/wallet-store.svelte';
+	import { store, flow, describe } from '$lib/wallet-store.svelte';
+	import { createDaoForm as schema } from '$lib/schemas';
 	import { Input } from '$lib/components/ui/input';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import Page from '$lib/components/page.svelte';
@@ -12,17 +14,21 @@
 	import Field from '$lib/components/field.svelte';
 	import FormActions from '$lib/components/form-actions.svelte';
 
-	let name = $state('');
-	let description = $state('');
-
-	async function submit(event: SubmitEvent) {
-		event.preventDefault();
-		let id = '';
-		const ok = await flow.act(async (signer, who) => {
-			id = await actions.createDao(signer, who, { name, description });
-		});
-		if (ok) await goto(`/daos/${id}/members`);
-	}
+	// The form's server half validates the fields and prepares the transaction; this half checks
+	// the fields first (preflight), then checks, signs and executes what came back.
+	const f = remote.createDaoForm;
+	const enhanced = f.preflight(schema).enhance(async ({ submit }) => {
+		try {
+			await submit();
+		} catch (e) {
+			store.problem = describe(e);
+			return;
+		}
+		const r = f.result;
+		if (!r) return;
+		const ok = await flow.act((s, w) => actions.signPrepared(s, w, r));
+		if (ok) await goto(`/daos/${r.id}/members`);
+	});
 </script>
 
 <svelte:head><title>Create DAO — SyncVotes</title></svelte:head>
@@ -37,35 +43,30 @@
 	{#if !store.who}
 		<ConnectPrompt what="create a DAO" />
 	{:else}
-		<form class="space-y-8" onsubmit={submit}>
+		<form {...enhanced} class="space-y-8">
 			<Problem message={store.problem} />
 
 			<FormSection title="Basic information">
-				<Field label="Name" id="name">
+				<Field label="Name" id="daoName" issues={f.fields.daoName.issues()}>
 					<Input
-						id="name"
+						{...f.fields.daoName.as('text')}
+						id="daoName"
 						placeholder="Canton Technical Committee"
 						maxlength={60}
-						bind:value={name}
 					/>
 				</Field>
-				<Field label="Description" id="description">
+				<Field label="Description" id="description" issues={f.fields.description.issues()}>
 					<Textarea
+						{...f.fields.description.as('text')}
 						id="description"
 						rows={4}
 						maxlength={2000}
 						placeholder="Governs protocol upgrades and technical parameters..."
-						bind:value={description}
 					/>
 				</Field>
 			</FormSection>
 
-			<FormActions
-				label="Create DAO"
-				busy={store.busy}
-				disabled={name.trim().length < 2}
-				cancelHref="/my-daos"
-			/>
+			<FormActions label="Create DAO" busy={store.busy || f.pending > 0} cancelHref="/my-daos" />
 		</form>
 	{/if}
 </Page>

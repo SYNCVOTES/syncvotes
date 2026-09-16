@@ -19,7 +19,7 @@
 	import LoadMore from '$lib/components/load-more.svelte';
 	import SearchInput from '$lib/components/search-input.svelte';
 	import RoleTag from '$lib/components/role-tag.svelte';
-	import MemberImport from '$lib/components/member-import.svelte';
+	import MemberPicker from '$lib/components/member-picker.svelte';
 	import SigningProgress from '$lib/components/signing-progress.svelte';
 	import { dateOf, fmt } from '$lib/format';
 
@@ -83,10 +83,10 @@
 			<Panel class="mb-8 space-y-3">
 				<h2 class="eyebrow">Add members</h2>
 				<p class="text-[13px] text-ink-mid">
-					Paste party ids — as many as you like. They are checked against the registry first, then
-					added a couple of hundred per transaction, each signed by your key.
+					Party ids, one or a thousand. Each is checked as it lands; they are added a couple of
+					hundred per transaction, each signed by your key.
 				</p>
-				<MemberImport busy={store.busy} onadd={add} />
+				<MemberPicker dao={d.id} busy={store.busy} onadd={add} />
 			</Panel>
 		{/if}
 

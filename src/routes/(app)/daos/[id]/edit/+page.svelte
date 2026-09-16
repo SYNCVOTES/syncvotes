@@ -3,7 +3,8 @@
 	import { page } from '$app/state';
 	import * as remote from '$lib/api.remote';
 	import * as actions from '$lib/actions';
-	import { store, flow } from '$lib/wallet-store.svelte';
+	import { store, flow, describe } from '$lib/wallet-store.svelte';
+	import { updateDaoForm as schema } from '$lib/schemas';
 	import { Input } from '$lib/components/ui/input';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import Page from '$lib/components/page.svelte';
@@ -21,28 +22,29 @@
 	const me = $derived(store.who?.party ?? null);
 	const dao = $derived(me ? remote.dao(id) : null);
 
-	let name = $state('');
-	let description = $state('');
+	const f = remote.updateDaoForm;
 	let loaded = $state(false);
-
 	// Fill the form once from the live query; later updates must not overwrite what is typed.
 	$effect(() => {
 		const d = dao?.current;
 		if (!d || loaded) return;
-		name = d.name;
-		description = d.description;
+		f.fields.daoName.set(d.name);
+		f.fields.description.set(d.description);
 		loaded = true;
 	});
 
-	async function save(event: SubmitEvent) {
-		event.preventDefault();
-		const contractId = dao?.current?.contractId;
-		if (!contractId) return;
-		const ok = await flow.act((signer, who) =>
-			actions.updateDao(signer, who, contractId, { name, description })
-		);
+	const enhanced = f.preflight(schema).enhance(async ({ submit }) => {
+		try {
+			await submit();
+		} catch (e) {
+			store.problem = describe(e);
+			return;
+		}
+		const r = f.result;
+		if (!r) return;
+		const ok = await flow.act((s, w) => actions.signPrepared(s, w, r));
 		if (ok) await goto(`/daos/${id}`);
-	}
+	});
 
 	async function remove() {
 		const contractId = dao?.current?.contractId;
@@ -64,28 +66,33 @@
 	{#if !dao}
 		<ConnectPrompt what="edit this DAO" />
 	{:else if dao.error}
-		<QueryError error={dao.error} refresh={() => dao.reconnect()} />
+		<QueryError error={dao.error} refresh={() => dao?.reconnect()} />
 	{:else if !dao.ready}
 		<Skeleton height="h-64" />
 	{:else if !dao.current.me.admin}
 		<p class="text-[13px] text-ink-dim">Only the admin can edit this DAO.</p>
 	{:else}
-		<form class="space-y-8" onsubmit={save}>
+		<form {...enhanced} class="space-y-8">
 			<Problem message={store.problem} />
+			<input {...f.fields.dao.as('hidden', dao.current.contractId)} />
 
 			<FormSection title="Basic information">
-				<Field label="Name" id="name">
-					<Input id="name" maxlength={60} bind:value={name} />
+				<Field label="Name" id="daoName" issues={f.fields.daoName.issues()}>
+					<Input {...f.fields.daoName.as('text')} id="daoName" maxlength={60} />
 				</Field>
-				<Field label="Description" id="description">
-					<Textarea id="description" rows={4} maxlength={2000} bind:value={description} />
+				<Field label="Description" id="description" issues={f.fields.description.issues()}>
+					<Textarea
+						{...f.fields.description.as('text')}
+						id="description"
+						rows={4}
+						maxlength={2000}
+					/>
 				</Field>
 			</FormSection>
 
 			<FormActions
 				label="Save changes"
-				busy={store.busy}
-				disabled={name.trim().length < 2}
+				busy={store.busy || f.pending > 0}
 				cancelHref="/daos/{id}"
 			/>
 		</form>

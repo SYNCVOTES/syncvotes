@@ -1,6 +1,6 @@
 import { error } from '@sveltejs/kit';
 import { ed25519 } from '@noble/curves/ed25519.js';
-import { command, query } from '$app/server';
+import { command, form, query } from '$app/server';
 import * as v from 'valibot';
 import { Main } from '@daml.js/model';
 import * as participant from './server/participant';
@@ -10,6 +10,7 @@ import { nextChange } from './server/feed';
 import * as session from './server/session';
 import { fingerprintOf } from './verify';
 import { normaliseName, nameProblem } from './names';
+import * as schemas from './schemas';
 
 /**
  * The server's API, as remote functions: the page calls these like local functions, SvelteKit
@@ -46,7 +47,6 @@ async function* live<T>(key: string, load: () => T | Promise<T>): AsyncGenerator
 const base64 = v.pipe(v.string(), v.nonEmpty(), v.base64());
 const partyId = v.pipe(v.string(), v.includes('::'), v.maxLength(300));
 const contractId = v.pipe(v.string(), v.nonEmpty());
-const text = (max: number) => v.pipe(v.string(), v.trim(), v.nonEmpty(), v.maxLength(max));
 const paging = {
 	offset: v.pipe(v.number(), v.integer(), v.minValue(0)),
 	limit: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(100))
@@ -125,14 +125,19 @@ export const member = query(v.pipe(v.string(), v.trim(), v.maxLength(300)), (tok
 });
 
 /** Which of these party ids are registered — a pasted list, checked in one go. */
-export const checkMembers = query(v.pipe(v.array(partyId), v.maxLength(2000)), (parties) => {
-	session.required();
-	const unique = [...new Set(parties)];
-	return {
-		registered: unique.filter((p) => app.isRegistered(p)),
-		unknown: unique.filter((p) => !app.isRegistered(p))
-	};
-});
+export const checkMembers = query(
+	v.object({ dao: contractId, parties: v.pipe(v.array(partyId), v.maxLength(2000)) }),
+	({ dao, parties }) => {
+		const me = session.required();
+		const found = app.daoById(dao);
+		const unique = [...new Set(parties)].filter((p) => p !== me);
+		return {
+			registered: unique.filter((p) => app.isRegistered(p) && !app.isMember(found.id, p)),
+			already: unique.filter((p) => app.isMember(found.id, p)),
+			unknown: unique.filter((p) => !app.isRegistered(p))
+		};
+	}
+);
 
 // ---- Reads -------------------------------------------------------------------------------
 
@@ -234,25 +239,71 @@ const exercise = (
 	choiceArgument: unknown
 ) => [{ ExerciseCommand: { templateId, contractId, choice, choiceArgument } }];
 
-export const prepareCreateDao = command(
-	v.object({
-		party: partyId,
-		daoName: text(60),
-		description: v.pipe(v.string(), v.maxLength(2000)),
-		id: v.pipe(v.string(), v.uuid())
-	}),
-	async ({ party, daoName, description, id }) => {
-		session.required(party);
-		const account = app.accountOf(party);
-		if (index.daos.has(id)) throw error(409, 'That DAO id is taken');
-		return participant.prepare(
+/**
+ * The text forms. A remote form validates each field against the shared schema — the browser
+ * runs the same schema before submitting, so the issues show under the field — and the server
+ * prepares the transaction; the browser then checks it, signs it and executes it.
+ */
+export const createDaoForm = form(schemas.createDaoForm, async ({ daoName, description }) => {
+	const party = session.required();
+	const account = app.accountOf(party);
+	const id = crypto.randomUUID();
+	const args = { daoName, description, id };
+	const prepared = await participant.prepare(
+		party,
+		exercise(Main.Account.templateId, account.contractId, 'Account_CreateDAO', args)
+	);
+	return { choice: 'Account_CreateDAO', contractId: account.contractId, args, prepared, id };
+});
+
+export const updateDaoForm = form(schemas.updateDaoForm, async ({ dao, daoName, description }) => {
+	const party = session.required();
+	adminOf(dao, party);
+	const args = { daoName, description };
+	const prepared = await participant.prepare(
+		party,
+		exercise(Main.DAO.templateId, dao, 'DAO_Update', args)
+	);
+	return { choice: 'DAO_Update', contractId: dao, args, prepared };
+});
+
+export const createProposalForm = form(
+	schemas.createProposalForm,
+	async ({ dao, title, description, days }) => {
+		const party = session.required();
+		const found = app.currentDao(dao);
+		const membership = app.memberOf(found.id, party);
+		if (!membership) throw error(403, 'Only members can propose');
+		const pid = crypto.randomUUID();
+		const closesAt = new Date(Date.now() + days * 86_400_000).toISOString();
+		const args = {
+			proposer: party,
+			membership: membership.contractId,
+			title,
+			description,
+			closesAt,
+			pid
+		};
+		const prepared = await participant.prepare(
 			party,
-			exercise(Main.Account.templateId, account.contractId, 'Account_CreateDAO', {
-				daoName,
-				description,
-				id
-			})
+			exercise(Main.DAO.templateId, dao, 'DAO_CreateProposal', args)
 		);
+		return { choice: 'DAO_CreateProposal', contractId: dao, args, prepared, pid, daoId: found.id };
+	}
+);
+
+export const updateProposalForm = form(
+	schemas.updateProposalForm,
+	async ({ proposal, title, description }) => {
+		const party = session.required();
+		const current = proposerOf(proposal, party);
+		if (current.ready) throw error(409, 'Voting has opened; the text is fixed');
+		const args = { title, description };
+		const prepared = await participant.prepare(
+			party,
+			exercise(Main.Proposal.templateId, proposal, 'Proposal_Update', args)
+		);
+		return { choice: 'Proposal_Update', contractId: proposal, args, prepared };
 	}
 );
 
@@ -262,23 +313,6 @@ function adminOf(contractId: string, party: string) {
 	if (found.admin !== party) throw error(403, 'Only the admin can do this');
 	return found;
 }
-
-export const prepareUpdateDao = command(
-	v.object({
-		party: partyId,
-		dao: contractId,
-		daoName: text(60),
-		description: v.pipe(v.string(), v.maxLength(2000))
-	}),
-	async ({ party, dao, daoName, description }) => {
-		session.required(party);
-		adminOf(dao, party);
-		return participant.prepare(
-			party,
-			exercise(Main.DAO.templateId, dao, 'DAO_Update', { daoName, description })
-		);
-	}
-);
 
 /** Deleting archives the DAO. Its settled proposals stay readable; open ones block it. */
 export const prepareArchiveDao = command(
@@ -328,39 +362,6 @@ export const prepareRemoveMembers = command(
 	}
 );
 
-export const prepareCreateProposal = command(
-	v.object({
-		party: partyId,
-		dao: contractId,
-		title: text(120),
-		description: v.pipe(v.string(), v.maxLength(5000)),
-		closesAt: v.pipe(v.string(), v.isoTimestamp()),
-		pid: v.pipe(v.string(), v.uuid())
-	}),
-	async ({ party, dao, title, description, closesAt, pid }) => {
-		session.required(party);
-		const found = app.currentDao(dao);
-		const membership = app.memberOf(found.id, party);
-		if (!membership) throw error(403, 'Only members can propose');
-		// The browser picks the deadline and the id so it can check them before signing; the
-		// server only keeps them within bounds and unique.
-		const days = (new Date(closesAt).getTime() - Date.now()) / 86_400_000;
-		if (!(days > 0.5 && days <= 31)) throw error(400, 'The voting period must be 1 to 30 days');
-		if (index.proposals.has(pid)) throw error(409, 'That proposal id is taken');
-		return participant.prepare(
-			party,
-			exercise(Main.DAO.templateId, dao, 'DAO_CreateProposal', {
-				proposer: party,
-				membership: membership.contractId,
-				title,
-				description,
-				closesAt,
-				pid
-			})
-		);
-	}
-);
-
 /** The proposal contract the browser saw, if still current and the caller is its proposer. */
 function proposerOf(contractId: string, party: string) {
 	const current = app.currentProposal(contractId);
@@ -394,24 +395,6 @@ export const prepareReady = command(
 		return participant.prepare(
 			party,
 			exercise(Main.Proposal.templateId, proposal, 'Proposal_Ready', {})
-		);
-	}
-);
-
-export const prepareUpdateProposal = command(
-	v.object({
-		party: partyId,
-		proposal: contractId,
-		title: text(120),
-		description: v.pipe(v.string(), v.maxLength(5000))
-	}),
-	async ({ party, proposal, title, description }) => {
-		session.required(party);
-		const current = proposerOf(proposal, party);
-		if (current.ready) throw error(409, 'Voting has opened; the text is fixed');
-		return participant.prepare(
-			party,
-			exercise(Main.Proposal.templateId, proposal, 'Proposal_Update', { title, description })
 		);
 	}
 );

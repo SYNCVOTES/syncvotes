@@ -3,7 +3,8 @@
 	import { page } from '$app/state';
 	import * as remote from '$lib/api.remote';
 	import * as actions from '$lib/actions';
-	import { store, flow } from '$lib/wallet-store.svelte';
+	import { store, flow, describe } from '$lib/wallet-store.svelte';
+	import { createProposalForm as schema } from '$lib/schemas';
 	import { Input } from '$lib/components/ui/input';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import Page from '$lib/components/page.svelte';
@@ -19,36 +20,32 @@
 
 	const id = $derived(page.params.id!);
 	const dao = $derived(store.who ? remote.dao(id) : null);
-
-	let title = $state('');
-	let description = $state('');
-	let days = $state(7);
-	const period = $derived(Math.round(Number(days) || 0));
-	const periodOk = $derived(period >= 1 && period <= 30);
 	let progress = $state({ done: 0, total: 0, what: '' });
 
-	async function submit(event: SubmitEvent) {
-		event.preventDefault();
-		const d = dao?.current;
-		if (!d || !periodOk) return;
-		let pid = '';
-		const ok = await flow.act(async (signer, who) => {
-			pid = await actions.createProposal(
-				signer,
-				who,
-				{
-					dao: d.contractId,
-					daoId: d.id,
-					membership: d.me.membership,
-					title,
-					description,
-					days: period
-				},
+	// Three steps: the proposal (this form), a voting right for every member in batches, then
+	// opening the vote — all signed in turn, no prompt in between.
+	const f = remote.createProposalForm;
+	const enhanced = f.preflight(schema).enhance(async ({ submit }) => {
+		try {
+			await submit();
+		} catch (e) {
+			store.problem = describe(e);
+			return;
+		}
+		const r = f.result;
+		if (!r) return;
+		const ok = await flow.act(async (s, w) => {
+			await actions.signPrepared(s, w, r);
+			await actions.openVoting(
+				s,
+				w,
+				r.pid,
+				r.daoId,
 				(done, total) => (progress = { done, total, what: 'Opening the vote' })
 			);
 		});
-		if (ok) await goto(`/proposals/${pid}`);
-	}
+		if (ok) await goto(`/proposals/${r.pid}`);
+	});
 </script>
 
 <svelte:head><title>New proposal — SyncVotes</title></svelte:head>
@@ -65,45 +62,51 @@
 	{:else if dao?.error}
 		<QueryError error={dao.error} refresh={() => dao?.reconnect()} />
 	{:else}
-		<form class="space-y-8" onsubmit={submit}>
+		<form {...enhanced} class="space-y-8">
 			<Problem message={store.problem} />
 			<SigningProgress {...progress} />
+			{#if dao?.ready}<input {...f.fields.dao.as('hidden', dao.current.contractId)} />{/if}
 
 			<FormSection>
-				<Field label="Title" id="title">
-					<Input id="title" placeholder="Adopt the Q4 budget" maxlength={120} bind:value={title} />
+				<Field label="Title" id="title" issues={f.fields.title.issues()}>
+					<Input
+						{...f.fields.title.as('text')}
+						id="title"
+						placeholder="Adopt the Q4 budget"
+						maxlength={120}
+					/>
 				</Field>
-				<Field label="Description" id="description">
+				<Field label="Description" id="description" issues={f.fields.description.issues()}>
 					<Textarea
+						{...f.fields.description.as('text')}
 						id="description"
 						rows={6}
 						maxlength={5000}
 						placeholder="What is being decided, and why."
-						bind:value={description}
 					/>
 				</Field>
 				<Field
 					label="Voting period (days)"
 					id="days"
-					hint={periodOk ? '1 to 30 days.' : 'The voting period must be 1 to 30 days.'}
+					hint="1 to 30 days."
+					issues={f.fields.days.issues()}
 				>
-					<Input id="days" type="number" min={1} max={30} class="w-32" bind:value={days} />
+					<Input {...f.fields.days.as('number')} id="days" min={1} max={30} class="w-32" />
 				</Field>
 			</FormSection>
 
 			{#if dao?.ready}
 				<p class="font-mono text-xs text-ink-dim">
-					Opening the vote issues a voting right to each of the {fmt(dao.current.members)} members — {Math.ceil(
-						dao.current.members / actions.BATCH
-					) + 2}
-					transactions, signed one after another without further prompts.
+					Opening the vote issues a voting right to each of the {fmt(dao.current.members)} members —
+					{Math.ceil(dao.current.members / actions.RIGHTS_BATCH) + 2} transactions, signed one after another
+					without further prompts.
 				</p>
 			{/if}
 
 			<FormActions
 				label="Create proposal"
-				busy={store.busy}
-				disabled={title.trim().length < 2 || !dao?.ready || !periodOk}
+				busy={store.busy || f.pending > 0}
+				disabled={!dao?.ready}
 				cancelHref="/daos/{id}"
 			/>
 		</form>
