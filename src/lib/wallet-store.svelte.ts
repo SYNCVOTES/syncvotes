@@ -195,6 +195,7 @@ export const flow = {
 				'passkey' in how
 					? await wallet.lockWithPasskey(signer, who.party)
 					: await wallet.lockWithPassword(signer, how.password, who.party);
+			wallets = wallet.storedWallets();
 			await enter(signer, who);
 		});
 	},
