@@ -20,6 +20,7 @@
 
 	let {
 		value = $bindable([]),
+		// eslint-disable-next-line no-useless-assignment -- the effect below keeps it current
 		status = $bindable({ valid: true, checking: false }),
 		exclude,
 		placeholder = 'Paste or type names or party addresses, separated by spaces or commas',
@@ -65,11 +66,16 @@
 			setTimeout(() => (duplicate = null), 1200);
 			return;
 		}
-		const chip: Chip = { token: t, status: 'checking' };
-		chips = [...chips, chip];
-		const found = await remote.member(t).catch(() => null);
+		chips = [...chips, { token: t, status: 'checking' }];
+		let found: { party: string; name: string } | null = null;
+		try {
+			found = await remote.member(t);
+		} catch {
+			found = null;
+		}
+		// By token, not identity: the array is reactive state, so its items are proxies.
 		chips = chips.map((c) =>
-			c !== chip
+			c.token !== t
 				? c
 				: found && found.party !== exclude
 					? { ...c, status: 'valid', party: found.party, name: found.name }
