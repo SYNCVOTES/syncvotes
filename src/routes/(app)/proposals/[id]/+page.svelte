@@ -22,7 +22,7 @@
 	import SearchInput from '$lib/components/search-input.svelte';
 	import DangerZone from '$lib/components/danger-zone.svelte';
 	import SigningProgress from '$lib/components/signing-progress.svelte';
-	import { relative } from '$lib/format';
+	import { relative, dateOf } from '$lib/format';
 
 	const id = $derived(page.params.id!);
 	const me = $derived(store.who?.party ?? null);
@@ -93,7 +93,7 @@
 					<p class="mt-2 flex flex-wrap items-center gap-x-2 font-mono text-xs text-ink-dim">
 						<span>Proposed by</span>
 						<PartyId party={p.proposer} />
-						<span>· {relative(p.createdAt)}</span>
+						<span>· {dateOf(p.createdAt)} ({relative(p.createdAt)})</span>
 					</p>
 				</div>
 				{#if mine && !p.ready}
