@@ -66,8 +66,10 @@ export function daoById(id: string): index.Dao {
 
 /** The browser names the contract it saw; if an edit replaced it meanwhile, say so. */
 export function currentDao(contractId: string): index.Dao {
-	for (const d of index.daos.values()) if (d.contractId === contractId) return d;
-	throw error(409, 'This DAO changed while you were looking at it — reload and try again');
+	const dao = index.daoByContract(contractId);
+	if (!dao)
+		throw error(409, 'This DAO changed while you were looking at it — reload and try again');
+	return dao;
 }
 
 export const daosOf = (party: string): index.Dao[] =>
@@ -111,8 +113,10 @@ export function proposalById(id: string): index.Proposal {
 }
 
 export function currentProposal(contractId: string): index.Proposal {
-	for (const p of index.proposals.values()) if (p.contractId === contractId) return p;
-	throw error(409, 'This proposal changed while you were looking at it — reload and try again');
+	const p = index.proposalByContract(contractId);
+	if (!p)
+		throw error(409, 'This proposal changed while you were looking at it — reload and try again');
+	return p;
 }
 
 export const proposalsOf = (daoId: string): index.Proposal[] =>

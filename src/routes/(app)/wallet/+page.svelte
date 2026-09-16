@@ -14,7 +14,7 @@
 	import KeyValue from '$lib/components/key-value.svelte';
 	import Phrase from '$lib/components/phrase.svelte';
 	import WalletSources from '$lib/components/wallet-sources.svelte';
-	import { normaliseName, nameProblem } from '$lib/names';
+	import { normaliseHint, hintProblem } from '$lib/hint';
 	import { hintOf } from '$lib/format';
 
 	let phraseInput = $state('');
@@ -24,8 +24,8 @@
 
 	const screen = $derived(store.screen);
 	const selectedWallet = $derived(store.wallets.find((w) => w.id === store.selected) ?? null);
-	const chosenHint = $derived(normaliseName(hintInput));
-	const hintIssue = $derived(hintInput.trim() ? nameProblem(chosenHint) : null);
+	const chosenHint = $derived(normaliseHint(hintInput));
+	const hintIssue = $derived(hintInput.trim() ? hintProblem(chosenHint) : null);
 	let passkeys = $state(false);
 	$effect(() => {
 		wallet.passkeysAvailable().then((ok) => (passkeys = ok));

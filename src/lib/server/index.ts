@@ -52,6 +52,7 @@ const int = (v: unknown) => Number(v);
 // ---- the tables --------------------------------------------------------------------------
 
 export const accounts = new Map<string, Account>();
+const accountByCid = new Map<string, string>();
 export const daos = new Map<string, Dao>();
 const daoByCid = new Map<string, string>();
 /** daoId → party → member */
@@ -126,6 +127,7 @@ export function created(e: Created) {
 	if (is(e.templateId, Main.Account)) {
 		const party = a.user as string;
 		accounts.set(party, { contractId: e.contractId, party });
+		accountByCid.set(e.contractId, party);
 		touch(keys.all);
 	} else if (is(e.templateId, Main.DAO)) {
 		const dao: Dao = {
@@ -198,12 +200,12 @@ export function created(e: Created) {
 }
 
 export function archived(contractId: string) {
-	for (const [party, acc] of accounts) {
-		if (acc.contractId === contractId) {
-			accounts.delete(party);
-			touch(keys.all);
-			return;
-		}
+	const owner = accountByCid.get(contractId);
+	if (owner) {
+		accountByCid.delete(contractId);
+		if (accounts.get(owner)?.contractId === contractId) accounts.delete(owner);
+		touch(keys.all);
+		return;
 	}
 	const daoId = daoByCid.get(contractId);
 	if (daoId) {
@@ -252,6 +254,20 @@ export function archived(contractId: string) {
 		touch(keys.proposal(b.proposalId), keys.party(b.voter));
 	}
 }
+
+/** The DAO whose current contract this is, if any. */
+export const daoByContract = (contractId: string) => {
+	const id = daoByCid.get(contractId);
+	const dao = id ? daos.get(id) : undefined;
+	return dao?.contractId === contractId ? dao : undefined;
+};
+
+/** The proposal whose current contract this is, if any. */
+export const proposalByContract = (contractId: string) => {
+	const id = proposalByCid.get(contractId);
+	const p = id ? proposals.get(id) : undefined;
+	return p?.contractId === contractId ? p : undefined;
+};
 
 /** Called after each transaction's events were applied: wake whoever watches what changed. */
 export function commit() {

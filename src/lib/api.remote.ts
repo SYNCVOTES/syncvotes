@@ -9,7 +9,7 @@ import * as index from './server/index';
 import { nextChange } from './server/feed';
 import * as session from './server/session';
 import { fingerprintOf } from './verify';
-import { normaliseName, nameProblem } from './names';
+import { normaliseHint, hintProblem } from './hint';
 import * as schemas from './schemas';
 
 /**
@@ -68,8 +68,8 @@ export const lookup = query(base64, async (publicKey) => {
 });
 
 const hintOf = (hint: string) => {
-	const chosen = normaliseName(hint);
-	const problem = nameProblem(chosen);
+	const chosen = normaliseHint(hint);
+	const problem = hintProblem(chosen);
 	if (problem) throw error(400, problem);
 	return chosen;
 };
@@ -117,12 +117,6 @@ export const sessionStart = command(
 );
 
 export const sessionEnd = command(() => session.end());
-
-/** Whether a party id is registered — what a member chip checks itself against. */
-export const member = query(v.pipe(v.string(), v.trim(), v.maxLength(300)), (token) => {
-	session.required();
-	return app.isRegistered(token) ? { party: token } : null;
-});
 
 /** Which of these party ids are registered — a pasted list, checked in one go. */
 export const checkMembers = query(

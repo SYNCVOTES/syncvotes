@@ -1,6 +1,6 @@
 import * as wallet from './wallet';
 import * as actions from './actions';
-import * as session from './session';
+import * as autoLock from './auto-lock';
 import { label } from './format';
 
 /**
@@ -130,14 +130,14 @@ async function enter(signer: wallet.Signer, who: actions.Identity) {
 	// The read session first, so the pages that open next are allowed to read.
 	await actions.openSession(signer, who);
 	screen = { at: 'home', signer, who };
-	session.start(signer, lock);
+	autoLock.start(signer, lock);
 }
 
 /** A key is in hand — find out whether the ledger already knows it. */
 const identify = (signer: wallet.Signer) =>
 	run(async () => {
 		// From here on a key is in memory, so the auto-lock is armed from here on too.
-		session.start(signer, lock);
+		autoLock.start(signer, lock);
 		const found = await actions.lookup(signer);
 		if (found.exists) {
 			screen = { at: 'protect', signer, who: { party: found.party, account: found.account } };
@@ -149,12 +149,12 @@ const identify = (signer: wallet.Signer) =>
 export const flow = {
 	startCreate() {
 		if ('signer' in screen) screen.signer.dispose();
-		session.lock();
+		autoLock.lock();
 		screen = { at: 'create', phrase: wallet.newPhrase() };
 	},
 	startRestore() {
 		if ('signer' in screen) screen.signer.dispose();
-		session.lock();
+		autoLock.lock();
 		screen = { at: 'restore' };
 	},
 	back: () => lock(),
@@ -162,7 +162,7 @@ export const flow = {
 	/** Offers another stored key to unlock; whatever was unlocked is locked first. */
 	select(id: string) {
 		if ('signer' in screen) screen.signer.dispose();
-		session.lock();
+		autoLock.lock();
 		offer(id);
 	},
 
@@ -228,7 +228,7 @@ export const flow = {
 				kind === 'passkey'
 					? await wallet.unlockWithPasskey(id)
 					: await wallet.unlockWithPassword(password ?? '', id);
-			session.start(signer, lock);
+			autoLock.start(signer, lock);
 			const found = await actions.lookup(signer);
 			if (!found.exists) {
 				screen = { at: 'hint', signer, fingerprint: found.fingerprint };
@@ -274,6 +274,6 @@ export function lock() {
 		screen.signer.dispose();
 		void actions.closeSession();
 	}
-	session.lock();
+	autoLock.lock();
 	offer(selected);
 }

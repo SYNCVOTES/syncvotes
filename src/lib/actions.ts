@@ -1,6 +1,6 @@
 import * as remote from './api.remote';
 import { toBase64, type Signer } from './wallet';
-import { verifyPrepared, verifyTopology, fingerprintOf, type Plain } from './verify';
+import { verifyPrepared, verifyTopology, type Plain } from './verify';
 
 /**
  * The browser's half of every ledger operation. The server prepares transactions; this file
@@ -12,7 +12,7 @@ import { verifyPrepared, verifyTopology, fingerprintOf, type Plain } from './ver
  */
 
 export type Identity = { party: string; account: string };
-export type Lookup = Awaited<ReturnType<typeof remote.lookup>>;
+type Lookup = Awaited<ReturnType<typeof remote.lookup>>;
 export type Topology = Awaited<ReturnType<typeof remote.topology>>;
 export type Progress = (done: number, total: number) => void;
 
@@ -23,10 +23,6 @@ export const RIGHTS_BATCH = 100;
 
 /** Whether the ledger already knows this key. */
 export const lookup = (s: Signer): Promise<Lookup> => remote.lookup(toBase64(s.publicKey));
-
-/** The party id this key gets under `hint`: hint, two colons, the key's fingerprint. */
-export const partyFor = async (s: Signer, hint: string) =>
-	`${hint}::${await fingerprintOf(s.publicKey)}`;
 
 /** What creating the party under `hint` would sign. */
 export const topology = (s: Signer, hint: string): Promise<Topology> =>

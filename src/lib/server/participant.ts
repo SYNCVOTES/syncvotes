@@ -188,16 +188,6 @@ export async function allocateExternal(
 	return creation.execute(signature, { grantUserRights: false });
 }
 
-/** A party the participant knows is connected to at least one synchronizer. */
-export async function partyExists(party: string): Promise<boolean> {
-	try {
-		const { connectedSynchronizers } = await (await sdk()).ledger.connectedSynchronizers({ party });
-		return (connectedSynchronizers?.length ?? 0) > 0;
-	} catch {
-		return false;
-	}
-}
-
 export type Prepared = {
 	preparedTransaction: string;
 	preparedTransactionHash: string;

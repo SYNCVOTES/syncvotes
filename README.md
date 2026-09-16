@@ -150,7 +150,7 @@ submissions.
 | `daml/src/Main.daml`             | `Account`, `DAO`, `Proposal` — the whole model                                                |
 | `daml.js/`                       | Generated bindings — never edit, regenerate with `pnpm daml:codegen`                          |
 | `src/lib/wallet.ts`              | Phrase → signer closure; any number of keys encrypted at rest per device                      |
-| `src/lib/session.ts`             | Auto-lock: disposes the signer after 15 quiet minutes or on `pagehide`                        |
+| `src/lib/auto-lock.ts`           | Disposes the signer after 15 quiet minutes or on `pagehide`                                   |
 | `src/lib/wallet-store.svelte.ts` | The wallet as one rune store: onboarding screens, signer, identity                            |
 | `src/lib/verify.ts`              | Recomputes hashes and inspects transactions before anything is signed                         |
 | `src/lib/actions.ts`             | What the browser does: call the API, verify, sign, call again                                 |

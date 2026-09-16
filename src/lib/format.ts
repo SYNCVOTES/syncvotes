@@ -10,9 +10,6 @@ export function relative(iso: string, now = Date.now()): string {
 	return diff > 0 ? `in ${span}` : `${span} ago`;
 }
 
-export const shortParty = (party: string) =>
-	`${party.split('::')[0]}::${party.split('::')[1]?.slice(0, 8)}…`;
-
 /** "Sep 15, 2026" */
 export const dateOf = (iso: string) =>
 	new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });

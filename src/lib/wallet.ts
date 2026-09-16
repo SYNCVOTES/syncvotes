@@ -103,7 +103,6 @@ export function signerFromPhrase(phrase: string): Signer {
 
 const STORE = 'syncvotes.keys';
 const ACTIVE = 'syncvotes.active';
-const LEGACY = 'syncvotes.key';
 
 type Lock =
 	{ kind: 'passkey'; credentialId: string; salt: string } | { kind: 'password'; salt: string };
@@ -123,15 +122,6 @@ type Stored = Omit<StoredWallet, 'lock'> & { version: 2; lock: Lock; iv: string;
 function loadAll(): Stored[] {
 	try {
 		const list = JSON.parse(localStorage.getItem(STORE) ?? '[]') as Stored[];
-		// A key stored by the single-wallet version becomes the first entry; its name and party
-		// are filled in the first time it is unlocked.
-		const legacy = localStorage.getItem(LEGACY);
-		if (legacy) {
-			const old = JSON.parse(legacy) as { lock: Lock; iv: string; data: string };
-			list.push({ version: 2, id: crypto.randomUUID(), name: '', party: '', created: '', ...old });
-			saveAll(list);
-			localStorage.removeItem(LEGACY);
-		}
 		return list;
 	} catch {
 		return [];
