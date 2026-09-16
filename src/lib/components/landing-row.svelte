@@ -11,7 +11,7 @@
 </script>
 
 <div
-	class="{reveal} grid gap-4 border-b border-border py-9 md:grid-cols-[200px_1fr_1fr] md:gap-10 md:py-11"
+	class="{reveal} grid gap-4 border-b border-border py-9 md:grid-cols-[200px_1fr_1fr] md:items-center md:gap-10 md:py-11"
 	style="transition-delay: {delay}s"
 >
 	<div class="{tag} text-orange">{label}</div>
