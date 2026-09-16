@@ -73,11 +73,18 @@
 		} catch {
 			found = null;
 		}
+		// Yourself, by name: not a chip, you are in already.
+		if (found && found.party === exclude) {
+			chips = chips.filter((c) => c.token !== t);
+			duplicate = t;
+			setTimeout(() => (duplicate = null), 1200);
+			return;
+		}
 		// By token, not identity: the array is reactive state, so its items are proxies.
 		chips = chips.map((c) =>
 			c.token !== t
 				? c
-				: found && found.party !== exclude
+				: found
 					? { ...c, status: 'valid', party: found.party, name: found.name }
 					: { ...c, status: 'invalid' }
 		);
