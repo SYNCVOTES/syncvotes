@@ -97,6 +97,10 @@ async function run(action: () => Promise<void>) {
 export function describe(error: unknown): string {
 	const body = (error as { body?: { message?: string } })?.body;
 	if (body?.message) return body.message;
+	// WebAuthn's one error for "cancelled", "timed out" and "no such passkey here".
+	if (error instanceof DOMException && error.name === 'NotAllowedError') {
+		return 'Touch ID was cancelled or timed out — try again';
+	}
 	return error instanceof Error ? error.message : String(error);
 }
 

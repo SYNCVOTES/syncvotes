@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { afterNavigate } from '$app/navigation';
 	import BrandMark from '$lib/components/brand-mark.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { store } from '$lib/wallet-store.svelte';
@@ -10,6 +11,9 @@
 	import ArrowUpRight from '@lucide/svelte/icons/arrow-up-right';
 
 	let { children } = $props();
+
+	// A problem belongs to the page it happened on.
+	afterNavigate(() => (store.problem = null));
 
 	const nav = [
 		{ href: '/my-daos', label: 'My DAOs' },
