@@ -160,8 +160,14 @@ package, with the asked-for arguments, acting as the user alone — and at sign-
 key's own namespace, held by this key alone, hosted for confirmation only. The server, in turn,
 executes only transactions it prepared itself, so its own rules cannot be bypassed.
 
-Reads are open: a DAO is private to the _network_, and this app — as operator — sees all of them,
-so listing a party's DAOs takes only the party id. A signed read session is a later iteration.
+Reads need a session. A DAO is private to the _network_ by construction, and this app — as
+operator — sees all of them; what keeps a DAO to its members on the way to a browser is the app.
+Once per unlock the browser signs a challenge with the party's key (`sessionChallenge` /
+`sessionStart`), the server checks the signature against the key the party id names and keeps a
+session in memory behind an HttpOnly cookie (`src/lib/server/session.ts`). The DAO, proposal and
+my-DAOs reads require that session and membership; prepares require it too. The directory, the
+landing counts and the party lookup stay open. A restart forgets sessions; the browser, still
+holding the key, signs again on its next unlock.
 
 Reads are live. The server holds one subscription to the participant's update stream (the SDK's
 `events.updates` over the JSON API websocket, as the operator, for the three templates), and

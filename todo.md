@@ -39,3 +39,5 @@
       under-the-hood sections; contrast raised in its own commit
 - [ ] the billing agent's auth model (one Keycloak client per wallet user, or one service account
       acting for the treasury only) — the user's call, script lives outside the repo
+- [x] read sessions: a DAO is readable by its members only (signed challenge per unlock, HttpOnly
+      cookie, in-memory sessions); WebAuthn errors in plain words; edit pages wait for data
