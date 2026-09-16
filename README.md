@@ -56,7 +56,7 @@ submission.
   proposals are open). Every edit replaces the contract, so a DAO carries a stable `id` chosen
   in the browser at creation.
 - `Proposal` — signatory proposer and provider. One ballot per member; passes when a majority of
-  all members voted Yes; closable once settled or after the deadline. The proposer can rewrite
+  all members voted Yes; after the deadline any member closes it (`Proposal_Close`), which records the outcome the ballots decided. The proposer can rewrite
   the text until the first ballot and withdraw it until it settles; the DAO admin can withdraw
   too (the proposal copies the admin and the DAO's id at creation, so it still knows its DAO
   after the DAO contract was replaced). Each vote replaces the contract, so a proposal carries a
@@ -166,8 +166,11 @@ operator — sees all of them; what keeps a DAO to its members on the way to a b
 Once per unlock the browser signs a challenge with the party's key (`sessionChallenge` /
 `sessionStart`), the server checks the signature against the key the party id names and keeps a
 session in memory behind an HttpOnly cookie (`src/lib/server/session.ts`). The DAO, proposal and
-my-DAOs reads require that session and membership; prepares require it too. The directory, the
-landing counts and the party lookup stay open. A restart forgets sessions; the browser, still
+my-DAOs reads require that session and membership; prepares, the directory and the member lookup
+require it too. Only the landing counts and the party lookup stay open. A live query that loses
+access ends with that error rather than freezing a stale view; a session lost while the key is
+still unlocked (a restart, another tab locking) is re-signed on the spot and the query
+reconnected. A restart forgets sessions; the browser, still
 holding the key, signs again on its next unlock.
 
 Reads are live. The server holds one subscription to the participant's update stream (the SDK's

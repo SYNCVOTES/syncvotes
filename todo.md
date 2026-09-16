@@ -44,3 +44,8 @@
 - [x] pages composed from components (components/ui = shadcn primitives, components/ = everything
       built on them, landing-* for the landing); SyncVotes favicon (SVG + PNG), the template's
       Svelte favicon link removed from the root layout
+- [x] second review round (UI/UX + edge cases, browser-tested): close after deadline, directory
+      behind a session, session recovery, error pages, trim-before-sign, overflow, name preview,
+      forget confirm, propose gate, period check
+- [ ] names are unique only app-side (no contract keys on LF 2.2): two simultaneous registrations
+      of one name can both land
