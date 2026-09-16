@@ -4,14 +4,17 @@
 	import * as remote from '$lib/api.remote';
 	import * as actions from '$lib/actions';
 	import { store, flow, describe } from '$lib/wallet-store.svelte';
-	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Textarea } from '$lib/components/ui/textarea';
-	import { Label } from '$lib/components/ui/label';
-	import PageHeader from '$lib/components/app/page-header.svelte';
-	import ConnectPrompt from '$lib/components/app/connect-prompt.svelte';
-	import Problem from '$lib/components/app/problem.svelte';
-	import BackLink from '$lib/components/app/back-link.svelte';
+	import Page from '$lib/components/page.svelte';
+	import PageHeader from '$lib/components/page-header.svelte';
+	import ConnectPrompt from '$lib/components/connect-prompt.svelte';
+	import Problem from '$lib/components/problem.svelte';
+	import Skeleton from '$lib/components/skeleton.svelte';
+	import FormSection from '$lib/components/form-section.svelte';
+	import Field from '$lib/components/field.svelte';
+	import FormActions from '$lib/components/form-actions.svelte';
+	import DangerZone from '$lib/components/danger-zone.svelte';
 
 	const id = $derived(page.params.id!);
 	const me = $derived(store.who?.party ?? null);
@@ -21,7 +24,6 @@
 	let description = $state('');
 	let membersText = $state('');
 	let loaded = $state(false);
-	let confirming = $state(false);
 
 	// Fill the form once from the live query; later updates must not overwrite what is typed.
 	$effect(() => {
@@ -63,80 +65,66 @@
 
 <svelte:head><title>Edit {dao?.current?.name ?? 'DAO'} — SyncVotes</title></svelte:head>
 
-<div class="mx-auto max-w-[760px] px-6 py-12 md:px-10">
-	<BackLink href="/daos/{id}" label={dao?.current?.name ?? 'DAO'} />
-	<div class="mt-6">
-		<PageHeader
-			eyebrow="Settings"
-			title="Edit DAO"
-			description="Changes are signed by your key like everything else. Open proposals keep the member list they were opened with."
-		/>
-	</div>
+<Page width="narrow" back={{ href: `/daos/${id}`, label: dao?.current?.name ?? 'DAO' }}>
+	<PageHeader
+		eyebrow="Settings"
+		title="Edit DAO"
+		description="Changes are signed by your key like everything else. Open proposals keep the member list they were opened with."
+	/>
 
 	{#if !dao}
 		<ConnectPrompt what="edit this DAO" />
 	{:else if dao.error}
 		<Problem message={describe(dao.error)} />
 	{:else if !dao.ready}
-		<div class="h-64 animate-pulse border border-border bg-surface"></div>
+		<Skeleton height="h-64" />
 	{:else if dao.current.admin !== me}
 		<p class="text-[13px] text-ink-dim">Only the admin can edit this DAO.</p>
 	{:else}
 		<form class="space-y-8" onsubmit={save}>
 			<Problem message={store.problem} />
 
-			<section class="space-y-5 border border-border bg-surface p-6">
-				<h2 class="eyebrow">Basic information</h2>
-				<div class="space-y-2">
-					<Label for="name">Name</Label>
+			<FormSection title="Basic information">
+				<Field label="Name" id="name">
 					<Input id="name" maxlength={60} bind:value={name} />
-				</div>
-				<div class="space-y-2">
-					<Label for="description">Description</Label>
+				</Field>
+				<Field label="Description" id="description">
 					<Textarea id="description" rows={4} bind:value={description} />
-				</div>
-			</section>
+				</Field>
+			</FormSection>
 
-			<section class="space-y-5 border border-border bg-surface p-6">
-				<h2 class="eyebrow">Members</h2>
-				<div class="space-y-2">
-					<Label for="members">Members besides you</Label>
+			<FormSection title="Members">
+				<Field
+					label="Members besides you"
+					id="members"
+					hint="Members are named by their SyncVotes name. You stay the admin and a member."
+				>
 					<Textarea
 						id="members"
 						rows={3}
 						placeholder="Names, separated by spaces or commas — alice bob carol"
 						bind:value={membersText}
 					/>
-					<p class="text-xs text-ink-dim">
-						Members are named by their SyncVotes name. You stay the admin and a member.
-					</p>
-				</div>
-			</section>
+				</Field>
+			</FormSection>
 
-			<div class="flex items-center gap-3">
-				<Button type="submit" size="lg" disabled={store.busy || name.trim().length < 2}>
-					{store.busy ? 'Signing…' : 'Save changes'}
-				</Button>
-				<Button href="/daos/{id}" variant="ghost">Cancel</Button>
-			</div>
+			<FormActions
+				label="Save changes"
+				busy={store.busy}
+				disabled={name.trim().length < 2}
+				cancelHref="/daos/{id}"
+			/>
 		</form>
 
-		<section class="mt-14 space-y-4 border border-red/30 bg-red/[0.04] p-6">
-			<h2 class="eyebrow text-red">Delete DAO</h2>
-			<p class="text-[13px] text-ink-mid">
-				Archives the DAO on the ledger. Settled proposals stay readable; open ones have to be closed
-				or cancelled first.
-			</p>
-			{#if confirming}
-				<div class="flex items-center gap-3">
-					<Button variant="destructive" disabled={store.busy} onclick={remove}>
-						{store.busy ? 'Signing…' : 'Yes, delete it'}
-					</Button>
-					<Button variant="ghost" onclick={() => (confirming = false)}>Keep it</Button>
-				</div>
-			{:else}
-				<Button variant="destructive" onclick={() => (confirming = true)}>Delete DAO</Button>
-			{/if}
-		</section>
+		<div class="mt-14">
+			<DangerZone
+				title="Delete DAO"
+				text="Archives the DAO on the ledger. Settled proposals stay readable; open ones have to be closed or cancelled first."
+				action="Delete DAO"
+				confirm="Yes, delete it"
+				busy={store.busy}
+				onconfirm={remove}
+			/>
+		</div>
 	{/if}
-</div>
+</Page>

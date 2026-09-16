@@ -5,12 +5,20 @@
 	import * as actions from '$lib/actions';
 	import { store, flow, describe } from '$lib/wallet-store.svelte';
 	import { Button } from '$lib/components/ui/button';
-	import StatusBadge from '$lib/components/app/status-badge.svelte';
-	import Problem from '$lib/components/app/problem.svelte';
-	import BackLink from '$lib/components/app/back-link.svelte';
-	import PartyId from '$lib/components/app/party-id.svelte';
-	import UnlockForm from '$lib/components/app/unlock-form.svelte';
-	import ConnectPrompt from '$lib/components/app/connect-prompt.svelte';
+	import Page from '$lib/components/page.svelte';
+	import StatusBadge from '$lib/components/status-badge.svelte';
+	import Problem from '$lib/components/problem.svelte';
+	import UnlockForm from '$lib/components/unlock-form.svelte';
+	import ConnectPrompt from '$lib/components/connect-prompt.svelte';
+	import PartyId from '$lib/components/party-id.svelte';
+	import Panel from '$lib/components/panel.svelte';
+	import Note from '$lib/components/note.svelte';
+	import Tally from '$lib/components/tally.svelte';
+	import SectionTitle from '$lib/components/section-title.svelte';
+	import List from '$lib/components/list.svelte';
+	import ListItem from '$lib/components/list-item.svelte';
+	import Skeleton from '$lib/components/skeleton.svelte';
+	import DangerZone from '$lib/components/danger-zone.svelte';
 	import { relative } from '$lib/format';
 
 	const id = $derived(page.params.id!);
@@ -20,26 +28,28 @@
 	const nameOf = (party: string) => proposal?.current?.names[party] ?? party.split('::')[0];
 
 	// The stream brings the new contract the moment the vote lands; nothing to refresh by hand.
-	const act = (
-		what: (signer: Parameters<typeof actions.vote>[0], who: actions.Identity) => Promise<void>
-	) => flow.act(what);
+	const vote = (contractId: string, choice: 'Yes' | 'No') =>
+		flow.act((s, w) => actions.vote(s, w, contractId, choice));
 
-	let cancelling = $state(false);
 	async function cancel(contractId: string, dao: string) {
-		const ok = await act((s, w) => actions.cancelProposal(s, w, contractId));
+		const ok = await flow.act((s, w) => actions.cancelProposal(s, w, contractId));
 		if (ok) await goto(`/daos/${dao}`);
 	}
 </script>
 
 <svelte:head><title>{proposal?.current?.title ?? 'Proposal'} — SyncVotes</title></svelte:head>
 
-<div class="mx-auto max-w-[900px] px-6 py-12 md:px-10">
+<Page
+	back={proposal?.current
+		? { href: `/daos/${proposal.current.daoId}`, label: proposal.current.daoName }
+		: undefined}
+>
 	{#if !proposal}
 		<ConnectPrompt what="see this proposal" />
 	{:else if proposal.error}
 		<Problem message={describe(proposal.error)} />
 	{:else if !proposal.ready}
-		<div class="h-40 animate-pulse border border-border bg-surface"></div>
+		<Skeleton />
 	{:else}
 		{@const p = proposal.current}
 		{@const yes = p.ballots.filter((b) => b.vote === 'Yes').length}
@@ -53,9 +63,7 @@
 		{@const mine = me !== null && me === p.proposer}
 		{@const canCancel = !p.outcome && (mine || (me !== null && me === p.admin))}
 
-		<BackLink href="/daos/{p.daoId}" label={p.daoName} />
-
-		<div class="mt-6 mb-8">
+		<div class="mb-8">
 			<div class="mb-3 flex items-center gap-3">
 				<StatusBadge outcome={p.outcome} closesAt={p.closesAt} />
 				<span class="font-mono text-xs text-ink-dim">
@@ -85,106 +93,75 @@
 
 		<div class="grid gap-8 lg:grid-cols-[1fr_320px]">
 			<section class="space-y-8">
-				<div
-					class="border border-border bg-surface p-6 text-sm leading-relaxed whitespace-pre-wrap"
-				>
+				<Panel class="text-sm leading-relaxed whitespace-pre-wrap">
 					{p.description || 'No description.'}
-				</div>
+				</Panel>
 
 				<div>
-					<h2 class="eyebrow mb-4">Ballots</h2>
+					<SectionTitle title="Ballots" />
 					{#if p.ballots.length === 0}
 						<p class="text-[13px] text-ink-dim">No votes yet.</p>
 					{:else}
-						<ul class="divide-y divide-border border border-border bg-surface">
+						<List>
 							{#each p.ballots as b (b.voter)}
-								<li class="flex items-center gap-3 px-4 py-3 font-mono text-xs">
+								<ListItem class="flex items-center gap-3 font-mono text-xs">
 									<span class={b.voter === me ? 'text-orange' : ''}>{nameOf(b.voter)}</span>
 									<PartyId party={b.voter} class="min-w-0 flex-1" />
 									<span class={b.vote === 'Yes' ? 'text-green' : 'text-red'}>{b.vote}</span>
-								</li>
+								</ListItem>
 							{/each}
-						</ul>
+						</List>
 					{/if}
 				</div>
 			</section>
 
 			<aside class="space-y-6">
-				<div class="border border-border bg-surface p-5">
-					<h2 class="eyebrow mb-4">Tally</h2>
-					<div class="mb-2 flex h-2 overflow-hidden bg-surface-active">
-						<div class="bg-green" style="width: {(yes / n) * 100}%"></div>
-						<div class="bg-red" style="width: {(no / n) * 100}%"></div>
-					</div>
-					<div class="flex justify-between font-mono text-xs">
-						<span class="text-green">{yes} yes</span>
-						<span class="text-ink-dim">{needed} of {n} to pass</span>
-						<span class="text-red">{no} no</span>
-					</div>
-				</div>
+				<Tally {yes} {no} total={n} {needed} />
 
 				{#if outcome}
-					<div class="border border-border bg-surface p-5 font-mono text-xs text-ink-mid">
+					<Note>
 						{p.outcome ? 'Settled as' : 'Ended as'}
 						<span class={outcome === 'Passed' ? 'text-green' : 'text-red'}>{outcome}</span>.
-					</div>
+					</Note>
 				{/if}
 				{#if canCancel}
-					<div class="space-y-3 border border-border bg-surface p-5">
-						<p class="text-[13px] text-ink-dim">
-							{mine ? 'Withdraw your proposal.' : 'As admin you can withdraw this proposal.'}
-						</p>
-						{#if cancelling}
-							<div class="flex gap-3">
-								<Button
-									variant="destructive"
-									size="sm"
-									disabled={store.busy}
-									onclick={() => cancel(p.contractId, p.daoId)}>Yes, withdraw</Button
-								>
-								<Button variant="ghost" size="sm" onclick={() => (cancelling = false)}>Keep</Button>
-							</div>
-						{:else}
-							<Button variant="destructive" size="sm" onclick={() => (cancelling = true)}
-								>Cancel proposal</Button
-							>
-						{/if}
-					</div>
+					<DangerZone
+						compact
+						text={mine ? 'Withdraw your proposal.' : 'As admin you can withdraw this proposal.'}
+						action="Cancel proposal"
+						confirm="Yes, withdraw"
+						busy={store.busy}
+						onconfirm={() => cancel(p.contractId, p.daoId)}
+					/>
 				{/if}
 				{#if outcome}
 					<!-- settled: nothing more to do -->
 				{:else if store.screen.at === 'locked'}
-					<div class="space-y-3 border border-border bg-surface p-5">
+					<Panel padding="sm" class="space-y-3">
 						<p class="text-[13px] text-ink-dim">Unlock your wallet to vote.</p>
 						<UnlockForm />
-					</div>
+					</Panel>
 				{:else if !store.who}
-					<div class="border border-border bg-surface p-5 text-[13px] text-ink-dim">
+					<Note mono={false}>
 						<a href="/wallet" class="text-orange hover:underline">Connect a wallet</a> to vote.
-					</div>
+					</Note>
 				{:else if !member}
-					<div class="border border-border bg-surface p-5 text-[13px] text-ink-dim">
-						Only members can vote.
-					</div>
+					<Note mono={false}>Only members can vote.</Note>
 				{:else if voted}
-					<div class="border border-border bg-surface p-5 font-mono text-xs text-ink-dim">
-						You voted.
-					</div>
+					<Note>You voted.</Note>
 				{:else}
-					<div class="grid grid-cols-2 gap-3 border border-border bg-surface p-5">
-						<Button
-							variant="accent"
-							disabled={store.busy}
-							onclick={() => act((s, w) => actions.vote(s, w, p.contractId, 'Yes'))}>Yes</Button
+					<Panel padding="sm" class="grid grid-cols-2 gap-3">
+						<Button variant="accent" disabled={store.busy} onclick={() => vote(p.contractId, 'Yes')}
+							>Yes</Button
 						>
 						<Button
 							variant="destructive"
 							disabled={store.busy}
-							onclick={() => act((s, w) => actions.vote(s, w, p.contractId, 'No'))}>No</Button
+							onclick={() => vote(p.contractId, 'No')}>No</Button
 						>
-					</div>
+					</Panel>
 				{/if}
 			</aside>
 		</div>
 	{/if}
-</div>
+</Page>

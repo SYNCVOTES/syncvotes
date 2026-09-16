@@ -2,13 +2,15 @@
 	import { goto } from '$app/navigation';
 	import * as actions from '$lib/actions';
 	import { store, flow } from '$lib/wallet-store.svelte';
-	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Textarea } from '$lib/components/ui/textarea';
-	import { Label } from '$lib/components/ui/label';
-	import PageHeader from '$lib/components/app/page-header.svelte';
-	import ConnectPrompt from '$lib/components/app/connect-prompt.svelte';
-	import Problem from '$lib/components/app/problem.svelte';
+	import Page from '$lib/components/page.svelte';
+	import PageHeader from '$lib/components/page-header.svelte';
+	import ConnectPrompt from '$lib/components/connect-prompt.svelte';
+	import Problem from '$lib/components/problem.svelte';
+	import FormSection from '$lib/components/form-section.svelte';
+	import Field from '$lib/components/field.svelte';
+	import FormActions from '$lib/components/form-actions.svelte';
 
 	let name = $state('');
 	let description = $state('');
@@ -32,7 +34,7 @@
 
 <svelte:head><title>Create DAO — SyncVotes</title></svelte:head>
 
-<div class="mx-auto max-w-[760px] px-6 py-12 md:px-10">
+<Page width="narrow">
 	<PageHeader
 		eyebrow="New organisation"
 		title="Create DAO"
@@ -45,51 +47,46 @@
 		<form class="space-y-8" onsubmit={submit}>
 			<Problem message={store.problem} />
 
-			<section class="space-y-5 border border-border bg-surface p-6">
-				<h2 class="eyebrow">Basic information</h2>
-				<div class="space-y-2">
-					<Label for="name">Name</Label>
+			<FormSection title="Basic information">
+				<Field label="Name" id="name">
 					<Input
 						id="name"
 						placeholder="Canton Technical Committee"
 						maxlength={60}
 						bind:value={name}
 					/>
-				</div>
-				<div class="space-y-2">
-					<Label for="description">Description</Label>
+				</Field>
+				<Field label="Description" id="description">
 					<Textarea
 						id="description"
 						rows={4}
 						placeholder="Governs protocol upgrades and technical parameters..."
 						bind:value={description}
 					/>
-				</div>
-			</section>
+				</Field>
+			</FormSection>
 
-			<section class="space-y-5 border border-border bg-surface p-6">
-				<h2 class="eyebrow">Members</h2>
-				<div class="space-y-2">
-					<Label for="members">Additional members</Label>
+			<FormSection title="Members">
+				<Field
+					label="Additional members"
+					id="members"
+					hint="Members are named by their SyncVotes name. You can change the list later."
+				>
 					<Textarea
 						id="members"
 						rows={3}
 						placeholder="Names, separated by spaces or commas — alice bob carol"
 						bind:value={membersText}
 					/>
-					<p class="text-xs text-ink-dim">
-						Members are named by their SyncVotes name. Membership is fixed at creation in this
-						version.
-					</p>
-				</div>
-			</section>
+				</Field>
+			</FormSection>
 
-			<div class="flex items-center gap-3">
-				<Button type="submit" size="lg" disabled={store.busy || name.trim().length < 2}>
-					{store.busy ? 'Signing…' : 'Create DAO'}
-				</Button>
-				<Button href="/my-daos" variant="ghost">Cancel</Button>
-			</div>
+			<FormActions
+				label="Create DAO"
+				busy={store.busy}
+				disabled={name.trim().length < 2}
+				cancelHref="/my-daos"
+			/>
 		</form>
 	{/if}
-</div>
+</Page>

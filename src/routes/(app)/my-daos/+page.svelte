@@ -1,13 +1,15 @@
 <script lang="ts">
 	import * as remote from '$lib/api.remote';
-	import { store } from '$lib/wallet-store.svelte';
+	import { store, describe } from '$lib/wallet-store.svelte';
 	import { Button } from '$lib/components/ui/button';
-	import PageHeader from '$lib/components/app/page-header.svelte';
-	import ConnectPrompt from '$lib/components/app/connect-prompt.svelte';
-	import DaoCard from '$lib/components/app/dao-card.svelte';
-	import Stat from '$lib/components/app/stat.svelte';
-	import Problem from '$lib/components/app/problem.svelte';
-	import { describe } from '$lib/wallet-store.svelte';
+	import Page from '$lib/components/page.svelte';
+	import PageHeader from '$lib/components/page-header.svelte';
+	import ConnectPrompt from '$lib/components/connect-prompt.svelte';
+	import DaoCard from '$lib/components/dao-card.svelte';
+	import Stat from '$lib/components/stat.svelte';
+	import Problem from '$lib/components/problem.svelte';
+	import Skeleton from '$lib/components/skeleton.svelte';
+	import EmptyState from '$lib/components/empty-state.svelte';
 	import Plus from '@lucide/svelte/icons/plus';
 
 	const who = $derived(store.who);
@@ -17,7 +19,7 @@
 
 <svelte:head><title>My DAOs — SyncVotes</title></svelte:head>
 
-<div class="mx-auto max-w-[1120px] px-6 py-12 md:px-10">
+<Page width="wide">
 	<PageHeader
 		eyebrow="Personal workspace"
 		title="My DAOs"
@@ -34,9 +36,7 @@
 		<Problem message={describe(daos.error)} />
 	{:else if !daos.ready}
 		<div class="grid gap-3 md:grid-cols-3">
-			{#each [1, 2, 3] as i (i)}<div
-					class="h-24 animate-pulse border border-border bg-surface"
-				></div>{/each}
+			{#each [1, 2, 3] as i (i)}<Skeleton height="h-24" />{/each}
 		</div>
 	{:else}
 		<div class="mb-8 grid grid-cols-2 gap-3 md:grid-cols-3">
@@ -46,12 +46,9 @@
 		</div>
 
 		{#if daos.current.length === 0}
-			<div class="border border-dashed border-border px-6 py-16 text-center">
-				<p class="font-display text-[17px] font-bold">No DAOs yet</p>
-				<p class="mt-2 text-[13px] text-ink-dim">
-					Create one, or ask a friend to add <span class="font-mono text-ink">{who.name}</span> as a member.
-				</p>
-			</div>
+			<EmptyState title="No DAOs yet">
+				Create one, or ask a friend to add <span class="font-mono text-ink">{who.name}</span> as a member.
+			</EmptyState>
 		{:else}
 			<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
 				{#each daos.current as dao (dao.contractId)}
@@ -67,4 +64,4 @@
 			</div>
 		{/if}
 	{/if}
-</div>
+</Page>

@@ -1,13 +1,23 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import * as remote from '$lib/api.remote';
-	import BrandMark from '$lib/components/brand-mark.svelte';
 	import { NETWORK } from '$lib/network';
 	import { startField } from './field';
-	import ArrowRight from '@lucide/svelte/icons/arrow-right';
 	import ArrowUpRight from '@lucide/svelte/icons/arrow-up-right';
-	import Menu from '@lucide/svelte/icons/menu';
-	import X from '@lucide/svelte/icons/x';
+	import LandingNav from '$lib/components/landing-nav.svelte';
+	import LandingCursor from '$lib/components/landing-cursor.svelte';
+	import LandingSection from '$lib/components/landing-section.svelte';
+	import LandingKicker from '$lib/components/landing-kicker.svelte';
+	import LandingHeading from '$lib/components/landing-heading.svelte';
+	import LandingButton from '$lib/components/landing-button.svelte';
+	import LandingCards from '$lib/components/landing-cards.svelte';
+	import LandingCard from '$lib/components/landing-card.svelte';
+	import LandingRow from '$lib/components/landing-row.svelte';
+	import LandingNumbered from '$lib/components/landing-numbered.svelte';
+	import LandingTicker from '$lib/components/landing-ticker.svelte';
+	import LandingManifesto from '$lib/components/landing-manifesto.svelte';
+	import LandingFooter from '$lib/components/landing-footer.svelte';
+	import { reveal, body } from '$lib/components/landing-classes';
 
 	/**
 	 * The "Consensus Engine" landing, carried over from SyncVotes v1 and set in Tailwind: a
@@ -114,27 +124,16 @@
 		{ k: 'KEYS', v: 'YOURS' }
 	]);
 
-	// Shared looks. `rv` and `in`, `w` and `on`, `scrolled` are the hooks the script below toggles.
-	const reveal =
-		'rv translate-y-[30px] opacity-0 transition-[opacity,translate] duration-800 ease-[cubic-bezier(0.2,0.8,0.2,1)] [&.in]:translate-y-0 [&.in]:opacity-100 motion-reduce:translate-y-0 motion-reduce:opacity-100';
-	const btn =
-		'inline-flex items-center gap-2.5 rounded-full border border-orange bg-orange px-7 py-4 font-mono text-sm font-bold tracking-[0.1em] text-background uppercase transition-transform hover:-translate-y-0.5 max-sm:px-[22px] max-sm:py-3.5 max-sm:text-[13px] max-sm:whitespace-nowrap';
-	const ghost = 'border-border-hover bg-transparent text-ink hover:border-ink';
-	const h2 =
-		'font-display text-[clamp(36px,4vw,60px)] leading-[1.04] font-extrabold tracking-[-0.025em] [word-spacing:-0.08em] uppercase';
-	const tag = 'font-mono text-xs tracking-[0.16em] text-ink-dim uppercase';
-	const grid =
-		'group/grid grid grid-cols-3 gap-px border border-border bg-border max-[900px]:grid-cols-1';
-	const card =
-		'group/card relative translate-y-10 overflow-hidden bg-background px-9 pt-11 pb-13 opacity-0 transition-[opacity,translate,background-color] duration-800 ease-[cubic-bezier(0.2,0.8,0.2,1)] group-[.in]/grid:translate-y-0 group-[.in]/grid:opacity-100 hover:bg-surface motion-reduce:translate-y-0 motion-reduce:opacity-100 [&:nth-child(2)]:delay-150 [&:nth-child(3)]:delay-300';
-	const body = 'mt-4 max-w-[320px] font-mono text-sm leading-[1.75] text-ink-mid';
-	const navLink = 'opacity-65 transition-opacity hover:opacity-100';
-	const drawerLink =
-		'rounded-lg px-3.5 py-3 font-mono text-[15px] tracking-[0.1em] text-ink-mid uppercase hover:bg-orange-dim hover:text-ink';
+	const LINKS = [
+		{ href: '#what', label: 'What' },
+		{ href: '#moves', label: 'Protocol' },
+		{ href: '#privacy', label: 'Privacy' },
+		{ href: '/my-daos', label: 'DAOs' },
+		{ href: 'https://docs.canton.network', label: 'Canton', external: true }
+	];
 
 	let root: HTMLDivElement;
 	let canvas: HTMLCanvasElement;
-	let menuOpen = $state(false);
 
 	onMount(() => {
 		const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -262,74 +261,8 @@
 	bind:this={root}
 	class="relative z-0 min-h-screen overflow-x-hidden bg-background font-display text-ink selection:bg-orange selection:text-background motion-reduce:cursor-auto pointer-fine:cursor-none pointer-fine:[&_button]:cursor-none"
 >
-	<div
-		class="pointer-events-none fixed top-0 left-0 z-[999] hidden motion-reduce:hidden pointer-fine:block"
-	>
-		<div
-			class="cur-ring size-9 rounded-full border border-orange opacity-50 transition-[width,height,opacity] duration-250 [.cur-hover_&]:size-16 [.cur-hover_&]:opacity-90"
-		></div>
-	</div>
-	<div
-		class="pointer-events-none fixed top-0 left-0 z-[999] hidden motion-reduce:hidden pointer-fine:block"
-	>
-		<div class="cur-dot size-2 rounded-full bg-orange"></div>
-	</div>
-
-	<nav
-		class="fixed inset-x-0 top-0 z-50 flex items-center gap-8 border-b border-transparent px-edge py-5 transition-[padding,background-color,border-color] duration-300 max-sm:flex-wrap max-sm:gap-x-4 max-sm:gap-y-2.5 max-sm:px-5 max-sm:py-3.5 [&.scrolled]:border-border [&.scrolled]:bg-[rgba(11,10,8,0.86)] [&.scrolled]:py-3 [&.scrolled]:backdrop-blur-[18px]"
-	>
-		<button
-			class="inline-flex items-center gap-2 font-mono text-sm font-bold tracking-[0.22em] max-sm:gap-1.5 max-sm:text-xs max-sm:tracking-[0.16em]"
-			type="button"
-			onclick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-		>
-			<BrandMark size={15} /> SYNCVOTES
-		</button>
-		<div
-			class="ml-auto hidden gap-7 font-mono text-[13px] tracking-[0.12em] uppercase min-[1121px]:flex"
-		>
-			<a href="#what" class={navLink}>What</a>
-			<a href="#moves" class={navLink}>Protocol</a>
-			<a href="#privacy" class={navLink}>Privacy</a>
-			<a href="/my-daos" class={navLink}>DAOs</a>
-			<a href="https://docs.canton.network" target="_blank" rel="noopener" class={navLink}>Canton</a
-			>
-		</div>
-		<div class="flex items-center gap-3 max-[1120px]:ml-auto max-sm:gap-2">
-			<a
-				class="rounded-full border border-current px-4 py-[9px] font-mono text-[13px] tracking-[0.12em] whitespace-nowrap uppercase max-sm:px-[13px] max-sm:py-2 max-sm:text-xs max-sm:tracking-[0.08em]"
-				href="/my-daos"
-			>
-				<!-- eslint-disable-next-line svelte/no-useless-mustaches -- a bare space here is dropped -->
-				Launch<span class="max-sm:hidden">{' '}App</span>
-			</a>
-			<button
-				class="hidden size-10 shrink-0 items-center justify-center rounded-[10px] border border-border-hover max-[1120px]:inline-flex"
-				type="button"
-				aria-label={menuOpen ? 'Close menu' : 'Open menu'}
-				aria-expanded={menuOpen}
-				onclick={() => (menuOpen = !menuOpen)}
-			>
-				{#if menuOpen}<X size={18} />{:else}<Menu size={18} />{/if}
-			</button>
-		</div>
-	</nav>
-
-	{#if menuOpen}
-		<div
-			class="fixed top-[88px] right-edge left-edge z-[49] flex flex-col gap-1 rounded-[14px] border border-border bg-surface p-3 shadow-[0_24px_60px_rgba(0,0,0,0.55)] max-sm:top-[104px]"
-			role="presentation"
-			onclick={() => (menuOpen = false)}
-		>
-			<a href="#what" class={drawerLink}>What</a>
-			<a href="#moves" class={drawerLink}>Protocol</a>
-			<a href="#privacy" class={drawerLink}>Privacy</a>
-			<a href="/my-daos" class={drawerLink}>DAOs</a>
-			<a href="https://docs.canton.network" target="_blank" rel="noopener" class={drawerLink}
-				>Canton</a
-			>
-		</div>
-	{/if}
+	<LandingCursor />
+	<LandingNav links={LINKS} />
 
 	<!-- Exactly one screen: the copy centred inside it, the ticker at the fold. -->
 	<section
@@ -360,7 +293,7 @@
 				{/each}
 			</h1>
 			<p
-				class="mt-[26px] max-w-[540px] animate-fade-in font-mono text-[15px] leading-[1.75] text-ink-mid opacity-0 [animation-delay:0.6s] motion-reduce:animate-none motion-reduce:opacity-100 max-sm:max-w-none max-sm:text-sm"
+				class="{body} mt-[26px] max-w-[540px] animate-fade-in text-[15px] opacity-0 [animation-delay:0.6s] motion-reduce:animate-none motion-reduce:opacity-100 max-sm:max-w-none max-sm:text-sm"
 			>
 				Private DAOs. One key, one ballot. Proposals that are contracts and outcomes the ledger
 				settles — no Snapshot, no Telegram polls, no spreadsheets.
@@ -368,33 +301,20 @@
 			<div
 				class="mt-7 flex animate-fade-in gap-3.5 opacity-0 [animation-delay:0.8s] motion-reduce:animate-none motion-reduce:opacity-100 max-sm:flex-wrap max-sm:gap-2.5"
 			>
-				<a class={btn} href="/my-daos">Launch App <ArrowRight size={16} strokeWidth={2.5} /></a>
-				<a class="{btn} {ghost}" href="#moves">How it works</a>
+				<LandingButton href="/my-daos" arrow>Launch App</LandingButton>
+				<LandingButton href="#moves" variant="ghost">How it works</LandingButton>
 			</div>
 		</div>
 	</section>
 
-	<div class="group overflow-hidden border-y border-border bg-surface py-3.5" aria-hidden="true">
-		<ul
-			class="flex w-max animate-tape list-none whitespace-nowrap group-hover:[animation-play-state:paused] motion-reduce:animate-none"
-		>
-			{#each [...ticker, ...ticker] as it, i (i)}
-				<li class="mr-12 flex gap-2.5 font-mono text-[13px] tracking-[0.06em]">
-					<span class="text-ink-dim">{it.k}</span><span>{it.v}</span>
-				</li>
-			{/each}
-		</ul>
-	</div>
+	<LandingTicker items={ticker} />
 
-	<section
-		id="what"
-		class="grid gap-12 px-edge pt-[120px] pb-[40px] lg:grid-cols-[1fr_1.1fr] lg:gap-20"
-	>
+	<LandingSection id="what" class="grid gap-12 pb-[40px] lg:grid-cols-[1fr_1.1fr] lg:gap-20">
 		<div>
-			<div class="{tag} mb-[18px]">// What this is</div>
-			<h2 class="{h2} {reveal}">Governance that settles itself</h2>
+			<LandingKicker text="What this is" />
+			<LandingHeading>Governance that settles itself</LandingHeading>
 		</div>
-		<div class="{reveal} space-y-5 font-mono text-[15px] leading-[1.75] text-ink-mid lg:pt-2">
+		<div class="{reveal} {body} space-y-5 text-[15px] lg:pt-2">
 			<p>
 				SyncVotes is a governance app on the Canton Network. A DAO is a Daml contract signed by its
 				admin and this app; a proposal is another, with a deadline; a ballot is a choice on it,
@@ -407,106 +327,56 @@
 				prepares transactions and forwards what you signed; the ledger checks the rest.
 			</p>
 		</div>
-	</section>
+	</LandingSection>
 
-	<section id="moves" class="px-edge pt-[100px] pb-[110px]">
-		<h2 class="{h2} {reveal}">Three moves. Nothing in between.</h2>
-		<div class="{grid} mt-[60px]">
-			{#each MOVES as m (m.num)}
-				<div class={card}>
-					<div
-						class="absolute top-2 right-4 font-editorial text-[120px] leading-none text-orange/15 italic transition-colors duration-400 group-hover/card:text-orange"
-					>
-						{m.num}
-					</div>
-					<div class={tag}>{m.tag}</div>
-					<h3 class="mt-14 font-display text-[30px] font-bold tracking-[-0.02em] uppercase">
-						{m.title}
-					</h3>
-					<p class={body}>{m.body}</p>
-				</div>
-			{/each}
-		</div>
-	</section>
+	<LandingSection id="moves" class="pt-[100px] pb-[110px]">
+		<LandingHeading>Three moves. Nothing in between.</LandingHeading>
+		<LandingCards class="mt-[60px]">
+			{#each MOVES as m (m.num)}<LandingCard
+					num={m.num}
+					tag={m.tag}
+					title={m.title}
+					text={m.body}
+				/>{/each}
+		</LandingCards>
+	</LandingSection>
 
-	<!-- An editorial pause: the words light up as the block scrolls through. -->
-	<section class="manif mx-auto max-w-[calc(1200px+2*var(--spacing-edge))] px-edge py-[72px]">
-		<p
-			class="font-display text-[clamp(34px,4.6vw,72px)] leading-[1.1] font-bold tracking-[-0.02em] uppercase [word-spacing:0.04em]"
-		>
-			<!-- eslint-disable svelte/no-useless-mustaches -- a bare space between the spans is dropped -->
-			{#each MANIFESTO as w, i (i)}
-				<span
-					><span
-						class="w opacity-[0.13] transition-opacity duration-400 motion-reduce:opacity-100 [&.on]:opacity-100 {w.a
-							? 'text-orange'
-							: ''} {w.s
-							? 'mx-[0.06em] font-editorial text-[1.08em] font-medium normal-case italic'
-							: ''}">{w.t}</span
-					>{' '}</span
-				>
-			{/each}
-			<!-- eslint-enable svelte/no-useless-mustaches -->
-		</p>
-	</section>
+	<LandingManifesto words={MANIFESTO} />
 
-	<section id="privacy" class="border-t border-border px-edge pt-[120px] pb-[140px]">
+	<LandingSection id="privacy" rule>
 		<div class="mb-12 flex items-start justify-between gap-6 max-sm:flex-col">
 			<div>
-				<div class="{tag} mb-[18px]">// Privacy</div>
-				<h2 class="{h2} {reveal} max-sm:text-[clamp(28px,8.6vw,44px)]">
+				<LandingKicker text="Privacy" />
+				<LandingHeading class="max-sm:text-[clamp(28px,8.6vw,44px)]">
 					Every DAO here <span class="whitespace-nowrap">is private</span>
-				</h2>
+				</LandingHeading>
 			</div>
-			<p class="{reveal} mt-2 max-w-[460px] font-mono text-[14.5px] leading-[1.75] text-ink-mid">
+			<p class="{reveal} {body} mt-2 max-w-[460px] text-[14.5px]">
 				Canton delivers a transaction only to the parties in it. A DAO's name, proposals, ballots
 				and members reach the members and the validator that hosts them — nobody else.
 			</p>
 		</div>
 		<div class="border-t border-border">
-			{#each WHO as w, i (w.tag)}
-				<div
-					class="{reveal} grid gap-4 border-b border-border py-9 md:grid-cols-[200px_1fr_1fr] md:gap-10 md:py-11"
-					style="transition-delay: {i * 0.12}s"
-				>
-					<div class="{tag} text-orange">{w.tag}</div>
-					<h3
-						class="font-display text-[clamp(24px,2.4vw,34px)] leading-[1.05] font-bold tracking-[-0.02em] uppercase"
-					>
-						{w.title}
-					</h3>
-					<p class="max-w-[440px] font-mono text-sm leading-[1.75] text-ink-mid">{w.body}</p>
-				</div>
-			{/each}
+			{#each WHO as w, i (w.tag)}<LandingRow
+					tag={w.tag}
+					title={w.title}
+					text={w.body}
+					delay={i * 0.12}
+				/>{/each}
 		</div>
-		<a class="{btn} mt-12" href="/daos/create"
-			>Deploy your DAO <ArrowRight size={16} strokeWidth={2.5} /></a
-		>
-	</section>
+		<LandingButton href="/daos/create" arrow class="mt-12">Deploy your DAO</LandingButton>
+	</LandingSection>
 
-	<section id="hood" class="border-t border-border px-edge pt-[120px] pb-[140px]">
-		<div class="{tag} mb-[18px]">// Under the hood</div>
-		<h2 class="{h2} {reveal}">What actually runs</h2>
+	<LandingSection id="hood" rule>
+		<LandingKicker text="Under the hood" />
+		<LandingHeading>What actually runs</LandingHeading>
 		<ol class="mt-12 grid gap-x-16 border-t border-border lg:grid-cols-2">
-			{#each HOOD as h, i (h.tag)}
-				<li
-					class="{reveal} grid grid-cols-[72px_1fr] gap-6 border-b border-border py-9 md:grid-cols-[96px_1fr]"
-					style="transition-delay: {i * 0.1}s"
-				>
-					<span class="font-editorial text-[56px] leading-none text-orange italic md:text-[72px]"
-						>0{i + 1}</span
-					>
-					<div>
-						<div class={tag}>{h.tag}</div>
-						<h3
-							class="mt-2 font-display text-[24px] leading-[1.1] font-bold tracking-[-0.02em] uppercase"
-						>
-							{h.title}
-						</h3>
-						<p class="mt-3 max-w-[420px] font-mono text-sm leading-[1.75] text-ink-mid">{h.body}</p>
-					</div>
-				</li>
-			{/each}
+			{#each HOOD as h, i (h.tag)}<LandingNumbered
+					index={i}
+					tag={h.tag}
+					title={h.title}
+					text={h.body}
+				/>{/each}
 		</ol>
 		<p class="{reveal} mt-10 font-mono text-[13px] tracking-[0.06em] text-ink-dim">
 			Open source, Daml and SvelteKit —
@@ -518,7 +388,7 @@
 				>read the code<ArrowUpRight size={13} /></a
 			>.
 		</p>
-	</section>
+	</LandingSection>
 
 	<section
 		class="relative overflow-hidden border-t border-border px-edge pt-[180px] pb-[160px] text-center"
@@ -534,9 +404,7 @@
 				>Start governing.</span
 			>
 		</h2>
-		<a class="{btn} {reveal} mt-12" href="/daos/create"
-			>Deploy your DAO <ArrowRight size={16} strokeWidth={2.5} /></a
-		>
+		<LandingButton href="/daos/create" arrow class="{reveal} mt-12">Deploy your DAO</LandingButton>
 		<p
 			class="mt-8 flex items-center justify-center gap-2.5 font-mono text-xs tracking-[0.16em] text-ink-dim uppercase"
 		>
@@ -546,16 +414,5 @@
 		</p>
 	</section>
 
-	<footer
-		class="flex flex-wrap justify-between gap-4 border-t border-border px-edge py-7 font-mono text-[12.5px] tracking-[0.12em] text-ink-dim uppercase [&_a:hover]:text-ink"
-	>
-		<span class="inline-flex items-center gap-2"
-			><BrandMark size={12} /> SyncVotes · Canton Network</span
-		>
-		<span
-			>Daml-native governance · <a href={GITHUB} target="_blank" rel="noopener">GitHub</a> ·
-			<a href="/version">build</a></span
-		>
-		<span>© {new Date().getFullYear()}</span>
-	</footer>
+	<LandingFooter github={GITHUB} />
 </div>
