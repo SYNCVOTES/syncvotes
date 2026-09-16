@@ -115,8 +115,9 @@
 								<div class="min-w-0 flex-1">
 									<div class="truncate font-display text-[15px] font-bold">{p.title}</div>
 									<div class="mt-1 font-mono text-xs text-ink-dim">
-										by <PartyId party={p.proposer} class="align-middle" /> · {fmt(p.yes + p.no)} counted
-										of
+										by <PartyId party={p.proposer} class="align-middle" /> · {dateOf(p.createdAt)} · {fmt(
+											p.yes + p.no
+										)} counted of
 										{fmt(p.eligible)} · {p.outcome
 											? 'closed'
 											: !p.ready
