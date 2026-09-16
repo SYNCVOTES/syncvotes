@@ -15,7 +15,7 @@
 	import Phrase from '$lib/components/phrase.svelte';
 	import WalletSources from '$lib/components/wallet-sources.svelte';
 	import { normaliseHint, hintProblem } from '$lib/hint';
-	import { hintOf } from '$lib/format';
+	import { hintOf, label } from '$lib/format';
 
 	let phraseInput = $state('');
 	let savedPhrase = $state(false);
@@ -136,7 +136,7 @@
 				phrase.
 			</p>
 			{#if passkeys}
-				<Button disabled={store.busy} onclick={flow.protectWithPasskey}
+				<Button disabled={store.busy} onclick={() => flow.protect({ passkey: true })}
 					>Use Touch ID / passkey</Button
 				>
 			{/if}
@@ -144,7 +144,7 @@
 				class="flex gap-3"
 				onsubmit={(e) => {
 					e.preventDefault();
-					flow.protectWithPassword(password);
+					flow.protect({ password });
 					password = '';
 				}}
 			>
@@ -167,8 +167,8 @@
 		<Panel padding="lg" class="space-y-5">
 			<h2 class="eyebrow">Unlock</h2>
 			<p class="text-sm text-ink-mid">
-				{selectedWallet?.name
-					? `Unlock ${selectedWallet.name}.`
+				{selectedWallet
+					? `Unlock ${label(selectedWallet.party)}.`
 					: 'Unlock the key kept on this device.'}
 			</p>
 			<UnlockForm />

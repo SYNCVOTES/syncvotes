@@ -45,3 +45,6 @@ export const updateProposalForm = v.object({
 	title: proposalTitle,
 	description: proposalDescription
 });
+
+/** Members added or removed per transaction; longer lists are split. */
+export const BATCH = 200;

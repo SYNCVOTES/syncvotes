@@ -4,7 +4,7 @@
 	import Panel from './panel.svelte';
 	import SectionTitle from './section-title.svelte';
 	import Plus from '@lucide/svelte/icons/plus';
-	import { dateOf } from '$lib/format';
+	import { dateOf, label } from '$lib/format';
 
 	/** Every key kept on this device: select another, add one, or forget one. */
 	const screen = $derived(store.screen);
@@ -20,7 +20,7 @@
 			<li class="flex items-center gap-4 py-3.5">
 				<div class="min-w-0 flex-1">
 					<div class="font-mono text-sm {unlocked || offered ? 'text-orange' : 'text-ink'}">
-						{w.name || 'Wallet'}
+						{label(w.party)}
 					</div>
 					<div class="mt-0.5 font-mono text-xs text-ink-dim">
 						{w.lock === 'passkey' ? 'Passkey' : 'Password'}{w.created
@@ -46,7 +46,7 @@
 					<Button
 						variant="ghost"
 						size="sm"
-						aria-label="Forget {w.name || 'this key'}"
+						aria-label="Forget {label(w.party)}"
 						onclick={() => (forgetting = w.id)}
 					>
 						Forget

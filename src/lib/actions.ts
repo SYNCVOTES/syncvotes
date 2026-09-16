@@ -1,6 +1,7 @@
 import * as remote from './api.remote';
 import { toBase64, type Signer } from './wallet';
 import { verifyPrepared, verifyTopology, type Expected, type Plain } from './verify';
+import { BATCH } from './schemas';
 
 /**
  * The browser's half of every ledger write. The server prepares a transaction; this file says
@@ -66,7 +67,7 @@ async function inBatches<T extends Plain>(
 	progress: Progress | undefined,
 	each: (batch: T[]) => Promise<void>
 ) {
-	const all = batches(items, remote.BATCH);
+	const all = batches(items, BATCH);
 	for (const [i, batch] of all.entries()) {
 		progress?.(i, all.length);
 		await each(batch);

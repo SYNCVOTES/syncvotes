@@ -3,6 +3,7 @@ import { wordlist } from '@scure/bip39/wordlists/english.js';
 import { ed25519 } from '@noble/curves/ed25519.js';
 import { hmac } from '@noble/hashes/hmac.js';
 import { sha512 } from '@noble/hashes/sha2.js';
+import { label } from './format';
 
 /**
  * The user's key, and nothing else. It is derived from a recovery phrase, lives in a closure in
@@ -107,22 +108,15 @@ const ACTIVE = 'syncvotes.active';
 type Lock =
 	{ kind: 'passkey'; credentialId: string; salt: string } | { kind: 'password'; salt: string };
 
-/** One key kept on this device: who it is, how it is locked, when it was added. */
-export type StoredWallet = {
-	id: string;
-	name: string;
-	party: string;
-	created: string;
-	lock: Lock['kind'];
-};
-export type Owner = { name: string; party: string };
+/** One key kept on this device: whose it is, how it is locked, when it was added. */
+export type StoredWallet = { id: string; party: string; created: string; lock: Lock['kind'] };
 
-type Stored = Omit<StoredWallet, 'lock'> & { version: 2; lock: Lock; iv: string; data: string };
+type Stored = Omit<StoredWallet, 'lock'> & { lock: Lock; iv: string; data: string };
 
 function loadAll(): Stored[] {
 	try {
 		const list = JSON.parse(localStorage.getItem(STORE) ?? '[]') as Stored[];
-		return list;
+		return list.filter((w) => typeof w.party === 'string');
 	} catch {
 		return [];
 	}
@@ -131,13 +125,7 @@ function loadAll(): Stored[] {
 const saveAll = (list: Stored[]) => localStorage.setItem(STORE, JSON.stringify(list));
 
 export const storedWallets = (): StoredWallet[] =>
-	loadAll().map(({ id, name, party, created, lock }) => ({
-		id,
-		name,
-		party,
-		created,
-		lock: lock.kind
-	}));
+	loadAll().map(({ id, party, created, lock }) => ({ id, party, created, lock: lock.kind }));
 
 export const activeWallet = (): string | null => {
 	try {
@@ -153,11 +141,6 @@ export function forgetStoredKey(id: string) {
 	if (activeWallet() === id) localStorage.removeItem(ACTIVE);
 }
 
-/** Fills in what a legacy entry did not know about itself. */
-export function describeStored(id: string, owner: Owner) {
-	saveAll(loadAll().map((w) => (w.id === id ? { ...w, ...owner } : w)));
-}
-
 function find(id: string): Stored {
 	const found = loadAll().find((w) => w.id === id);
 	if (!found) throw new Error('That key is no longer on this device');
@@ -165,18 +148,17 @@ function find(id: string): Stored {
 }
 
 /** Adds the key; protecting the same party again replaces its earlier entry. */
-async function store(s: Signer, lock: Lock, aes: CryptoKey, owner: Owner): Promise<string> {
+async function store(s: Signer, lock: Lock, aes: CryptoKey, party: string): Promise<string> {
 	const { iv, data } = await s.seal(aes);
 	const entry: Stored = {
-		version: 2,
 		id: crypto.randomUUID(),
-		...owner,
+		party,
 		created: new Date().toISOString(),
 		lock,
 		iv,
 		data
 	};
-	saveAll([...loadAll().filter((w) => w.party !== owner.party), entry]);
+	saveAll([...loadAll().filter((w) => w.party !== party), entry]);
 	setActiveWallet(entry.id);
 	return entry.id;
 }
@@ -210,13 +192,17 @@ async function passwordKey(password: string, salt: Bytes): Promise<CryptoKey> {
 	);
 }
 
-export async function lockWithPassword(s: Signer, password: string, owner: Owner): Promise<string> {
+export async function lockWithPassword(
+	s: Signer,
+	password: string,
+	party: string
+): Promise<string> {
 	const salt = crypto.getRandomValues(new Uint8Array(16));
 	return store(
 		s,
 		{ kind: 'password', salt: toBase64(salt) },
 		await passwordKey(password, salt),
-		owner
+		party
 	);
 }
 
@@ -297,7 +283,7 @@ async function assertSecret(credentialId: Bytes, salt: Bytes): Promise<ArrayBuff
 	return secret;
 }
 
-export async function lockWithPasskey(s: Signer, owner: Owner): Promise<string> {
+export async function lockWithPasskey(s: Signer, party: string): Promise<string> {
 	// The salt goes into the creation request so the PRF is evaluated there and then — one
 	// prompt. Authenticators that only evaluate on assertion return nothing here, and get asked
 	// once more; that is the second prompt some devices show, not the norm.
@@ -309,8 +295,8 @@ export async function lockWithPasskey(s: Signer, owner: Owner): Promise<string> 
 			rp: { name: 'SyncVotes' },
 			user: {
 				id: new Uint8Array(s.publicKey.subarray(0, 16)),
-				name: owner.name,
-				displayName: owner.name
+				name: label(party),
+				displayName: label(party)
 			},
 			pubKeyCredParams: [
 				{ type: 'public-key', alg: -7 },
@@ -337,7 +323,7 @@ export async function lockWithPasskey(s: Signer, owner: Owner): Promise<string> 
 		s,
 		{ kind: 'passkey', credentialId: toBase64(credentialId), salt: toBase64(salt) },
 		await keyFromSecret(secret, salt),
-		owner
+		party
 	);
 }
 

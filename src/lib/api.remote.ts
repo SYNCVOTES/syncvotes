@@ -49,9 +49,6 @@ const paging = {
 };
 const filter = v.optional(v.pipe(v.string(), v.maxLength(100)), '');
 
-/** Members per transaction; the app splits longer lists. */
-export const BATCH = 200;
-
 type Page<T> = { items: T[]; total: number; offset: number };
 const page = <T>(all: T[], offset: number, limit: number): Page<T> => ({
 	items: all.slice(offset, offset + limit),
@@ -396,7 +393,7 @@ export const prepareArchiveDao = command(contractId, (daoId) => {
 export const prepareAddMembers = command(
 	v.object({
 		dao: contractId,
-		parties: v.pipe(v.array(partyId), v.minLength(1), v.maxLength(BATCH))
+		parties: v.pipe(v.array(partyId), v.minLength(1), v.maxLength(schemas.BATCH))
 	}),
 	({ dao, parties }) => {
 		const party = session.required();
@@ -412,7 +409,7 @@ export const prepareAddMembers = command(
 export const prepareRemoveMembers = command(
 	v.object({
 		dao: contractId,
-		memberCids: v.pipe(v.array(contractId), v.minLength(1), v.maxLength(BATCH))
+		memberCids: v.pipe(v.array(contractId), v.minLength(1), v.maxLength(schemas.BATCH))
 	}),
 	({ dao, memberCids }) => {
 		const party = session.required();
