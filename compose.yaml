@@ -57,10 +57,8 @@ services:
       WALLET_USER_NAME: ${WALLET_USER_NAME:?set in the env file}
       KC_VALIDATOR_SECRET: ${KC_VALIDATOR_SECRET:?set in the env file}
       KC_APP_SECRET: ${KC_APP_SECRET}
-      KC_BILLING_SECRET: ${KC_BILLING_SECRET:?set in the env file}
       KC_VALIDATOR_USER_ID: ${KC_VALIDATOR_USER_ID:?set in the env file}
       KC_APP_USER_ID: ${KC_APP_USER_ID:?set in the env file}
-      KC_BILLING_USER_ID: ${KC_BILLING_USER_ID:?set in the env file}
       KC_WALLET_USER_ID: ${KC_WALLET_USER_ID:?set in the env file}
       KC_WALLET_USER_PASSWORD: ${KC_WALLET_USER_PASSWORD:?set in the env file}
     depends_on:

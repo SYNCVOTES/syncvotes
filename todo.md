@@ -30,15 +30,13 @@
 - [x] real auth: Keycloak realm under /auth, RS256 everywhere, validator restarted with `-a`;
       the app's ledger user is a service account with participant-wide read/execute rights and no
       `CanActAs` on user parties. Measured: `prepare` needs read rights on the acting party
-- [ ] clients for everything else that talked to the participant unauthenticated (billing agent,
-      the gRPC poller behind the WireGuard peer)
+- [ ] a client for the gRPC poller behind the WireGuard peer, if it still talks to the participant
 
 - [x] edit and delete DAOs and proposals (Daml 0.1.4: DAO_Update/Archive, Proposal_Update/Cancel,
       stable DAO id, admin copied into proposals); several keys per device; DAO page and footer as
       in v1; lucide icons; copyable party ids; landing on Tailwind with what-it-is and
       under-the-hood sections; contrast raised in its own commit
-- [ ] the billing agent's auth model (one Keycloak client per wallet user, or one service account
-      acting for the treasury only) — the user's call, script lives outside the repo
+- [x] billing agent dropped — not needed; its Keycloak client and variables removed
 - [x] read sessions: a DAO is readable by its members only (signed challenge per unlock, HttpOnly
       cookie, in-memory sessions); WebAuthn errors in plain words; edit pages wait for data
 - [x] pages composed from components (components/ui = shadcn primitives, components/ = everything
