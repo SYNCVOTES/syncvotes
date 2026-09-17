@@ -33,7 +33,6 @@
 
 	// Every write lands on this page through the live query; nothing to refresh by hand.
 	const vote = (choice: 'Yes' | 'No') => flow.act((s, w) => actions.vote(s, w, id, choice));
-	const open = () => flow.act(() => actions.openProposal(id));
 	async function cancel(daoId: string) {
 		const ok = await flow.act((s, w) => actions.cancelProposal(s, w, id));
 		if (ok) await goto(`/daos/${daoId}`);
@@ -66,7 +65,7 @@
 					{p.outcome
 						? 'closed'
 						: !p.openedAt
-							? 'voting not open yet'
+							? 'opening the vote'
 							: ended
 								? `ended ${relative(p.closesAt)}`
 								: `closes ${relative(p.closesAt)}`}
@@ -81,9 +80,6 @@
 						<span>· {dateOf(p.createdAt)} ({relative(p.createdAt)})</span>
 					</p>
 				</div>
-				{#if mine && !p.openedAt}
-					<Button href="/proposals/{id}/edit" variant="outline" size="sm">Edit</Button>
-				{/if}
 			</div>
 		</div>
 
@@ -141,16 +137,7 @@
 				<Tally yes={p.yes} no={p.no} total={p.eligible} {needed} cast={p.cast} />
 
 				{#if !p.openedAt}
-					<Note mono={false}>
-						{#if mine}
-							Voting has not opened yet.
-							<div class="mt-3">
-								<Button size="sm" disabled={store.busy} onclick={open}>Open the vote</Button>
-							</div>
-						{:else}
-							The proposer has not opened the vote yet.
-						{/if}
-					</Note>
+					<Note mono={false}>Opening the vote…</Note>
 				{:else if p.outcome}
 					<Note>
 						Settled as <span class={p.outcome === 'Passed' ? 'text-green' : 'text-red'}

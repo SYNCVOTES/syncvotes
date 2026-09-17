@@ -2,8 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import * as remote from '$lib/api.remote';
-	import * as actions from '$lib/actions';
-	import { store, flow } from '$lib/wallet-store.svelte';
+	import { store } from '$lib/wallet-store.svelte';
 	import { signedForm } from '$lib/forms';
 	import { createProposalForm as schema } from '$lib/schemas';
 	import { Input } from '$lib/components/ui/input';
@@ -21,7 +20,7 @@
 	const id = $derived(page.params.id!);
 	const dao = $derived(store.who ? remote.dao(id) : null);
 
-	// One signature — the proposal, from the member's own contract — then the vote is opened.
+	// One signature, from the member's own contract; the provider opens the vote as it lands.
 	const f = remote.createProposalForm;
 	const enhanced = signedForm(
 		f,
@@ -31,10 +30,7 @@
 			contractId: membership,
 			args: { pid, title, description, closesAt }
 		}),
-		async ({ pid }) => {
-			const ok = await flow.act(() => actions.openProposal(pid));
-			if (ok) await goto(`/proposals/${pid}`);
-		}
+		({ pid }) => goto(`/proposals/${pid}`)
 	);
 
 	// A week is the usual voting period; the field starts there.

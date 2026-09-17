@@ -16,7 +16,7 @@
 			: outcome === 'Failed'
 				? { label: 'Failed', icon: X, variant: 'red' as const }
 				: !opened
-					? { label: 'Draft', icon: null, variant: 'outline' as const }
+					? { label: 'Opening', icon: null, variant: 'outline' as const }
 					: new Date(closesAt).getTime() < Date.now()
 						? { label: 'Ended', icon: Clock, variant: 'amber' as const }
 						: { label: 'Active', icon: null, variant: 'accent' as const }

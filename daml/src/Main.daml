@@ -115,8 +115,8 @@ template Member
     signatory admin, provider
     observer party, operator
 
-    -- A proposal starts as a draft: the text can still change, and nobody can vote until the
-    -- provider opens it at the proposer's request.
+    -- The proposal is created here and opened by the provider the moment it sees it; what
+    -- members vote on is what was proposed, never a later edit.
     nonconsuming choice Member_Propose : ContractId Proposal
       with
         pid : Text
@@ -174,18 +174,9 @@ template Proposal
 
     ensure title /= ""
 
-    choice Proposal_Update : ContractId Proposal
-      with
-        title : Text
-        description : Text
-      controller proposer
-      do
-        assertMsg "Voting has opened" (isNone openedAt)
-        create this with title; description
-
-    -- Opening fixes the electorate from the DAO's member count. The provider does it, at the
-    -- proposer's request, because the DAO contract is the admin's and the provider's to see —
-    -- a member cannot read it — and the count comes off the ledger either way.
+    -- Opening fixes the electorate from the DAO's member count. The provider does it because
+    -- the DAO contract is the admin's and the provider's to see — a member cannot read it — and
+    -- the count comes off the ledger either way.
     choice Proposal_Open : ContractId Proposal
       with
         dao : ContractId DAO

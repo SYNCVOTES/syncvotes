@@ -44,7 +44,6 @@ const CHOICES: Record<string, string> = {
 	DAO_RemoveMembers: 'Main:DAO',
 	Member_Propose: 'Main:Member',
 	Member_Vote: 'Main:Member',
-	Proposal_Update: 'Main:Proposal',
 	Proposal_Cancel: 'Main:Proposal'
 };
 

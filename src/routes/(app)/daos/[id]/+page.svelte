@@ -121,7 +121,7 @@
 										{fmt(p.eligible)} · {p.outcome
 											? 'closed'
 											: !p.openedAt
-												? 'not open yet'
+												? 'opening'
 												: `closes ${relative(p.closesAt)}`}
 									</div>
 								</div>

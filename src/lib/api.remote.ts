@@ -324,13 +324,6 @@ const adminOf = (daoId: string, party: string): ledger.Dao => {
 	return found;
 };
 
-const draftOf = (proposalId: string, party: string): ledger.Proposal => {
-	const found = proposalOf(proposalId);
-	if (found.proposer !== party) error(403, 'Only the proposer can do this');
-	if (found.openedAt) error(409, 'Voting has opened');
-	return found;
-};
-
 /**
  * The text forms: each field is checked against the shared schema — in the browser before
  * submitting, so issues show under the field, and here again — then the transaction is
@@ -365,16 +358,6 @@ export const createProposalForm = form(
 			closesAt,
 			prepared: await prepare(party, Main.Member, membership, 'Member_Propose', args)
 		};
-	}
-);
-
-export const updateProposalForm = form(
-	schemas.updateProposalForm,
-	async ({ proposal, title, description }) => {
-		const party = session.required();
-		const { contractId } = draftOf(proposal, party);
-		const args = { title, description };
-		return { prepared: await prepare(party, Main.Proposal, contractId, 'Proposal_Update', args) };
 	}
 );
 
@@ -414,32 +397,6 @@ export const prepareRemoveMembers = command(
 		return prepare(party, Main.DAO, contractId, 'DAO_RemoveMembers', { memberCids });
 	}
 );
-
-/** Opens the vote: the electorate is fixed to the DAO's members as of now. */
-/**
- * Opens the vote on a draft. The provider signs this one: the electorate is the DAO's member
- * count, and the DAO contract is the admin's and the provider's to read, not a member's. The
- * proposer asks; the ledger takes the count off the DAO contract itself.
- */
-export const openProposal = command(contractId, async (proposalId) => {
-	const party = session.required();
-	const { contractId, daoId } = draftOf(proposalId, party);
-	const dao = daoOf(daoId).contractId;
-	const updateId = await participant.submitAsProvider(
-		[
-			{
-				ExerciseCommand: {
-					templateId: Main.Proposal.templateId,
-					contractId,
-					choice: 'Proposal_Open',
-					choiceArgument: { dao }
-				}
-			}
-		],
-		`open-${proposalId}`
-	);
-	await ledger.applied(updateId);
-});
 
 export const prepareCancelProposal = command(contractId, (proposalId) => {
 	const party = session.required();

@@ -3,7 +3,7 @@ import { submitAsProvider } from './participant';
 import * as ledger from './ledger';
 
 /**
- * The provider's one job after a vote: count. Every open proposal with uncounted ballots gets a
+ * The provider's two jobs: open every proposal it sees, and count. Every open proposal with uncounted ballots gets a
  * `Proposal_Tally` of a batch of them; after the deadline the batch that empties the queue is
  * final and decides the outcome. One count at a time per proposal, since each replaces the
  * contract. The ledger checks every ballot it is handed, so this can only delay a result.
@@ -17,13 +17,41 @@ export function start(): void {
 	void (async () => {
 		for (;;) {
 			await ledger.nextChange(ledger.keys.all);
-			for (const id of ledger.proposals.keys()) void count(id);
+			for (const p of ledger.proposals.values()) void (p.openedAt ? count(p.id) : open(p));
 		}
 	})();
 	// A deadline passes without a ledger event.
 	setInterval(() => {
 		for (const id of ledger.proposals.keys()) void count(id);
 	}, 30_000);
+}
+
+const opening = new Set<string>();
+
+/** Fixes the electorate: the DAO's member count as of now, read off the DAO contract. */
+async function open(p: ledger.Proposal) {
+	const dao = ledger.daos.get(p.daoId);
+	if (!dao || opening.has(p.id)) return;
+	opening.add(p.id);
+	try {
+		await submitAsProvider(
+			[
+				{
+					ExerciseCommand: {
+						templateId: Main.Proposal.templateId,
+						contractId: p.contractId,
+						choice: 'Proposal_Open',
+						choiceArgument: { dao: dao.contractId }
+					}
+				}
+			],
+			`open-${p.id}`
+		);
+	} catch (e) {
+		console.warn(`Opening ${p.id} failed; retrying later:`, e instanceof Error ? e.message : e);
+	} finally {
+		opening.delete(p.id);
+	}
 }
 
 /** Ballots the count can accept: cast by members of the time, before the deadline, oldest first. */

@@ -62,11 +62,11 @@ nothing lists, and a member's vote touches no contract another member's vote tou
   thousand members can vote at once and none of them waits on the count.
 - `Proposal` — signatory proposer and provider; counters, not lists: `eligible`, `yes`, `no`,
   `outcome`. A member proposes from their own `Member` contract (`Member_Propose`) — the DAO
-  contract is the admin's and the provider's to see, not a member's — and the proposal starts as
-  a draft, editable by the proposer. At the proposer's request the provider opens it:
-  `Proposal_Open` reads the DAO's member count into `eligible` and stamps `openedAt`, and from
-  then on the electorate is fixed: the members of that moment. The proposer or the admin can
-  cancel until it settles.
+  contract is the admin's and the provider's to see, not a member's. The provider opens the vote
+  the moment it sees the proposal: `Proposal_Open` reads the DAO's member count into `eligible`
+  and stamps `openedAt`, and from then on the electorate is fixed: the members of that moment.
+  A proposal cannot be edited — what members vote on is what was proposed; the proposer or the
+  admin can cancel it until it settles, and propose again.
 - `Ballot` — one vote, signed by the voter and the provider, carrying the voter's `since` from
   their membership. The provider counts (`Proposal_Tally`, batches of two hundred), and
   `Ballot_Count` checks each ballot against the proposal it is counted into: right DAO, right

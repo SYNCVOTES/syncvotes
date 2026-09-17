@@ -40,11 +40,6 @@ export const createProposalForm = v.object({
 	description: proposalDescription,
 	days: votingDays
 });
-export const updateProposalForm = v.object({
-	proposal: id,
-	title: proposalTitle,
-	description: proposalDescription
-});
 
 /** Members added or removed per transaction; longer lists are split. */
 export const BATCH = 200;

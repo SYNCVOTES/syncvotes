@@ -122,9 +122,6 @@ export const removeMembers = (
 
 // ---- Proposals ----------------------------------------------------------------------------
 
-/** Asks the provider to open the vote on a draft; the DAO's members as of now become the electorate. */
-export const openProposal = (proposalId: string) => remote.openProposal(proposalId);
-
 export async function cancelProposal(s: Signer, who: Identity, proposalId: string) {
 	const { contractId } = await remote.proposal(proposalId);
 	const prepared = await remote.prepareCancelProposal(proposalId);

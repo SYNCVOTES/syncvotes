@@ -68,3 +68,5 @@
       40 parallel voters 45 s with 0 failures, count within 3 s (121 members: 9 s, 9 s, 42 s)
 - [ ] a member's contract grows by a proposal id per vote; fine for hundreds of proposals,
       revisit past thousands (epochs, or a per-proposal receipt archived at settlement)
+- [x] no proposal editing and no draft state: a proposal opens as the provider sees it; to
+      change one, cancel and propose again
