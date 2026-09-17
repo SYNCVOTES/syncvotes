@@ -134,7 +134,13 @@
 			</section>
 
 			<aside class="space-y-6">
-				<Tally yes={p.yes} no={p.no} total={p.eligible} {needed} cast={p.cast} />
+				{#if p.openedAt}<Tally
+						yes={p.yes}
+						no={p.no}
+						total={p.eligible}
+						{needed}
+						cast={p.cast}
+					/>{/if}
 
 				{#if !p.openedAt}
 					<Note mono={false}>Opening the vote…</Note>
