@@ -2,15 +2,21 @@
 	import Panel from './panel.svelte';
 	import { fmt } from '$lib/format';
 
-	/** Yes against no, out of everyone eligible; what it takes to pass; how many have voted. */
+	/**
+	 * Yes, no and abstentions out of everyone eligible; what it takes to pass; how many voted.
+	 * An abstention counts as a vote cast, and as one that will never be a yes.
+	 */
 	let {
 		yes,
 		no,
+		abstain,
 		total,
 		needed,
 		cast
-	}: { yes: number; no: number; total: number; needed: number; cast: number } = $props();
+	}: { yes: number; no: number; abstain: number; total: number; needed: number; cast: number } =
+		$props();
 	const pct = (n: number) => (total > 0 ? (n / total) * 100 : 0);
+	const counted = $derived(yes + no + abstain);
 </script>
 
 <Panel padding="sm">
@@ -18,6 +24,7 @@
 	<div class="mb-2 flex h-2 overflow-hidden bg-surface-active">
 		<div class="bg-green" style="width: {pct(yes)}%"></div>
 		<div class="bg-red" style="width: {pct(no)}%"></div>
+		<div class="bg-ink-dim" style="width: {pct(abstain)}%"></div>
 	</div>
 	<div class="flex justify-between font-mono text-xs">
 		<span class="text-green">{fmt(yes)} yes</span>
@@ -25,8 +32,8 @@
 		<span class="text-red">{fmt(no)} no</span>
 	</div>
 	<p class="mt-3 font-mono text-xs text-ink-dim">
-		{fmt(cast)} of {fmt(total)} voted{cast > yes + no
-			? `, ${fmt(cast - yes - no)} being counted`
+		{fmt(cast)} of {fmt(total)} voted{abstain ? `, ${fmt(abstain)} abstained` : ''}{cast > counted
+			? `, ${fmt(cast - counted)} being counted`
 			: ''}
 	</p>
 </Panel>

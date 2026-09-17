@@ -32,7 +32,9 @@
 	const ballots = $derived(me ? remote.proposalBallots({ id, offset: 0, limit, q }) : null);
 
 	// Every write lands on this page through the live query; nothing to refresh by hand.
-	const vote = (choice: 'Yes' | 'No') => flow.act((s, w) => actions.vote(s, w, id, choice));
+	const vote = (choice: actions.Choice) => flow.act((s, w) => actions.vote(s, w, id, choice));
+	const tone = (v: string) =>
+		v === 'Yes' ? 'text-green' : v === 'No' ? 'text-red' : 'text-ink-dim';
 	async function cancel(daoId: string) {
 		const ok = await flow.act((s, w) => actions.cancelProposal(s, w, id));
 		if (ok) await goto(`/daos/${daoId}`);
@@ -119,7 +121,7 @@
 											class="text-ink-dim"
 											title="Cast; the provider has not counted it yet">pending</span
 										>{/if}
-									<span class={b.vote === 'Yes' ? 'text-green' : 'text-red'}>{b.vote}</span>
+									<span class={tone(b.vote)}>{b.vote}</span>
 								</ListItem>
 							{/each}
 						</List>
@@ -137,6 +139,7 @@
 				{#if p.openedAt}<Tally
 						yes={p.yes}
 						no={p.no}
+						abstain={p.abstain}
 						total={p.eligible}
 						{needed}
 						cast={p.cast}
@@ -173,17 +176,29 @@
 						</Panel>
 					{:else if p.me.vote}
 						<Note
-							>You voted <span class={p.me.vote === 'Yes' ? 'text-green' : 'text-red'}
-								>{p.me.vote}</span
+							>You voted <span class={tone(p.me.vote)}
+								>{p.me.vote === 'Abstain' ? 'to abstain' : p.me.vote}</span
 							>.</Note
 						>
 					{:else if p.me.mayVote}
-						<Panel padding="sm" class="grid grid-cols-2 gap-3">
-							<Button variant="accent" disabled={store.busy} onclick={() => vote('Yes')}>Yes</Button
+						<Panel padding="sm" class="space-y-3">
+							<div class="grid grid-cols-2 gap-3">
+								<Button variant="accent" disabled={store.busy} onclick={() => vote('Yes')}
+									>Yes</Button
+								>
+								<Button variant="destructive" disabled={store.busy} onclick={() => vote('No')}
+									>No</Button
+								>
+							</div>
+							<Button
+								variant="ghost"
+								size="sm"
+								class="w-full"
+								disabled={store.busy}
+								onclick={() => vote('Abstain')}
 							>
-							<Button variant="destructive" disabled={store.busy} onclick={() => vote('No')}
-								>No</Button
-							>
+								Abstain
+							</Button>
 						</Panel>
 					{:else}
 						<Note mono={false}>You joined after this vote opened, so it has no ballot for you.</Note

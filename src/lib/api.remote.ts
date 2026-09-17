@@ -409,12 +409,12 @@ export const prepareCancelProposal = command(contractId, (proposalId) => {
 
 /** A ballot, cast from the voter's own membership contract. */
 export const prepareVote = command(
-	v.object({ proposal: contractId, vote: v.picklist(['Yes', 'No']) }),
+	v.object({ proposal: contractId, vote: v.picklist(['Yes', 'No', 'Abstain']) }),
 	({ proposal, vote }) => {
 		const p = proposalOf(proposal);
 		const me = proposalReader(p);
 		if (!me || !mayVote(p, me)) error(409, 'You have no vote on this proposal');
-		const args = { proposalId: proposal, vote };
+		const args = { proposalId: proposal, closesAt: p.closesAt, vote };
 		return prepare(me.party, Main.Member, me.contractId, 'Member_Vote', args);
 	}
 );

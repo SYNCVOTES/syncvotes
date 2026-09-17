@@ -8,7 +8,7 @@ import { operatorParty, sdk, streamActiveContracts, type Created } from './parti
  * map lookup. A page waits on the keys it shows (`nextChange`); a transaction wakes only those.
  */
 
-export type Vote = 'Yes' | 'No';
+export type Vote = 'Yes' | 'No' | 'Abstain';
 export type Outcome = 'Passed' | 'Failed';
 
 export type Account = { contractId: string; party: string };
@@ -35,6 +35,7 @@ export type Proposal = {
 	eligible: number;
 	yes: number;
 	no: number;
+	abstain: number;
 	outcome: Outcome | null;
 };
 export type Ballot = {
@@ -44,6 +45,7 @@ export type Ballot = {
 	voter: string;
 	since: string;
 	vote: Vote;
+	closesAt: string;
 	castAt: string;
 	counted: boolean;
 };
@@ -180,6 +182,7 @@ function created({ contractId, templateId, createArgument: a }: Created) {
 				eligible: int(a.eligible),
 				yes: int(a.yes),
 				no: int(a.no),
+				abstain: int(a.abstain),
 				outcome: (a.outcome as Outcome | null | undefined) ?? null
 			};
 			track(
@@ -198,6 +201,7 @@ function created({ contractId, templateId, createArgument: a }: Created) {
 				voter: text(a.voter),
 				since: text(a.since),
 				vote: a.vote as Vote,
+				closesAt: text(a.closesAt),
 				castAt: text(a.castAt),
 				counted: a.counted === true
 			};

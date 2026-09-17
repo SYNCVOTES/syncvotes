@@ -15,7 +15,7 @@ import DA.Optional (isNone, isSome, optional)
 -- ballots in batches; the ledger checks each one it is handed, so the provider can delay a
 -- result but never change it.
 
-data Vote = Yes | No
+data Vote = Yes | No | Abstain
   deriving (Eq, Show)
 
 data Outcome = Passed | Failed
@@ -110,7 +110,10 @@ template Member
     daoId : Text
     party : Party
     since : Time
-    voted : [Text]
+    -- Proposals voted on whose deadline has not passed, with that deadline. Nothing can be cast
+    -- on a proposal after its deadline, so entries past it are forgotten as the next vote is
+    -- cast, and the contract stays the size of the member's open business, not their history.
+    voted : [(Text, Time)]
   where
     signatory admin, provider
     observer party, operator
@@ -130,22 +133,26 @@ template Member
         create Proposal with
           provider; operator; daoId; admin; proposer = party; id = pid; title; description
           createdAt = now; closesAt; openedAt = None; eligible = 0; yes = 0; no = 0
-          outcome = None
+          abstain = 0; outcome = None
 
     -- Nothing here reads the proposal, so a vote never waits on the count or on other voters.
     -- Whether the ballot is valid for its proposal (right DAO, member in time, before the
     -- deadline) is checked when the provider counts it.
+    -- `closesAt` is the voter's word for the deadline; the count checks it against the
+    -- proposal's. A voter who lies about it only wastes a ballot the count will refuse.
     choice Member_Vote : ContractId Ballot
       with
         proposalId : Text
+        closesAt : Time
         vote : Vote
       controller party
       do
-        assertMsg "Already voted" (proposalId `notElem` voted)
         now <- getTime
-        create this with voted = proposalId :: voted
+        let open = filter (\(_, deadline) -> deadline > now) voted
+        assertMsg "Already voted" (proposalId `notElem` map fst open)
+        create this with voted = (proposalId, closesAt) :: open
         create Ballot with
-          provider; operator; daoId; proposalId; voter = party; since; vote
+          provider; operator; daoId; proposalId; voter = party; since; vote; closesAt
           castAt = now; counted = False
 
 -- | A proposal counts; it does not list. Opening it fixes the electorate: every member at that
@@ -167,6 +174,7 @@ template Proposal
     eligible : Int
     yes : Int
     no : Int
+    abstain : Int
     outcome : Optional Outcome
   where
     signatory proposer, provider
@@ -207,19 +215,22 @@ template Proposal
       do
         assertMsg "Voting has not opened" (isSome openedAt)
         assertMsg "Already settled" (isNone outcome)
-        (y, n) <- foldlA
-          (\(y, n) cid -> do
+        (y, n, a) <- foldlA
+          (\(y, n, a) cid -> do
             vote <- exercise cid Ballot_Count with proposal = this
-            pure (if vote == Yes then (y + 1, n) else (y, n + 1)))
-          (yes, no) ballots
+            pure case vote of
+              Yes -> (y + 1, n, a)
+              No -> (y, n + 1, a)
+              Abstain -> (y, n, a + 1))
+          (yes, no, abstain) ballots
         now <- getTime
         let needed = eligible / 2 + 1
             decided
               | y >= needed = Some Passed
-              | eligible - n < needed = Some Failed
+              | eligible - n - a < needed = Some Failed
               | final && now >= closesAt = Some Failed
               | otherwise = None
-        create this with yes = y; no = n; outcome = decided
+        create this with yes = y; no = n; abstain = a; outcome = decided
 
 -- | One vote. Signed by the voter and the provider; `since` is copied from the voter's
 -- membership, so the count can tell whether they were a member when the vote opened. Counting
@@ -233,6 +244,7 @@ template Ballot
     voter : Party
     since : Time
     vote : Vote
+    closesAt : Time
     castAt : Time
     counted : Bool
   where
@@ -247,6 +259,7 @@ template Ballot
         assertMsg "Already counted" (not counted)
         assertMsg "A ballot for another proposal" (proposalId == proposal.id && daoId == proposal.daoId)
         assertMsg "Cast after the deadline" (castAt < proposal.closesAt)
+        assertMsg "Cast against another deadline" (closesAt == proposal.closesAt)
         assertMsg "Joined after the vote opened" (optional False (since <=) proposal.openedAt)
         create this with counted = True
         pure vote

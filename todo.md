@@ -47,12 +47,9 @@
 - [x] second review round (UI/UX + edge cases, browser-tested): close after deadline, directory
       behind a session, session recovery, error pages, trim-before-sign, overflow, name preview,
       forget confirm, propose gate, period check
-- [ ] names are unique only app-side (no contract keys on LF 2.2): two simultaneous registrations
-      of one name can both land
 - [x] text forms are SvelteKit remote forms with per-field validation (lib/schemas.ts, preflight
       in the browser, re-check on the server, then sign); members as chips again; dead code and
       the single-key migration removed; auto-lock and hint modules named for what they are
-- [ ] passkey e2e (passkey.mjs) still drives the 0.1 flow; port to lib2 when touching passkeys
 
 # 2026-09-16
 
@@ -66,7 +63,7 @@
       fields, not the server's reply; wallet store with one `lock()` and one `protect()`
 - [x] measured (scale.mjs, 221 members): add 220 members 13 s in two batches, create + open 13 s,
       40 parallel voters 45 s with 0 failures, count within 3 s (121 members: 9 s, 9 s, 42 s)
-- [ ] a member's contract grows by a proposal id per vote; fine for hundreds of proposals,
-      revisit past thousands (epochs, or a per-proposal receipt archived at settlement)
+- [x] a member's contract no longer grows with history: it keeps only votes whose deadline has
+      not passed (Daml syncvotes-consensus 0.5.0); Abstain added as a third choice
 - [x] no proposal editing and no draft state: a proposal opens as the provider sees it; to
       change one, cancel and propose again

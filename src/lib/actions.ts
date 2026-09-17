@@ -130,14 +130,16 @@ export async function cancelProposal(s: Signer, who: Identity, proposalId: strin
 }
 
 /** A ballot is cast from the voter's own membership contract, which the proposal page names. */
-export async function vote(s: Signer, who: Identity, proposalId: string, choice: 'Yes' | 'No') {
-	const { me } = await remote.proposal(proposalId);
+export type Choice = 'Yes' | 'No' | 'Abstain';
+
+export async function vote(s: Signer, who: Identity, proposalId: string, choice: Choice) {
+	const { me, closesAt } = await remote.proposal(proposalId);
 	if (!me.membership) throw new Error('You are not a member of this DAO');
 	const prepared = await remote.prepareVote({ proposal: proposalId, vote: choice });
 	const intent = {
 		choice: 'Member_Vote',
 		contractId: me.membership,
-		args: { proposalId, vote: choice }
+		args: { proposalId, closesAt, vote: choice }
 	};
 	await sign(s, who, intent, prepared);
 }

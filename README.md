@@ -58,8 +58,8 @@ nothing lists, and a member's vote touches no contract another member's vote tou
 - `Member` — one per party per DAO, created and removed through the DAO's choices in batches of
   two hundred. It is also that member's ballot box: `Member_Vote` replaces it with a copy that
   remembers the proposal, so a second ballot on the same proposal is impossible, and creates a
-  `Ballot`. Nothing in that transaction reads the proposal or anyone else's contract, so a
-  thousand members can vote at once and none of them waits on the count.
+  `Ballot` — Yes, No or Abstain. Nothing in that transaction reads the proposal or anyone else's
+  contract, so a thousand members can vote at once and none of them waits on the count.
 - `Proposal` — signatory proposer and provider; counters, not lists: `eligible`, `yes`, `no`,
   `outcome`. A member proposes from their own `Member` contract (`Member_Propose`) — the DAO
   contract is the admin's and the provider's to see, not a member's. The provider opens the vote
@@ -278,9 +278,7 @@ idempotent by package id — so the code and the package it needs always land to
 - A package name and version can be uploaded once, and a later version under the same name must
   be a compatible upgrade (fields can only be added, and as `Optional`). A change that is not —
   a template dropped, a field made mandatory — needs a new package name, which is why the model
-  has been `daml`, `syncvotes`, `syncvotes-governance`, `syncvotes-dao` and now `syncvotes-vote`.
-  Contract keys would have enforced name uniqueness on-ledger, but they need Daml-LF 2.3 and the
-  SDK targets 2.2.
+  has changed name with every incompatible step and is `syncvotes-consensus` now.
 - A `.remote.ts` module may export nothing but remote functions — a shared constant next to
   them fails the build, which is why the batch size lives in `schemas.ts`.
 - The kit's `form.fields.value()` knows only the fields the user touched; `forms.ts` reads the
@@ -288,6 +286,8 @@ idempotent by package id — so the code and the package it needs always land to
   what the browser verifies.
 - `dpm codegen-js` emits CommonJS. Vite does not pre-bundle workspace-linked packages by default, so
   `optimizeDeps.include` in `vite.config.ts` is what stops the browser receiving raw CJS.
-- A member's contract grows by one proposal id per vote cast. That is the price of a vote that
-  touches nothing shared; a DAO with thousands of proposals will see its members' contracts grow
-  to tens of kilobytes, which is still one small transaction per vote.
+- Nothing grows with use. A member's contract remembers only the proposals it voted on whose
+  deadline has not passed (nothing can be cast after one), so a vote's transaction is the size
+  of that member's open business, not their history; the DAO holds a count, a proposal holds
+  counters, and every batch (members, ballots) is a fixed size. Transaction size is what a
+  validator pays for, so it is what the model is shaped around.
