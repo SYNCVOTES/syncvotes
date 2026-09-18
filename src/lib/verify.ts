@@ -68,7 +68,7 @@ const CHOICES: Record<string, Home> = {
 		iface: 'Splice.Api.Token.TransferInstructionV1:TransferInstruction'
 	},
 	TransferFactory_Transfer: {
-		template: 'Splice.AmuletRules:AmuletRules',
+		template: 'Splice.ExternalPartyAmuletRules:ExternalPartyAmuletRules',
 		pkg: AMULET,
 		iface: 'Splice.Api.Token.TransferInstructionV1:TransferFactory'
 	}
