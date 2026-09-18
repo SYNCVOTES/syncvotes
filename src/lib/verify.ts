@@ -250,7 +250,10 @@ function covers(expected: Plain, actual: Plain): boolean {
 		typeof expected === 'object' &&
 		typeof actual === 'object'
 	) {
-		return Object.keys(expected).every((k) => k in actual && covers(expected[k], actual[k]));
+		// A field that is None may be left out of the record altogether.
+		return Object.keys(expected).every((k) =>
+			k in actual ? covers(expected[k], actual[k]) : expected[k] === null
+		);
 	}
 	return expected === actual;
 }
