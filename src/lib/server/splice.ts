@@ -219,7 +219,7 @@ export async function lockCommand(
 					outputs: [
 						{
 							receiver: owner,
-							receiverFeeRatio: '0.0',
+							receiverFeeRatio: '0.0000000000',
 							amount,
 							lock: { holders: [], expiresAt, optContext: context }
 						}

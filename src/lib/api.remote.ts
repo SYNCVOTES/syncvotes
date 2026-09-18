@@ -600,7 +600,21 @@ export const prepareArchiveDao = command(contractId, (daoId) => {
 	const party = session.required();
 	const { contractId } = adminOf(daoId, party);
 	if (openProposals(daoId) > 0) error(409, 'Close or cancel the open proposals first');
-	return prepare(party, Main.DAO, contractId, 'DAO_Archive', { admin: party }, daoId);
+	// The one write an empty balance does not refuse: a DAO can always be wound up.
+	return participant.prepare(
+		party,
+		[
+			{
+				ExerciseCommand: {
+					templateId: Main.DAO.templateId,
+					contractId,
+					choice: 'DAO_Archive',
+					choiceArgument: { admin: party }
+				}
+			}
+		],
+		{ dao: daoId }
+	);
 });
 
 /** A batch of new members: registered parties that are not members yet. */

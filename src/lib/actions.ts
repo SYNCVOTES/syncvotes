@@ -232,7 +232,7 @@ export async function lock(s: Signer, who: Identity, amount: number, days: numbe
 				outputs: [
 					{
 						receiver: who.party,
-						receiverFeeRatio: '0.0',
+						receiverFeeRatio: '0.0000000000',
 						amount: asText,
 						lock: { holders: [], expiresAt, optContext: 'syncvotes stake' }
 					}
