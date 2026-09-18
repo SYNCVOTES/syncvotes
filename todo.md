@@ -20,10 +20,8 @@
 - [x] browser verifies what it signs (hash recomputed, choice/template/actAs checked) — tamper test passes
 - [x] deploy = `pnpm deploy`: compose over `DOCKER_HOST=ssh://`, build on the server's daemon from
       the local tree; the app uploads its own DAR at startup. GitHub Actions + runner removed
-- [ ] token standard + treasury — users fund their app party from any wallet (CC transfers work
-      across validators), payments to the treasury are party-to-party on our validator.
-      Treasury party needs a transfer pre-approval (`sdk.amulet.preapproval`) or every incoming
-      payment sits as a pending instruction until someone accepts it
+- [x] token standard + treasury — every party gets a pre-approval at sign-up; the treasury is a
+      multi-key party with one from the validator's setup proposal (2026-09-18)
 
 # 2026-09-15
 
@@ -65,3 +63,16 @@
       not passed (Daml syncvotes-consensus 0.5.0); Abstain added as a third choice
 - [x] no proposal editing and no draft state: a proposal opens as the provider sees it; to
       change one, cancel and propose again
+
+# 2026-09-18
+
+- [x] admins (several; at creation, by an admin, by a vote), proposal effects carried out by the
+      ledger, stake votes on coin locked in the wallet, a treasury owned by the admins' keys
+      (m of n) with signing sessions, billing at the traffic the participant reports
+      (`syncvotes-charter` 0.7.0; e2e council/stake/scale green on TestNet)
+- [ ] `BILLING_FACTOR`: measure rewards against traffic once the provider party is featured on
+      the network it runs on (it is not on TestNet), then set it below one
+- [ ] a treasury cannot be rotated in place (the network allows no second topology serial via
+      the JSON API); today the admins rebuild it and move the coin — an admin API path may
+      allow rotation later
+- [ ] the gRPC poller behind the WireGuard peer, if it still talks to the participant
