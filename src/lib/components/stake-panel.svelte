@@ -10,7 +10,8 @@
 	let locked = $state<{ amount: number; until: string }[] | null>(null);
 	$effect(() => {
 		if (!store.who) return;
-		remote.myHoldings().then(
+		const q = remote.myHoldings();
+		q.refresh().then(() => q).then(
 			({ holdings }) =>
 				(locked = holdings
 					.filter((h) => h.lock)

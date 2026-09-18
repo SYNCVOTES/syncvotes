@@ -399,7 +399,8 @@ export async function verifyTreasury(
 		throw new Error('The treasury topology does not match the hash the server asked to sign');
 	}
 	const owners = [...admins].sort();
-	const fingerprints = owners.map((p) => p.split('::')[1]);
+	// Canton orders a namespace's owners by fingerprint, so the check does too.
+	const fingerprints = owners.map((p) => p.split('::')[1]).sort();
 	if (plan.owners.length !== owners.length || !plan.owners.every((o) => owners.includes(o.party))) {
 		throw new Error('The treasury would not be owned by the admins');
 	}

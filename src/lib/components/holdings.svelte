@@ -19,11 +19,16 @@
 	let amount = $state(0);
 	let days = $state(30);
 
-	const load = () =>
-		remote.myHoldings().then(
-			(v) => (view = v),
-			(e) => (failed = String(e?.body?.message ?? e))
-		);
+	// A query's result is cached by the client; what the ledger says now needs a refresh.
+	const load = async () => {
+		try {
+			const q = remote.myHoldings();
+			await q.refresh();
+			view = await q;
+		} catch (e) {
+			failed = String((e as { body?: { message?: string } })?.body?.message ?? e);
+		}
+	};
 	$effect(() => {
 		if (store.who) void load();
 	});

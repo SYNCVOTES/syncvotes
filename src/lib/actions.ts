@@ -191,7 +191,9 @@ export async function vote(s: Signer, who: Identity, proposalId: string, choice:
 	if (!me.membership) throw new Error('You are not a member of this DAO');
 	let stake: Plain = null;
 	if (voting.kind === 'stake') {
-		const { holdings } = await remote.myHoldings();
+		const fresh = remote.myHoldings();
+		await fresh.refresh();
+		const { holdings } = await fresh;
 		const locked = holdings
 			.filter((h) => h.lock && new Date(h.lock.expiresAt) >= new Date(closesAt))
 			.slice(0, 20)
