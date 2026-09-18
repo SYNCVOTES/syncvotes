@@ -309,5 +309,24 @@ export async function setupState(party: string) {
 	};
 }
 
+/** Coin sent to `party` that waits for it to accept — the case without a pre-approval. */
+export async function incoming(party: string) {
+	const pending = await (await sdk()).token.transfer.pending(party);
+	return pending.map((t) => ({
+		contractId: t.contractId,
+		amount: Number(t.interfaceViewValue.transfer.amount),
+		from: t.interfaceViewValue.transfer.sender
+	}));
+}
+
+export async function acceptCommand(
+	transferInstructionCid: string
+): Promise<[Command, DisclosedContract[]]> {
+	const [command, disclosed] = await (
+		await sdk()
+	).token.transfer.accept({ transferInstructionCid, registryUrl: scanUrl() });
+	return [command as Command, disclosed as DisclosedContract[]];
+}
+
 /** The provider's own coin: what the DAOs' fees end up as. */
 export const providerHoldings = () => holdings(providerParty());

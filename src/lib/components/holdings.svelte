@@ -37,6 +37,12 @@
 			await load();
 		}
 	};
+	const acceptDeposits = async () => {
+		if (await flow.act((s, w) => actions.acceptDeposits(s, w))) await load();
+	};
+	const acceptIncoming = async (cid: string) => {
+		if (await flow.act((s, w) => actions.acceptIncoming(s, w, cid))) await load();
+	};
 	const release = async (cid: string) => {
 		if (await flow.act((s, w) => actions.release(s, w, cid))) await load();
 	};
@@ -62,6 +68,31 @@
 		</div>
 		<Button variant="ghost" size="sm" onclick={load}>Refresh</Button>
 	</div>
+
+	{#if view && !view.approved}
+		<div class="flex flex-wrap items-center gap-3 border border-border bg-surface-hover p-3">
+			<p class="flex-1 text-[13px] text-ink-mid">
+				Coin sent to you waits until you accept it. One signature lets it land on its own.
+			</p>
+			<Button size="sm" disabled={store.busy} onclick={acceptDeposits}>Accept deposits</Button>
+		</div>
+	{/if}
+	{#if view && view.incoming.length > 0}
+		<List>
+			{#each view.incoming as t (t.contractId)}
+				<ListItem class="flex items-center gap-3 font-mono text-xs">
+					<span class="text-ink">{coin(t.amount)}</span>
+					<span class="flex-1 text-ink-dim">from {t.from.split('::')[0]}</span>
+					<Button
+						size="sm"
+						variant="outline"
+						disabled={store.busy}
+						onclick={() => acceptIncoming(t.contractId)}>Accept</Button
+					>
+				</ListItem>
+			{/each}
+		</List>
+	{/if}
 
 	{#if view && free.length > 0}
 		<form

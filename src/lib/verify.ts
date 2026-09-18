@@ -60,7 +60,13 @@ const CHOICES: Record<string, Home> = {
 		template: 'Splice.AmuletRules:ExternalPartySetupProposal',
 		pkg: AMULET
 	},
-	// The token standard's transfer: an interface choice, implemented by Canton Coin's rules.
+	// The token standard's transfer and its acceptance: interface choices, implemented by
+	// Canton Coin's rules and its transfer instructions.
+	TransferInstruction_Accept: {
+		template: 'Splice.AmuletTransferInstruction:AmuletTransferInstruction',
+		pkg: AMULET,
+		iface: 'Splice.Api.Token.TransferInstructionV1:TransferInstruction'
+	},
 	TransferFactory_Transfer: {
 		template: 'Splice.AmuletRules:AmuletRules',
 		pkg: AMULET,

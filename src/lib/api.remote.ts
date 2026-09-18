@@ -360,10 +360,60 @@ export const daoBilling = query.live(contractId, (id) =>
 	})
 );
 
-/** The caller's coin: free and locked, with what the network says a coin is worth. */
+/**
+ * The caller's coin: free and locked, with what the network says a coin is worth; whether
+ * coin sent to them just lands, and what waits to be accepted meanwhile.
+ */
 export const myHoldings = query(async () => {
 	const party = session.required();
-	return { holdings: await splice.holdings(party), prices: await splice.prices() };
+	const [holdings, prices, setup, incoming] = await Promise.all([
+		splice.holdings(party),
+		splice.prices(),
+		splice.setupState(party),
+		splice.incoming(party)
+	]);
+	return { holdings, prices, approved: setup.approved, incoming };
+});
+
+/**
+ * Opens the caller's party to deposits: the validator offers a pre-approval (it pays for it
+ * and keeps it renewed), the party accepts it with one signature. Asked at sign-up, and
+ * from the wallet page for a party that skipped it.
+ */
+export const prepareAcceptDeposits = command(async () => {
+	const party = session.required();
+	let { proposal, approved } = await splice.setupState(party);
+	if (approved) error(409, 'Deposits already land');
+	if (!proposal) {
+		await splice.proposeSetup(party);
+		for (let i = 0; i < 30 && !proposal; i++) {
+			await new Promise((r) => setTimeout(r, 1000));
+			proposal = (await splice.setupState(party)).proposal;
+		}
+		if (!proposal) error(503, 'The validator has not offered the pre-approval yet — try again');
+	}
+	return {
+		proposal: proposal.contractId,
+		prepared: await participant.prepare(party, [
+			{
+				ExerciseCommand: {
+					templateId: splice.SETUP_PROPOSAL,
+					contractId: proposal.contractId,
+					choice: 'ExternalPartySetupProposal_Accept',
+					choiceArgument: {}
+				}
+			}
+		])
+	};
+});
+
+/** Accepts coin that was sent without a pre-approval in place. */
+export const prepareAcceptIncoming = command(contractId, async (cid) => {
+	const party = session.required();
+	if (!(await splice.incoming(party)).some((t) => t.contractId === cid))
+		error(404, 'No such transfer');
+	const [cmd, disclosed] = await splice.acceptCommand(cid);
+	return participant.prepare(party, [cmd], { disclosedContracts: disclosed });
 });
 
 /** The DAO's treasury: what it holds, what is due, a setup under way, sessions to sign. */

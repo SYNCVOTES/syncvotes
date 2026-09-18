@@ -182,6 +182,10 @@ export const flow = {
 		return run(async () => {
 			const topology = await actions.topology(signer, hint);
 			const who = await actions.enrol(signer, hint, topology);
+			// A second signature opens the new party to deposits; the wallet page offers it again
+			// if this one does not go through.
+			await actions.openSession(signer, who);
+			await actions.acceptDeposits(signer, who).catch(() => {});
 			screen = { at: 'protect', signer, who };
 		});
 	},

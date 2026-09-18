@@ -243,6 +243,19 @@ export async function lock(s: Signer, who: Identity, amount: number, days: numbe
 	await sign(s, who, intent, prepared);
 }
 
+/** Opens the party to deposits: accepts the validator's pre-approval offer. */
+export async function acceptDeposits(s: Signer, who: Identity) {
+	const { proposal, prepared } = await remote.prepareAcceptDeposits();
+	const intent = { choice: 'ExternalPartySetupProposal_Accept', contractId: proposal, args: {} };
+	await sign(s, who, intent, prepared);
+}
+
+/** Accepts coin sent before deposits landed on their own. */
+export async function acceptIncoming(s: Signer, who: Identity, contractId: string) {
+	const prepared = await remote.prepareAcceptIncoming(contractId);
+	await sign(s, who, { choice: 'TransferInstruction_Accept', contractId, args: {} }, prepared);
+}
+
 export async function release(s: Signer, who: Identity, contractId: string) {
 	const prepared = await remote.prepareRelease(contractId);
 	await sign(s, who, { choice: 'LockedAmulet_OwnerExpireLockV2', contractId, args: {} }, prepared);
