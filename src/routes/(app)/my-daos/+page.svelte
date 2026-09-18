@@ -15,7 +15,9 @@
 
 	const who = $derived(store.who);
 	const daos = $derived(who ? remote.myDaos(who.party) : null);
-	const admin = $derived(daos?.current?.filter((d) => d.admin === who?.party).length ?? 0);
+	const admin = $derived(
+		daos?.current?.filter((d) => d.admins.includes(who?.party ?? '')).length ?? 0
+	);
 </script>
 
 <svelte:head><title>My DAOs — SyncVotes</title></svelte:head>
@@ -60,7 +62,7 @@
 						description={dao.description}
 						members={dao.members}
 						openProposals={dao.openProposals}
-						role={dao.admin === who.party ? 'admin' : 'member'}
+						role={dao.admins.includes(who.party) ? 'admin' : 'member'}
 					/>
 				{/each}
 			</div>

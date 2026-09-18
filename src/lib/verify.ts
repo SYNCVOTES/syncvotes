@@ -32,19 +32,40 @@ const ADD_REPLACE = 1;
 const CONFIRMATION = 2;
 const EC_CURVE25519 = 1;
 
-/** The package every user action must live in; a same-named choice elsewhere is refused. */
+/** The package this app was built with; a same-named choice elsewhere is refused. */
 const PACKAGE_NAME = Main.Account.templateId.slice(1).split(':')[0];
 
-/** The only choices a user is ever asked to sign, and the template each lives on. */
-const CHOICES: Record<string, string> = {
-	Account_CreateDAO: 'Main:Account',
-	DAO_Update: 'Main:DAO',
-	DAO_Archive: 'Main:DAO',
-	DAO_AddMembers: 'Main:DAO',
-	DAO_RemoveMembers: 'Main:DAO',
-	Member_Propose: 'Main:Member',
-	Member_Vote: 'Main:Member',
-	Proposal_Cancel: 'Main:Proposal'
+/** Canton Coin's own package: coin moves, locks and pre-approvals live there. */
+const AMULET = 'splice-amulet';
+
+type Home = { template: string; pkg: string; iface?: string };
+
+/** The only choices a user is ever asked to sign, and where each lives. */
+const CHOICES: Record<string, Home> = {
+	Account_CreateDAO: { template: 'Main:Account', pkg: PACKAGE_NAME },
+	DAO_Update: { template: 'Main:DAO', pkg: PACKAGE_NAME },
+	DAO_Archive: { template: 'Main:DAO', pkg: PACKAGE_NAME },
+	DAO_SetAdmins: { template: 'Main:DAO', pkg: PACKAGE_NAME },
+	DAO_SetVoting: { template: 'Main:DAO', pkg: PACKAGE_NAME },
+	DAO_SetTreasury: { template: 'Main:DAO', pkg: PACKAGE_NAME },
+	DAO_AddMembers: { template: 'Main:DAO', pkg: PACKAGE_NAME },
+	DAO_RemoveMembers: { template: 'Main:DAO', pkg: PACKAGE_NAME },
+	Member_Propose: { template: 'Main:Member', pkg: PACKAGE_NAME },
+	Member_Vote: { template: 'Main:Member', pkg: PACKAGE_NAME },
+	Proposal_Cancel: { template: 'Main:Proposal', pkg: PACKAGE_NAME },
+	PayoutDue_Settle: { template: 'Main:PayoutDue', pkg: PACKAGE_NAME },
+	AmuletRules_Transfer: { template: 'Splice.AmuletRules:AmuletRules', pkg: AMULET },
+	LockedAmulet_OwnerExpireLockV2: { template: 'Splice.Amulet:LockedAmulet', pkg: AMULET },
+	ExternalPartySetupProposal_Accept: {
+		template: 'Splice.AmuletRules:ExternalPartySetupProposal',
+		pkg: AMULET
+	},
+	// The token standard's transfer: an interface choice, implemented by Canton Coin's rules.
+	TransferFactory_Transfer: {
+		template: 'Splice.AmuletRules:AmuletRules',
+		pkg: AMULET,
+		iface: 'Splice.Api.Token.TransferInstructionV1:TransferFactory'
+	}
 };
 
 // ---- Sign-up: the party topology --------------------------------------------------------
@@ -196,79 +217,259 @@ function plain(value: Value | undefined): Plain {
 	}
 }
 
-function same(a: Plain, b: Plain): boolean {
-	if (Array.isArray(a) || Array.isArray(b)) {
+/**
+ * Whether `actual` says everything `expected` says. Records may carry more than the page
+ * asked about (a coin transfer names the participant's choice of inputs and its timestamps);
+ * lists must match exactly.
+ */
+function covers(expected: Plain, actual: Plain): boolean {
+	if (Array.isArray(expected) || Array.isArray(actual)) {
 		return (
-			Array.isArray(a) &&
-			Array.isArray(b) &&
-			a.length === b.length &&
-			a.every((x, i) => same(x, b[i]))
+			Array.isArray(expected) &&
+			Array.isArray(actual) &&
+			expected.length === actual.length &&
+			expected.every((x, i) => covers(x, actual[i]))
 		);
 	}
-	if (a !== null && b !== null && typeof a === 'object' && typeof b === 'object') {
-		const keys = Object.keys(a);
-		return keys.length === Object.keys(b).length && keys.every((k) => k in b && same(a[k], b[k]));
+	if (
+		expected !== null &&
+		actual !== null &&
+		typeof expected === 'object' &&
+		typeof actual === 'object'
+	) {
+		return Object.keys(expected).every((k) => k in actual && covers(expected[k], actual[k]));
 	}
-	return a === b;
+	return expected === actual;
 }
 
 export type Expected = {
+	/** The party the transaction acts as: the signer's own, or a treasury the signer co-owns. */
 	party: string;
 	choice: string;
-	contractId: string;
+	/** The contract the choice is on, when the page knows it; a transfer's factory it does not. */
+	contractId?: string;
 	args: { [field: string]: Plain };
 };
 
+/**
+ * A prepared transaction is signed only if it acts as the expected party alone, and each of
+ * its roots is the expected choice on the expected contract with the expected arguments, in
+ * the expected package. Whatever hangs below a root is the choice's own body, authorised by
+ * that contract's signatories, not by us. (Who the transaction reads as is not in the signed
+ * bytes; reading changes nothing about what the signature authorises.)
+ */
 export async function verifyPrepared(
 	prepared: { preparedTransaction: string; preparedTransactionHash: string },
-	expected: Expected
+	expected: Expected | Expected[]
 ): Promise<void> {
 	const hash = await hashPreparedTransaction(prepared.preparedTransaction, 'base64');
 	if (hash !== prepared.preparedTransactionHash) {
 		throw new Error('The transaction does not match the hash the server asked to sign');
 	}
+	const intents = Array.isArray(expected) ? expected : [expected];
+	const party = intents[0].party;
 
 	const tx = decodePreparedTransaction(prepared.preparedTransaction);
 
-	// The signature authorises exactly the submitter's actAs — so that must be the user, alone.
+	// The signature authorises exactly the submitter's actAs — so that must be the party, alone.
 	const actAs = tx.metadata?.submitterInfo?.actAs ?? [];
-	if (actAs.length !== 1 || actAs[0] !== expected.party) {
-		throw new Error(`The transaction acts as ${actAs.join(', ') || 'nobody'}, not you`);
+	if (actAs.length !== 1 || actAs[0] !== party) {
+		throw new Error(`The transaction acts as ${actAs.join(', ') || 'nobody'}, not ${party}`);
 	}
 
 	const nodes = tx.transaction?.nodes ?? [];
 	const roots = tx.transaction?.roots ?? [];
 	const byId = new Map(nodes.map((node) => [node.nodeId, node]));
-
-	// One root, and it is the user exercising the asked-for choice on the asked-for contract.
-	// Whatever hangs below it is the choice's own body, authorised by that contract's
-	// signatories, not by us.
-	const root = roots.length === 1 ? byId.get(roots[0])?.versionedNode : undefined;
-	if (root?.oneofKind !== 'v1' || root.v1.nodeType.oneofKind !== 'exercise') {
-		throw new Error('Expected a single choice exercise, got something else');
+	if (roots.length !== intents.length) {
+		throw new Error(`Expected ${intents.length} choice(s), the transaction has ${roots.length}`);
 	}
 
-	const exercise = root.v1.nodeType.exercise;
-	const template = `${exercise.templateId?.moduleName}:${exercise.templateId?.entityName}`;
-	const home = CHOICES[expected.choice];
-	if (!home || exercise.choiceId !== expected.choice || template !== home) {
-		throw new Error(
-			`Expected to sign ${expected.choice} on ${home}, got ${exercise.choiceId} on ${template}`
-		);
-	}
-	if (exercise.packageName !== PACKAGE_NAME || exercise.templateId?.packageId !== packageId) {
-		throw new Error('The transaction uses a package this app was not built with');
-	}
-	if (exercise.contractId !== expected.contractId) {
-		throw new Error('The transaction is on a different contract than the one you are looking at');
-	}
-	if (exercise.actingParties.some((p) => p !== expected.party)) {
-		throw new Error(
-			`The choice would be exercised by ${exercise.actingParties.join(', ')}, not you`
-		);
-	}
+	roots.forEach((rootId, i) => {
+		const want = intents[i];
+		const root = byId.get(rootId)?.versionedNode;
+		if (root?.oneofKind !== 'v1' || root.v1.nodeType.oneofKind !== 'exercise') {
+			throw new Error('Expected a choice exercise, got something else');
+		}
+		const exercise = root.v1.nodeType.exercise;
+		const home = CHOICES[want.choice];
+		const template = `${exercise.templateId?.moduleName}:${exercise.templateId?.entityName}`;
+		const iface = exercise.interfaceId
+			? `${exercise.interfaceId.moduleName}:${exercise.interfaceId.entityName}`
+			: undefined;
+		if (!home || exercise.choiceId !== want.choice || template !== home.template) {
+			throw new Error(
+				`Expected to sign ${want.choice} on ${home?.template}, got ${exercise.choiceId} on ${template}`
+			);
+		}
+		if (home.iface !== iface) throw new Error('The choice is not on the interface expected');
+		if (exercise.packageName !== home.pkg) {
+			throw new Error(`The transaction uses ${exercise.packageName}, not ${home.pkg}`);
+		}
+		if (home.pkg === PACKAGE_NAME && exercise.templateId?.packageId !== packageId) {
+			throw new Error('The transaction uses a package this app was not built with');
+		}
+		if (want.contractId !== undefined && exercise.contractId !== want.contractId) {
+			throw new Error('The transaction is on a different contract than the one you are looking at');
+		}
+		if (exercise.actingParties.some((p) => p !== party)) {
+			throw new Error(
+				`The choice would be exercised by ${exercise.actingParties.join(', ')}, not ${party}`
+			);
+		}
+		if (!covers(want.args, plain(exercise.chosenValue))) {
+			throw new Error('The transaction does not say what you asked for');
+		}
+	});
+}
 
-	if (!same(plain(exercise.chosenValue), expected.args)) {
-		throw new Error('The transaction does not say what you asked for');
+// ---- A treasury: the party the DAO's admins own together --------------------------------
+
+// HashPurpose.DecentralizedNamespace; the mapping numbers in TopologyMapping's oneof.
+const DECENTRALIZED_NAMESPACE = 37;
+const NAMESPACE_DELEGATION = 1;
+const DECENTRALIZED_DEFINITION = 3;
+const PARTY_TO_PARTICIPANT = 9;
+
+const hex = (bytes: Uint8Array) => [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+
+/** DecentralizedNamespaceDefinition.computeNamespace, as Canton computes it. */
+export async function decentralizedNamespace(owners: string[]): Promise<string> {
+	const parts: Uint8Array[] = [new Uint8Array([0, 0, 0, DECENTRALIZED_NAMESPACE])];
+	for (const o of [...owners].sort()) {
+		const b = new TextEncoder().encode(o);
+		const len = new Uint8Array(4);
+		new DataView(len.buffer).setUint32(0, b.length);
+		parts.push(len, b);
 	}
+	const all = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+	let at = 0;
+	for (const p of parts) {
+		all.set(p, at);
+		at += p.length;
+	}
+	return '1220' + hex(new Uint8Array(await crypto.subtle.digest('SHA-256', all)));
+}
+
+export type TreasuryPlan = {
+	party: string;
+	owners: { party: string; publicKey: string }[];
+	threshold: number;
+	transactions: string[];
+	multiHash: string;
+};
+
+/**
+ * Before an admin signs a treasury into existence: the hash is of these transactions; they are
+ * one root certificate per admin (each admin's own key, in the namespace that is that key's
+ * fingerprint), a namespace all the admins own with every one of them needed to change it,
+ * and one party in it, hosted here for confirmation, signable by the admins' keys with the
+ * agreed threshold. Nothing else, nobody else.
+ */
+export async function verifyTreasury(
+	plan: TreasuryPlan,
+	admins: string[],
+	threshold: number,
+	publicKey: Uint8Array
+): Promise<void> {
+	const bytes = plan.transactions.map(fromBase64);
+	const hashes = await Promise.all(
+		bytes.map((tx) => computeSha256CantonHash(TOPOLOGY_TRANSACTION, tx))
+	);
+	const combined = await computeMultiHashForTopology(hashes);
+	if (toBase64(await computeSha256CantonHash(TOPOLOGY_MULTI_HASH, combined)) !== plan.multiHash) {
+		throw new Error('The treasury topology does not match the hash the server asked to sign');
+	}
+	const owners = [...admins].sort();
+	const fingerprints = owners.map((p) => p.split('::')[1]);
+	if (plan.owners.length !== owners.length || !plan.owners.every((o) => owners.includes(o.party))) {
+		throw new Error('The treasury would not be owned by the admins');
+	}
+	if (threshold < 1 || threshold > owners.length || plan.threshold !== threshold) {
+		throw new Error('The signing threshold is not the one agreed');
+	}
+	const namespace = await decentralizedNamespace(fingerprints);
+	if (plan.party.split('::')[1] !== namespace || !plan.party.startsWith('treasury-')) {
+		throw new Error('The treasury party is not in the namespace the admins own');
+	}
+	if (bytes.length !== owners.length + 2) throw new Error('Unexpected topology transactions');
+
+	const mappings = bytes.map((tx) => {
+		const wrapper = fields(tx);
+		only(wrapper, [1, 2]);
+		const transaction = fields(bytesOf(one(wrapper, 1, 'transaction')));
+		only(transaction, [1, 2, 3]);
+		if (num(one(transaction, 1, 'operation')) !== ADD_REPLACE) {
+			throw new Error('The treasury topology is not an addition');
+		}
+		if (num(one(transaction, 2, 'serial')) !== 1) throw new Error('Not a first topology serial');
+		const mapping = fields(bytesOf(one(transaction, 3, 'mapping')));
+		if (mapping.length !== 1) throw new Error('A mapping with more than one kind');
+		return mapping[0];
+	});
+
+	// A key is checked by what it is, not by who says it is: its fingerprint must be the
+	// namespace of one of the admins, and the set of them must be exactly the admins.
+	const keyOwner = async (keyField: Field): Promise<string> => {
+		const key = fields(bytesOf(keyField));
+		only(key, [2, 3, 5, 6]);
+		if (num(one(key, 6, 'key spec')) !== EC_CURVE25519) throw new Error('A key is not ed25519');
+		const raw = bytesOf(one(key, 3, 'key bytes'));
+		const fp = await fingerprintOf(raw.subarray(raw.length - 32));
+		if (!fingerprints.includes(fp)) throw new Error("A key that is not an admin's");
+		return fp;
+	};
+
+	const seenRoots = new Set<string>();
+	let definitions = 0;
+	let hostings = 0;
+	for (const m of mappings) {
+		if (m.number === NAMESPACE_DELEGATION) {
+			const root = fields(bytesOf(m));
+			only(root, [1, 2, 4]);
+			const fp = await keyOwner(one(root, 2, 'root key'));
+			if (text(one(root, 1, 'namespace')) !== fp)
+				throw new Error('A root certificate for another namespace');
+			if (bytesOf(one(root, 4, 'restriction')).length !== 0)
+				throw new Error('A restricted root certificate');
+			seenRoots.add(fp);
+		} else if (m.number === DECENTRALIZED_DEFINITION) {
+			definitions++;
+			const def = fields(bytesOf(m));
+			only(def, [1, 2, 3]);
+			if (text(one(def, 1, 'namespace')) !== namespace) throw new Error('Another namespace');
+			if (num(one(def, 2, 'owner threshold')) !== owners.length) {
+				throw new Error('Not every admin would be needed to change the treasury');
+			}
+			const listed = def.filter((f) => f.number === 3).map(text);
+			if (listed.join() !== fingerprints.join())
+				throw new Error('The namespace owners are not the admins');
+		} else if (m.number === PARTY_TO_PARTICIPANT) {
+			hostings++;
+			const hosting = fields(bytesOf(m));
+			only(hosting, [1, 2, 3, 6]);
+			if (text(one(hosting, 1, 'party')) !== plan.party)
+				throw new Error('The mapping is for another party');
+			if (num(one(hosting, 2, 'threshold')) !== 1)
+				throw new Error('The hosting threshold is not one');
+			const participant = fields(bytesOf(one(hosting, 3, 'hosting participant')));
+			only(participant, [1, 2]);
+			if (num(one(participant, 2, 'permission')) !== CONFIRMATION) {
+				throw new Error('The participant would get more than confirmation rights');
+			}
+			const signing = fields(bytesOf(one(hosting, 6, 'signing key set')));
+			only(signing, [1, 2]);
+			if (num(one(signing, 2, 'signing threshold')) !== threshold) {
+				throw new Error('The signing threshold is not the one agreed');
+			}
+			const keys = await Promise.all(signing.filter((f) => f.number === 1).map(keyOwner));
+			if ([...new Set(keys)].sort().join() !== fingerprints.join()) {
+				throw new Error("The signing keys are not the admins' keys");
+			}
+		} else throw new Error(`Unexpected topology mapping ${m.number}`);
+	}
+	if (definitions !== 1 || hostings !== 1 || seenRoots.size !== owners.length) {
+		throw new Error('The treasury topology is incomplete');
+	}
+	const mine = await fingerprintOf(publicKey);
+	if (!fingerprints.includes(mine)) throw new Error("Your key is not among the treasury's");
 }

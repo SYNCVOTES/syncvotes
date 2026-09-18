@@ -18,9 +18,13 @@
 	import Skeleton from '$lib/components/skeleton.svelte';
 	import LoadMore from '$lib/components/load-more.svelte';
 	import RoleTag from '$lib/components/role-tag.svelte';
+	import Problem from '$lib/components/problem.svelte';
+	import BillingPanel from '$lib/components/billing-panel.svelte';
+	import TreasuryPanel from '$lib/components/treasury-panel.svelte';
+	import StakePanel from '$lib/components/stake-panel.svelte';
 	import Plus from '@lucide/svelte/icons/plus';
 	import ArrowRight from '@lucide/svelte/icons/arrow-right';
-	import { relative, dateOf, fmt } from '$lib/format';
+	import { relative, dateOf, fmt, coin } from '$lib/format';
 
 	const id = $derived(page.params.id!);
 	const me = $derived(store.who?.party ?? null);
@@ -31,6 +35,8 @@
 	let limit = $state(20);
 	const proposals = $derived(me ? remote.daoProposals({ id, offset: 0, limit, status }) : null);
 	const preview = $derived(me ? remote.daoMembers({ id, offset: 0, limit: 6 }) : null);
+
+	const counted = (p: { yes: number; no: number; abstain: number }) => p.yes + p.no + p.abstain;
 </script>
 
 <svelte:head><title>{dao?.current?.name ?? 'DAO'} — SyncVotes</title></svelte:head>
@@ -52,7 +58,8 @@
 					<h1 class="display text-3xl md:text-4xl">{d.name}</h1>
 					<div class="mt-3 flex flex-wrap items-center gap-2">
 						<Badge variant="accent">Private</Badge>
-						<Badge>Majority</Badge>
+						<Badge>{d.voting.kind === 'stake' ? 'By stake' : 'By member'}</Badge>
+						{#if d.treasury}<Badge>Treasury</Badge>{/if}
 						{#if d.me.admin}<Badge variant="amber">You are admin</Badge>{:else}<Badge
 								variant="green">Member</Badge
 							>{/if}
@@ -66,23 +73,28 @@
 			</div>
 			<div class="flex shrink-0 items-center gap-2">
 				{#if d.me.admin}
-					<Button href="/daos/{d.id}/edit" variant="outline">Edit</Button>
+					<Button href="/daos/{d.id}/edit" variant="outline">Settings</Button>
 				{/if}
-				<Button href="/daos/{d.id}/proposals/create"><Plus strokeWidth={2.5} /> New proposal</Button
-				>
+				{#if d.me.membership}
+					<Button href="/daos/{d.id}/proposals/create"
+						><Plus strokeWidth={2.5} /> New proposal</Button
+					>
+				{/if}
 			</div>
 		</div>
+
+		<Problem message={store.problem} />
 
 		<Facts
 			items={[
 				{ label: 'Members', value: fmt(d.members) },
-				{ label: 'Proposals', value: fmt(d.proposals) },
 				{ label: 'Open', value: fmt(d.openProposals), accent: d.openProposals > 0 },
+				{ label: 'Balance', value: coin(d.balance), accent: d.balance <= 0 },
 				{ label: 'Established', value: dateOf(d.createdAt) }
 			]}
 		/>
 
-		<div class="grid gap-10 lg:grid-cols-[1fr_300px]">
+		<div class="grid gap-10 lg:grid-cols-[1fr_320px]">
 			<section>
 				<div class="mb-4 flex items-center justify-between gap-4">
 					<h2 class="eyebrow">Proposals</h2>
@@ -115,17 +127,16 @@
 								<div class="min-w-0 flex-1">
 									<div class="truncate font-display text-[15px] font-bold">{p.title}</div>
 									<div class="mt-1 font-mono text-xs text-ink-dim">
-										by <PartyId party={p.proposer} class="align-middle" /> · {dateOf(p.createdAt)} · {fmt(
-											p.yes + p.no
-										)} counted of
-										{fmt(p.eligible)} · {p.outcome
+										by <PartyId party={p.proposer} class="align-middle" /> · {dateOf(p.createdAt)}
+										· {p.voting.kind === 'member'
+											? `${fmt(counted(p))} counted of ${fmt(p.eligible)}`
+											: `${coin(counted(p))} counted`}
+										· {p.effect.kind !== 'signal' ? `${p.effect.kind} · ` : ''}{p.outcome
 											? 'closed'
-											: !p.openedAt
-												? 'opening'
-												: `closes ${relative(p.closesAt)}`}
+											: `closes ${relative(p.closesAt)}`}
 									</div>
 								</div>
-								<StatusBadge outcome={p.outcome} closesAt={p.closesAt} opened={!!p.openedAt} />
+								<StatusBadge outcome={p.outcome} closesAt={p.closesAt} executedAt={p.executedAt} />
 								<ArrowRight
 									size={16}
 									class="text-ink-dim transition-all group-hover:translate-x-0.5 group-hover:text-orange"
@@ -143,27 +154,33 @@
 				{/if}
 			</section>
 
-			<aside>
-				<SectionTitle title="Members" count={fmt(d.members)} />
-				{#if preview?.ready}
-					<List>
-						{#each preview.current.items as m (m.party)}
-							<ListItem class="flex items-center justify-between gap-3 font-mono text-xs">
-								<PartyId
-									party={m.party}
-									class={m.party === me ? '[&>span>span:first-child]:text-orange' : ''}
-								/>
-								{#if m.party === d.admin}<RoleTag role="admin" />{/if}
-							</ListItem>
-						{/each}
-					</List>
-				{:else}
-					<Skeleton height="h-24" />
-				{/if}
-				<Button href="/daos/{d.id}/members" variant="outline" size="sm" class="mt-3 w-full">
-					{d.me.admin ? 'Manage members' : 'All members'}
-					<ArrowRight size={14} />
-				</Button>
+			<aside class="space-y-6">
+				<BillingPanel dao={d.id} admin={d.me.admin} />
+				<TreasuryPanel dao={d.id} admin={d.me.admin} treasury={d.treasury} />
+				{#if d.voting.kind === 'stake'}<StakePanel />{/if}
+
+				<div>
+					<SectionTitle title="Members" count={fmt(d.members)} />
+					{#if preview?.ready}
+						<List>
+							{#each preview.current.items as m (m.party)}
+								<ListItem class="flex items-center justify-between gap-3 font-mono text-xs">
+									<PartyId
+										party={m.party}
+										class={m.party === me ? '[&>span>span:first-child]:text-orange' : ''}
+									/>
+									{#if d.admins.includes(m.party)}<RoleTag role="admin" />{/if}
+								</ListItem>
+							{/each}
+						</List>
+					{:else}
+						<Skeleton height="h-24" />
+					{/if}
+					<Button href="/daos/{d.id}/members" variant="outline" size="sm" class="mt-3 w-full">
+						{d.me.admin ? 'Manage members' : 'All members'}
+						<ArrowRight size={14} />
+					</Button>
+				</div>
 			</aside>
 		</div>
 	{/if}

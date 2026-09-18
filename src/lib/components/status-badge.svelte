@@ -7,19 +7,21 @@
 	let {
 		outcome,
 		closesAt,
-		opened = true
-	}: { outcome: 'Passed' | 'Failed' | null; closesAt: string; opened?: boolean } = $props();
+		executedAt = null
+	}: {
+		outcome: 'Passed' | 'Failed' | null;
+		closesAt: string;
+		executedAt?: string | null;
+	} = $props();
 
 	const state = $derived(
 		outcome === 'Passed'
-			? { label: 'Passed', icon: Check, variant: 'green' as const }
+			? { label: executedAt ? 'Executed' : 'Passed', icon: Check, variant: 'green' as const }
 			: outcome === 'Failed'
 				? { label: 'Failed', icon: X, variant: 'red' as const }
-				: !opened
-					? { label: 'Opening', icon: null, variant: 'outline' as const }
-					: new Date(closesAt).getTime() < Date.now()
-						? { label: 'Ended', icon: Clock, variant: 'amber' as const }
-						: { label: 'Active', icon: null, variant: 'accent' as const }
+				: new Date(closesAt).getTime() < Date.now()
+					? { label: 'Ended', icon: Clock, variant: 'amber' as const }
+					: { label: 'Active', icon: null, variant: 'accent' as const }
 	);
 </script>
 

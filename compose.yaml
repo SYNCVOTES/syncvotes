@@ -25,6 +25,11 @@ services:
       LEDGER_AUTH_CLIENT_SECRET: ${KC_APP_SECRET:?set in the env file}
       LEDGER_AUTH_AUDIENCE: ${LEDGER_API_AUDIENCE:-https://canton.network.global}
       LEDGER_AUTH_SCOPE: daml_ledger_api
+      SCAN_URL: ${SCAN_URL:?set in the env file}
+      VALIDATOR_API_URL: http://validator:5003/api/validator
+      VALIDATOR_AUTH_CLIENT_ID: validator-app-backend
+      VALIDATOR_AUTH_CLIENT_SECRET: ${KC_VALIDATOR_SECRET:?set in the env file}
+      BILLING_FACTOR: ${BILLING_FACTOR:-1}
       # Shown to users; the ledger does not care.
       NETWORK: ${NETWORK:-TestNet}
       # A signed transaction that issues a hundred voting rights comes back as a ~1 MB request.

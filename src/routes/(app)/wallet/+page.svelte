@@ -14,6 +14,7 @@
 	import KeyValue from '$lib/components/key-value.svelte';
 	import Phrase from '$lib/components/phrase.svelte';
 	import WalletSources from '$lib/components/wallet-sources.svelte';
+	import Holdings from '$lib/components/holdings.svelte';
 	import { normaliseHint, hintProblem } from '$lib/hint';
 	import { hintOf, label } from '$lib/format';
 
@@ -192,6 +193,7 @@
 					</div>
 				</KeyValue>
 			</Panel>
+			<Holdings />
 			<div class="flex flex-wrap gap-3">
 				<Button href="/my-daos">My DAOs</Button>
 				<Button variant="outline" onclick={lock}>Lock</Button>

@@ -94,7 +94,7 @@
 			"directAccessGrantsEnabled": false,
 			"serviceAccountsEnabled": true,
 			"defaultClientScopes": ["daml_ledger_api"],
-			"optionalClientScopes": []
+			"optionalClientScopes": ["openid"]
 		},
 		{
 			"clientId": "syncvotes-app",

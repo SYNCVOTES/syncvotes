@@ -23,3 +23,7 @@ export const label = (party: string) =>
 
 /** 12,345 */
 export const fmt = (n: number) => n.toLocaleString('en-US');
+
+/** "12,345.67 CC" — coin, to the cents that matter on screen. */
+export const coin = (n: number) =>
+	`${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: n < 1 ? 6 : 2 })} CC`;

@@ -2,18 +2,23 @@ module Main where
 
 import DA.Action (foldlA)
 import DA.Foldable (forA_)
-import DA.List (dedup)
-import DA.Optional (isNone, isSome, optional)
+import DA.List (dedup, sort)
+import DA.Optional (fromSomeNote, isNone, optional)
+import Splice.Api.Token.HoldingV1 (Holding, HoldingView(..), InstrumentId(..), Lock(..))
 
 -- Every contract a user acts on carries the app provider's signature, so the provider confirms
 -- every transaction (which is what earns traffic rewards) while the user's own key is the only
 -- one that ever signs a submission. The provider's authority enters once, with the Account, and
 -- every later contract inherits it through the choice that creates it.
 --
+-- A DAO is signed by the party that created it as well, and that pair — creator and provider —
+-- is the DAO's own authority: choices that only the DAO may exercise (removing a member, marking
+-- a proposal executed) are controlled by both, and neither has the other's key.
+--
 -- Built for large DAOs: a member's vote touches only that member's own contract, so thousands
 -- can vote at once, and a proposal holds counters rather than lists. The provider counts the
 -- ballots in batches; the ledger checks each one it is handed, so the provider can delay a
--- result but never change it.
+-- result but never change it. Nothing here grows with history.
 
 data Vote = Yes | No | Abstain
   deriving (Eq, Show)
@@ -21,13 +26,52 @@ data Vote = Yes | No | Abstain
 data Outcome = Passed | Failed
   deriving (Eq, Show)
 
+-- | How a DAO decides: one member, one vote — or by tokens locked in the voter's own wallet.
+-- A stake vote passes at the deadline when yes outweighs no and at least `quorum` took part.
+data Voting
+  = ByMember
+  | ByStake with
+      instrument : InstrumentId
+      quorum : Decimal
+  deriving (Eq, Show)
+
+-- | The DAO's money: a party whose keys are the admins', `threshold` of which sign a payout.
+data Treasury = Treasury with
+    party : Party
+    signers : [Party]
+    threshold : Int
+  deriving (Eq, Show)
+
+-- | What a proposal does when it passes (`Effect`: `Action` is the Prelude's). `Signal` decides and does nothing else. (`Effect`, since
+-- `Effect` is the Prelude's.)
+data Effect
+  = Signal
+  | Payout with
+      to : Party
+      amount : Decimal
+  | SetMembers with
+      add : [Party]
+      remove : [Party]
+  | SetAdmins with
+      admins : [Party]
+  deriving (Eq, Show)
+
+-- | Members added or removed per transaction; longer lists are split.
+batch : Int
+batch = 200
+
+adminOnly : [Party] -> Party -> Update ()
+adminOnly admins party = assertMsg "Only an admin can do this" (party `elem` admins)
+
 -- | A party's standing with the app: created by the provider once per party, and the door
--- through which the party creates DAOs.
+-- through which the party creates DAOs. Remembers the key, so a treasury can be built from
+-- its admins' keys without asking them again.
 template Account
   with
     provider : Party
     operator : Party
     user : Party
+    publicKey : Text
   where
     signatory provider
     observer user, operator
@@ -37,76 +81,177 @@ template Account
         id : Text
         daoName : Text
         description : Text
+        members : [Party]
+        admins : [Party]
+        voting : Voting
       controller user
       do
         now <- getTime
-        create Member with
-          provider; operator; admin = user; daoId = id; party = user; since = now; voted = []
+        let everyone = dedup (user :: members)
+            leads = dedup admins
+        assertMsg "A DAO needs an admin" (not (null leads))
+        assertMsg "Admins are members" (all (`elem` everyone) leads)
+        assertMsg "Too many members at once" (length everyone <= batch)
+        forA_ everyone \party ->
+          create Member with
+            provider; operator; creator = user; sponsor = user; daoId = id; party; since = now
+            voted = []
         create DAO with
-          provider; operator; admin = user; id; name = daoName; description; createdAt = now
-          members = 1
+          provider; operator; creator = user; admins = leads; id; name = daoName; description
+          createdAt = now; members = length everyone; voting; treasury = None
 
--- | A DAO: who runs it, what it is called, and how many members it has. The members themselves
--- are `Member` contracts, so a DAO of ten thousand is as small as a DAO of three.
+-- | A DAO: who runs it, what it is called, how it decides, and how many members it has. The
+-- members themselves are `Member` contracts, so a DAO of ten thousand is as small as one of
+-- three. Any admin may change it; the creator's signature is what keeps the provider from
+-- archiving it alone.
 template DAO
   with
     provider : Party
     operator : Party
-    admin : Party
+    creator : Party
+    admins : [Party]
     id : Text
     name : Text
     description : Text
     createdAt : Time
     members : Int
+    voting : Voting
+    treasury : Optional Treasury
   where
-    signatory admin, provider
-    observer operator
+    signatory creator, provider
+    observer operator, admins
 
-    ensure name /= ""
+    ensure name /= "" && not (null admins)
 
     choice DAO_Update : ContractId DAO
       with
+        admin : Party
         daoName : Text
         description : Text
       controller admin
-      do create this with name = daoName; description
+      do
+        adminOnly admins admin
+        create this with name = daoName; description
 
     choice DAO_Archive : ()
+      with
+        admin : Party
       controller admin
-      do pure ()
+      do adminOnly admins admin
+
+    choice DAO_SetAdmins : ContractId DAO
+      with
+        admin : Party
+        newAdmins : [Party]
+      controller admin
+      do
+        adminOnly admins admin
+        create this with admins = dedup newAdmins
+
+    choice DAO_SetVoting : ContractId DAO
+      with
+        admin : Party
+        newVoting : Voting
+      controller admin
+      do
+        adminOnly admins admin
+        create this with voting = newVoting
+
+    -- The treasury's signers are the admins of the moment; when the admins change, the
+    -- treasury is rebuilt and the old signers move the money.
+    choice DAO_SetTreasury : ContractId DAO
+      with
+        admin : Party
+        newTreasury : Optional Treasury
+      controller admin
+      do
+        adminOnly admins admin
+        forA_ newTreasury \t -> do
+          assertMsg "The signers are the admins" (sort t.signers == sort admins)
+          assertMsg "Threshold out of range" (t.threshold >= 1 && t.threshold <= length t.signers)
+        create this with treasury = newTreasury
 
     choice DAO_AddMembers : ContractId DAO
       with
+        admin : Party
         parties : [Party]
       controller admin
       do
+        adminOnly admins admin
         now <- getTime
         let new = dedup parties
+        assertMsg "Too many at once" (length new <= batch)
         forA_ new \party ->
-          create Member with provider; operator; admin; daoId = id; party; since = now; voted = []
+          create Member with
+            provider; operator; creator; sponsor = admin; daoId = id; party; since = now; voted = []
         create this with members = members + length new
 
     choice DAO_RemoveMembers : ContractId DAO
       with
+        admin : Party
         memberCids : [ContractId Member]
       controller admin
       do
-        forA_ memberCids \cid -> do
+        adminOnly admins admin
+        gone <- forA memberCids \cid -> do
           member <- fetch cid
           assertMsg "Not a member of this DAO" (member.daoId == id)
-          assertMsg "The admin stays a member" (member.party /= admin)
-          archive cid
-        create this with members = members - length memberCids
+          assertMsg "The creator stays a member" (member.party /= creator)
+          exercise cid Member_Remove
+          pure member.party
+        create this with
+          members = members - length memberCids
+          admins = filter (`notElem` gone) admins
+
+    -- A passed proposal is carried out by the provider, with the DAO's authority and the
+    -- ledger's check that it did pass. Removals are named by contract, since a proposal can
+    -- only name parties; the ledger checks each one is who the proposal said.
+    choice DAO_Execute : ContractId DAO
+      with
+        proposal : ContractId Proposal
+        removals : [ContractId Member]
+      controller provider
+      do
+        p <- fetch proposal
+        assertMsg "Not this DAO's proposal" (p.daoId == id)
+        exercise proposal Proposal_MarkExecuted
+        now <- getTime
+        case p.action of
+          Signal -> create this
+          SetAdmins newAdmins -> create this with admins = dedup newAdmins
+          SetMembers add remove -> do
+            gone <- forA removals \cid -> do
+              member <- fetch cid
+              assertMsg "Not a member of this DAO" (member.daoId == id)
+              assertMsg "Not named by the proposal" (member.party `elem` remove)
+              assertMsg "The creator stays a member" (member.party /= creator)
+              exercise cid Member_Remove
+              pure member.party
+            let new = dedup add
+            forA_ new \party ->
+              create Member with
+                provider; operator; creator; sponsor = creator; daoId = id; party; since = now
+                voted = []
+            create this with
+              members = members + length new - length removals
+              admins = filter (`notElem` gone) admins
+          Payout to amount -> do
+            t <- pure (fromSomeNote "The DAO has no treasury" treasury)
+            create PayoutDue with
+              provider; creator; daoId = id; proposalId = p.id; treasury = t.party; to; amount
+              createdAt = now
+            create this
 
 -- | One party's membership of one DAO: the door through which the member proposes, and their
 -- ballot box — voting replaces it with a copy that remembers the proposal, which is what makes
--- a second ballot impossible. A member sees this contract and nothing of the DAO's own, so
--- everything a member does starts here.
+-- a second ballot impossible. Signed by whoever admitted the member, so the provider cannot
+-- invent members; removed only with the DAO's authority.
 template Member
   with
     provider : Party
     operator : Party
-    admin : Party
+    creator : Party
+    sponsor : Party
     daoId : Text
     party : Party
     since : Time
@@ -115,95 +260,124 @@ template Member
     -- cast, and the contract stays the size of the member's open business, not their history.
     voted : [(Text, Time)]
   where
-    signatory admin, provider
+    signatory provider, sponsor
     observer party, operator
 
-    -- The proposal is created here and opened by the provider the moment it sees it; what
-    -- members vote on is what was proposed, never a later edit.
+    choice Member_Remove : ()
+      controller provider, creator
+      do pure ()
+
+    -- The DAO is read as it is now: its rules and its member count are fixed into the proposal,
+    -- and voting is open from this moment. What members vote on is what was proposed.
     nonconsuming choice Member_Propose : ContractId Proposal
       with
+        dao : ContractId DAO
         pid : Text
         title : Text
         description : Text
         closesAt : Time
+        action : Effect
       controller party
       do
         now <- getTime
+        found <- fetch dao
+        assertMsg "Not this member's DAO" (found.id == daoId)
         assertMsg "The deadline must be in the future" (closesAt > now)
+        case action of
+          Signal -> pure ()
+          Payout _ amount -> do
+            assertMsg "The DAO has no treasury" (optional False (const True) found.treasury)
+            assertMsg "A payout is a positive amount" (amount > 0.0)
+          SetMembers add remove -> do
+            assertMsg "Nothing to change" (not (null add && null remove))
+            assertMsg "Too many at once" (length add <= batch && length remove <= batch)
+          SetAdmins admins -> assertMsg "A DAO needs an admin" (not (null admins))
+        let eligible = case found.voting of
+              ByMember -> intToDecimal found.members
+              ByStake _ _ -> 0.0
         create Proposal with
-          provider; operator; daoId; admin; proposer = party; id = pid; title; description
-          createdAt = now; closesAt; openedAt = None; eligible = 0; yes = 0; no = 0
-          abstain = 0; outcome = None
+          provider; operator; creator; daoId; proposer = party; id = pid; title; description
+          action; voting = found.voting; createdAt = now; closesAt; eligible; yes = 0.0; no = 0.0
+          abstain = 0.0; outcome = None; executedAt = None
 
     -- Nothing here reads the proposal, so a vote never waits on the count or on other voters.
     -- Whether the ballot is valid for its proposal (right DAO, member in time, before the
-    -- deadline) is checked when the provider counts it.
-    -- `closesAt` is the voter's word for the deadline; the count checks it against the
-    -- proposal's. A voter who lies about it only wastes a ballot the count will refuse.
+    -- deadline, the DAO's own instrument) is checked when the provider counts it. `closesAt`
+    -- and the instrument are the voter's word; a voter who lies only wastes a ballot the count
+    -- will refuse. A stake is the voter's own holdings, locked past the deadline: read here
+    -- through the token standard, so the weight is what the ledger says it is.
     choice Member_Vote : ContractId Ballot
       with
         proposalId : Text
         closesAt : Time
         vote : Vote
+        stake : Optional (InstrumentId, [ContractId Holding])
       controller party
       do
         now <- getTime
         let open = filter (\(_, deadline) -> deadline > now) voted
         assertMsg "Already voted" (proposalId `notElem` map fst open)
+        weight <- case stake of
+          None -> pure 1.0
+          Some (instrument, holdings) -> do
+            assertMsg "A holding is listed twice" (dedup holdings == holdings)
+            assertMsg "Too many holdings" (length holdings <= 20)
+            amounts <- forA holdings \cid -> do
+              holding <- fetch cid
+              let v = view holding
+              assertMsg "Not the voter's holding" (v.owner == party)
+              assertMsg "Not the DAO's instrument" (v.instrumentId == instrument)
+              let until = v.lock >>= \l -> l.expiresAt
+              assertMsg "Stake must stay locked past the deadline" (optional False (>= closesAt) until)
+              pure v.amount
+            assertMsg "Nothing staked" (sum amounts > 0.0)
+            pure (sum amounts)
         create this with voted = (proposalId, closesAt) :: open
         create Ballot with
-          provider; operator; daoId; proposalId; voter = party; since; vote; closesAt
-          castAt = now; counted = False
+          provider; operator; daoId; proposalId; voter = party; since; vote; weight
+          instrument = fst <$> stake; closesAt; castAt = now; counted = False
 
--- | A proposal counts; it does not list. Opening it fixes the electorate: every member at that
--- moment, and only they. It passes once yes reaches a majority of them, fails once no makes
--- that impossible, and is decided by the ballots cast when the deadline has passed.
+-- | A proposal counts; it does not list. Its electorate and rules were fixed when it was made.
+-- A member vote passes once yes reaches a majority of the members, fails once no makes that
+-- impossible, and is decided by the ballots cast when the deadline has passed. A stake vote is
+-- decided at the deadline only. An action is carried out by the DAO once it has passed.
 template Proposal
   with
     provider : Party
     operator : Party
+    creator : Party
     daoId : Text
-    admin : Party
     proposer : Party
     id : Text
     title : Text
     description : Text
+    action : Effect
+    voting : Voting
     createdAt : Time
     closesAt : Time
-    openedAt : Optional Time
-    eligible : Int
-    yes : Int
-    no : Int
-    abstain : Int
+    eligible : Decimal
+    yes : Decimal
+    no : Decimal
+    abstain : Decimal
     outcome : Optional Outcome
+    executedAt : Optional Time
   where
     signatory proposer, provider
-    observer operator, admin
+    observer operator
 
     ensure title /= ""
-
-    -- Opening fixes the electorate from the DAO's member count. The provider does it because
-    -- the DAO contract is the admin's and the provider's to see — a member cannot read it — and
-    -- the count comes off the ledger either way.
-    choice Proposal_Open : ContractId Proposal
-      with
-        dao : ContractId DAO
-      controller provider
-      do
-        assertMsg "Voting has opened" (isNone openedAt)
-        found <- fetch dao
-        assertMsg "Not this proposal's DAO" (found.id == daoId)
-        now <- getTime
-        create this with openedAt = Some now; eligible = found.members
 
     choice Proposal_Cancel : ()
       with
         canceller : Party
+        dao : ContractId DAO
       controller canceller
       do
         assertMsg "Already settled" (isNone outcome)
-        assertMsg "Only the proposer or the DAO admin can cancel"
-          (canceller == proposer || canceller == admin)
+        found <- fetch dao
+        assertMsg "Not this proposal's DAO" (found.id == daoId)
+        assertMsg "Only the proposer or an admin can cancel"
+          (canceller == proposer || canceller `elem` found.admins)
 
     -- `final` says the deadline has passed and these are the last ballots there are: the one
     -- thing the ledger takes on the provider's word, since it cannot see what was not handed in.
@@ -213,28 +387,40 @@ template Proposal
         final : Bool
       controller provider
       do
-        assertMsg "Voting has not opened" (isSome openedAt)
         assertMsg "Already settled" (isNone outcome)
         (y, n, a) <- foldlA
           (\(y, n, a) cid -> do
-            vote <- exercise cid Ballot_Count with proposal = this
+            (vote, weight) <- exercise cid Ballot_Count with proposal = this
             pure case vote of
-              Yes -> (y + 1, n, a)
-              No -> (y, n + 1, a)
-              Abstain -> (y, n, a + 1))
+              Yes -> (y + weight, n, a)
+              No -> (y, n + weight, a)
+              Abstain -> (y, n, a + weight))
           (yes, no, abstain) ballots
         now <- getTime
-        let needed = eligible / 2 + 1
-            decided
-              | y >= needed = Some Passed
-              | eligible - n - a < needed = Some Failed
-              | final && now >= closesAt = Some Failed
-              | otherwise = None
+        let over = final && now >= closesAt
+            decided = case voting of
+              ByMember ->
+                let needed = intToDecimal (truncate (eligible / 2.0)) + 1.0
+                in if y >= needed then Some Passed
+                   else if eligible - n - a < needed || over then Some Failed
+                   else None
+              ByStake _ quorum ->
+                if over then Some (if y > n && y + n + a >= quorum then Passed else Failed)
+                else None
         create this with yes = y; no = n; abstain = a; outcome = decided
 
--- | One vote. Signed by the voter and the provider; `since` is copied from the voter's
--- membership, so the count can tell whether they were a member when the vote opened. Counting
--- marks it rather than removing it, so who voted how stays on the ledger.
+    -- Only the DAO (creator and provider together) marks a proposal executed, and only once.
+    choice Proposal_MarkExecuted : ContractId Proposal
+      controller provider, creator
+      do
+        assertMsg "The proposal did not pass" (outcome == Some Passed)
+        assertMsg "Already executed" (isNone executedAt)
+        now <- getTime
+        create this with executedAt = Some now
+
+-- | One vote, with its weight. Signed by the voter and the provider; `since` is copied from the
+-- voter's membership, so the count can tell whether they were a member when the vote opened.
+-- Counting marks it rather than removing it, so who voted how stays on the ledger.
 template Ballot
   with
     provider : Party
@@ -244,6 +430,8 @@ template Ballot
     voter : Party
     since : Time
     vote : Vote
+    weight : Decimal
+    instrument : Optional InstrumentId
     closesAt : Time
     castAt : Time
     counted : Bool
@@ -251,7 +439,7 @@ template Ballot
     signatory voter, provider
     observer operator
 
-    choice Ballot_Count : Vote
+    choice Ballot_Count : (Vote, Decimal)
       with
         proposal : Proposal
       controller provider
@@ -260,6 +448,60 @@ template Ballot
         assertMsg "A ballot for another proposal" (proposalId == proposal.id && daoId == proposal.daoId)
         assertMsg "Cast after the deadline" (castAt < proposal.closesAt)
         assertMsg "Cast against another deadline" (closesAt == proposal.closesAt)
-        assertMsg "Joined after the vote opened" (optional False (since <=) proposal.openedAt)
+        assertMsg "Joined after the vote opened" (since <= proposal.createdAt)
+        assertMsg "Weighed in the wrong currency" case proposal.voting of
+          ByMember -> isNone instrument && weight == 1.0
+          ByStake wanted _ -> instrument == Some wanted
         create this with counted = True
-        pure vote
+        pure (vote, weight)
+
+-- | A payout the DAO decided: settled by the treasury in the same transaction as the transfer,
+-- so it is paid exactly once. The treasury sees it; the browser checks the transfer against it.
+template PayoutDue
+  with
+    provider : Party
+    creator : Party
+    daoId : Text
+    proposalId : Text
+    treasury : Party
+    to : Party
+    amount : Decimal
+    createdAt : Time
+  where
+    signatory provider, creator
+    observer treasury
+
+    choice PayoutDue_Settle : ()
+      controller treasury
+      do pure ()
+
+    -- Withdrawn by the DAO, say when the treasury was rebuilt for a new set of admins.
+    choice PayoutDue_Void : ()
+      controller provider, creator
+      do pure ()
+
+-- | The provider's statement of a DAO's account: what was paid in, and what its transactions
+-- have cost so far. Rewritten as the numbers move; one contract per DAO, whatever its history.
+template Meter
+  with
+    provider : Party
+    operator : Party
+    daoId : Text
+    admins : [Party]
+    credited : Decimal
+    charged : Decimal
+    updatedAt : Time
+  where
+    signatory provider
+    observer operator, admins
+
+    choice Meter_Update : ContractId Meter
+      with
+        newAdmins : [Party]
+        newCredited : Decimal
+        newCharged : Decimal
+      controller provider
+      do
+        now <- getTime
+        create this with
+          admins = newAdmins; credited = newCredited; charged = newCharged; updatedAt = now

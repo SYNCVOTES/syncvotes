@@ -31,15 +31,96 @@ export const votingDays = v.pipe(
 	v.maxValue(30, 'At most thirty days')
 );
 export const id = v.pipe(v.string(), v.nonEmpty());
-
-export const createDaoForm = v.object({ daoName, description: daoDescription });
-export const updateDaoForm = v.object({ dao: id, daoName, description: daoDescription });
-export const createProposalForm = v.object({
-	dao: id,
-	title: proposalTitle,
-	description: proposalDescription,
-	days: votingDays
-});
+export const partyId = v.pipe(v.string(), v.includes('::'), v.maxLength(300));
 
 /** Members added or removed per transaction; longer lists are split. */
 export const BATCH = 200;
+
+/** Party ids as a chips field submits them: separated by whitespace, in the order typed. */
+export const partyList = (max = BATCH) =>
+	v.pipe(
+		v.optional(v.string(), ''),
+		v.transform((s) => [...new Set(s.split(/\s+/).filter((t) => t.includes('::')))]),
+		v.maxLength(max, `At most ${max} parties at once`)
+	);
+
+/** A coin amount as typed: a positive number with at most ten decimals. */
+export const coin = v.pipe(
+	v.number('An amount of coin'),
+	v.minValue(0.0000000001, 'More than nothing'),
+	v.maxValue(1_000_000_000, 'That is more coin than there is')
+);
+
+/** How a DAO decides, as the create and settings forms name it. */
+export const votingKind = v.picklist(['member', 'stake'], 'Choose how the DAO votes');
+export const quorum = v.pipe(
+	v.optional(v.number('The quorum is an amount of coin'), 0),
+	v.minValue(0, 'The quorum cannot be negative')
+);
+
+export const createDaoForm = v.pipe(
+	v.object({
+		daoName,
+		description: daoDescription,
+		members: partyList(BATCH - 1),
+		admins: partyList(50),
+		voting: votingKind,
+		quorum
+	}),
+	v.check(
+		({ admins, members }) => admins.every((a) => members.includes(a)) || admins.length === 0,
+		'Every admin has to be among the members'
+	)
+);
+export const updateDaoForm = v.object({ dao: id, daoName, description: daoDescription });
+
+export const effectKind = v.picklist(['signal', 'payout', 'members', 'admins']);
+
+export const createProposalForm = v.pipe(
+	v.object({
+		dao: id,
+		title: proposalTitle,
+		description: proposalDescription,
+		days: votingDays,
+		kind: effectKind,
+		payoutTo: v.optional(v.string(), ''),
+		payoutAmount: v.optional(v.number(), 0),
+		add: partyList(),
+		remove: partyList(),
+		admins: partyList(50)
+	}),
+	v.forward(
+		v.check(
+			(f) => f.kind !== 'payout' || f.payoutTo.includes('::'),
+			'A payout needs a party id to pay'
+		),
+		['payoutTo']
+	),
+	v.forward(
+		v.check((f) => f.kind !== 'payout' || f.payoutAmount > 0, 'A payout is a positive amount'),
+		['payoutAmount']
+	),
+	v.forward(
+		v.check(
+			(f) => f.kind !== 'members' || f.add.length + f.remove.length > 0,
+			'Name someone to add or remove'
+		),
+		['add']
+	),
+	v.forward(
+		v.check((f) => f.kind !== 'admins' || f.admins.length > 0, 'A DAO needs at least one admin'),
+		['admins']
+	)
+);
+
+export const lockForm = v.object({
+	amount: coin,
+	days: v.pipe(
+		v.number('A number of days'),
+		v.integer('Whole days only'),
+		v.minValue(1, 'At least a day'),
+		v.maxValue(365, 'At most a year')
+	)
+});
+
+export const topUpForm = v.object({ dao: id, amount: coin });

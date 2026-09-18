@@ -5,6 +5,7 @@ import { packageId } from '@daml.js/model';
 import { sdk } from '$lib/server/participant';
 import * as ledger from '$lib/server/ledger';
 import * as tally from '$lib/server/tally';
+import * as billing from '$lib/server/billing';
 
 // Where the Dockerfile puts the DAR it built.
 const DAR_DIR = 'dar';
@@ -22,6 +23,7 @@ export const init: ServerInit = async () => {
 	console.log(`Daml package ${packageId.slice(0, 8)}… is on the participant (${dars[0]})`);
 	ledger.start();
 	tally.start();
+	billing.start();
 };
 
 /** An unexpected error still tells the user what happened; there is nothing secret in these. */

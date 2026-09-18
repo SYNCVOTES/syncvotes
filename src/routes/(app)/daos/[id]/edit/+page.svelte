@@ -39,7 +39,7 @@
 		({ daoName, description }) => ({
 			choice: 'DAO_Update',
 			contractId: dao!.current!.contractId,
-			args: { daoName, description }
+			args: { admin: store.who!.party, daoName, description }
 		}),
 		() => goto(`/daos/${id}`)
 	);

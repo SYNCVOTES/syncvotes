@@ -47,6 +47,26 @@ export const variables = defineEnvVars({
 		description: 'Scope to request for ledger tokens',
 		schema: v.optional(v.string(), 'daml_ledger_api')
 	},
+	SCAN_URL: {
+		description: "The network's public Scan: Canton Coin rules, rounds and prices, no token needed",
+		schema: required
+	},
+	VALIDATOR_API_URL: {
+		description: "This app's validator API, e.g. http://validator:5003/api/validator",
+		schema: required
+	},
+	VALIDATOR_AUTH_CLIENT_ID: {
+		description: "The validator backend's own OAuth client: its admin endpoints answer to it alone",
+		schema: required
+	},
+	VALIDATOR_AUTH_CLIENT_SECRET: {
+		description: "That client's secret",
+		schema: required
+	},
+	BILLING_FACTOR: {
+		description: 'What a DAO pays per byte of traffic, as a multiple of the network price',
+		schema: v.optional(v.string(), '1')
+	},
 	NETWORK: {
 		description: 'The Canton network this deployment is on, as shown to users: TestNet or MainNet',
 		public: true,
