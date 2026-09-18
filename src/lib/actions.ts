@@ -297,7 +297,7 @@ export async function recordTreasury(
 	const { treasury, prepared } = await remote.prepareRecordTreasury(daoId);
 	if (
 		treasury.party !== expected.party ||
-		treasury.threshold !== expected.threshold ||
+		Number(treasury.threshold) !== expected.threshold ||
 		[...treasury.signers].sort().join() !== [...expected.signers].sort().join()
 	) {
 		throw new Error('The server would record a different treasury');

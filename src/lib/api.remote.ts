@@ -782,10 +782,11 @@ export const prepareRecordTreasury = command(contractId, async (dao) => {
 	const { contractId } = adminOf(dao, party);
 	const p = treasury.current(dao);
 	if (!p) error(409, 'No treasury has been built');
+	// An Int travels as text through the JSON API.
 	const newTreasury = {
 		party: p.party,
 		signers: p.owners.map((o) => o.party),
-		threshold: p.threshold
+		threshold: String(p.threshold)
 	};
 	return {
 		treasury: newTreasury,
