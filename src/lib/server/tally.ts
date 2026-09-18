@@ -63,6 +63,8 @@ async function count(id: string) {
 			],
 			`tally-${id}-${p.contractId.slice(0, 12)}-${batch.length}`
 		);
+		// The next batch must see this one's result, or it would hand in ballots already counted.
+		await ledger.applied(updateId);
 		void billing.settle(p.daoId, updateId);
 	} catch (e) {
 		console.warn(`Tally of ${id} failed; retrying later:`, e instanceof Error ? e.message : e);
@@ -101,6 +103,7 @@ async function execute(p: ledger.Proposal) {
 			],
 			`execute-${p.id}-${dao.contractId.slice(0, 12)}`
 		);
+		await ledger.applied(updateId);
 		void billing.settle(p.daoId, updateId);
 	} catch (e) {
 		console.warn(`Executing ${p.id} failed; retrying later:`, e instanceof Error ? e.message : e);

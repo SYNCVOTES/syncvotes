@@ -255,8 +255,20 @@ function covers(expected: Plain, actual: Plain): boolean {
 			k in actual ? covers(expected[k], actual[k]) : expected[k] === null
 		);
 	}
+	// Timestamps come as ISO text from two writers (the ledger drops trailing zeros); the
+	// instant is what has to match.
+	if (
+		typeof expected === 'string' &&
+		typeof actual === 'string' &&
+		ISO.test(expected) &&
+		ISO.test(actual)
+	) {
+		return Date.parse(expected) === Date.parse(actual);
+	}
 	return expected === actual;
 }
+
+const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
 
 export type Expected = {
 	/** The party the transaction acts as: the signer's own, or a treasury the signer co-owns. */
