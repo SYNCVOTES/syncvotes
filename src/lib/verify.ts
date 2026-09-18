@@ -217,6 +217,8 @@ function plain(value: Value | undefined): Plain {
 			return { tag: sum.variant.constructor, value: plain(sum.variant.value) };
 		case 'genMap':
 			return sum.genMap.entries.map((e) => [plain(e.key), plain(e.value)]);
+		case 'textMap':
+			return Object.fromEntries(sum.textMap.entries.map((e) => [e.key, plain(e.value)]));
 		case 'optional':
 			return sum.optional.value ? plain(sum.optional.value) : null;
 		case 'list':
