@@ -350,7 +350,11 @@ export async function prepare(
 			verboseHashing: false,
 			packageIdSelectionPreference: [],
 			estimateTrafficCost: {
-				expectedSignatures: Array.from({ length: options.signatures ?? 1 }, () => 'ed25519')
+				disabled: false,
+				expectedSignatures: Array.from(
+					{ length: options.signatures ?? 1 },
+					() => 'SIGNING_ALGORITHM_SPEC_ED25519'
+				)
 			}
 		});
 		const now = Date.now();
