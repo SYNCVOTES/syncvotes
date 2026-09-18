@@ -1,12 +1,14 @@
 sdk-version: 3.5.7
-name: syncvotes-council
+name: syncvotes-charter
 source: src
-version: 0.6.0
+version: 0.7.0
 dependencies:
   - daml-prim
   - daml-stdlib
-# The token standard's Holding interface, the very DARs the validator uploads (copied from its
-# image, so the package ids match the network's): a member's stake is read through it.
+# The token standard's interfaces, the very DARs the validator uploads (copied from its image,
+# so the package ids match the network's): a member's stake is read through Holding, a payout
+# is made through TransferFactory.
 data-dependencies:
   - lib/splice-api-token-holding-v1-1.0.0.dar
   - lib/splice-api-token-metadata-v1-1.0.0.dar
+  - lib/splice-api-token-transfer-instruction-v1-1.0.0.dar

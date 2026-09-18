@@ -402,6 +402,7 @@ async function build(daoId: string, t: ledger.Treasury, intent: Intent) {
 				(d) => d.contractId === intent.due
 			);
 			if (!due) throw error(404, 'No such payout');
+			// The transfer the token standard would make, handed to the payout to make itself.
 			const [transfer, d] = await splice.transferCommand(
 				t.party,
 				due.to,
@@ -409,13 +410,15 @@ async function build(daoId: string, t: ledger.Treasury, intent: Intent) {
 				`syncvotes payout ${due.proposalId}`
 			);
 			commands = [
-				transfer,
 				{
 					ExerciseCommand: {
 						templateId: Main.PayoutDue.templateId,
 						contractId: due.contractId,
 						choice: 'PayoutDue_Settle',
-						choiceArgument: {}
+						choiceArgument: {
+							factory: transfer.ExerciseCommand.contractId,
+							transfer: transfer.ExerciseCommand.choiceArgument
+						}
 					}
 				}
 			];

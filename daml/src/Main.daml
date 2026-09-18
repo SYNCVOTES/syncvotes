@@ -5,6 +5,7 @@ import DA.Foldable (forA_)
 import DA.List (dedup, sort)
 import DA.Optional (fromSomeNote, isNone, optional)
 import Splice.Api.Token.HoldingV1 (Holding, HoldingView(..), InstrumentId(..), Lock(..))
+import Splice.Api.Token.TransferInstructionV1 (Transfer(..), TransferFactory, TransferFactory_Transfer(..))
 
 -- Every contract a user acts on carries the app provider's signature, so the provider confirms
 -- every transaction (which is what earns traffic rewards) while the user's own key is the only
@@ -455,8 +456,10 @@ template Ballot
         create this with counted = True
         pure (vote, weight)
 
--- | A payout the DAO decided: settled by the treasury in the same transaction as the transfer,
--- so it is paid exactly once. The treasury sees it; the browser checks the transfer against it.
+-- | A payout the DAO decided. Settling it is the transfer itself, through the token standard:
+-- the treasury hands in the coin's transfer factory and the transfer it means, the ledger checks
+-- that transfer is this payout — from the treasury, to the party, for the amount — and makes it.
+-- Paid exactly once, and never anything else.
 template PayoutDue
   with
     provider : Party
@@ -472,8 +475,16 @@ template PayoutDue
     observer treasury
 
     choice PayoutDue_Settle : ()
+      with
+        factory : ContractId TransferFactory
+        transfer : TransferFactory_Transfer
       controller treasury
-      do pure ()
+      do
+        assertMsg "Not from the treasury" (transfer.transfer.sender == treasury)
+        assertMsg "Not to the party the DAO named" (transfer.transfer.receiver == to)
+        assertMsg "Not the amount the DAO decided" (transfer.transfer.amount == amount)
+        exercise factory transfer
+        pure ()
 
     -- Withdrawn by the DAO, say when the treasury was rebuilt for a new set of admins.
     choice PayoutDue_Void : ()

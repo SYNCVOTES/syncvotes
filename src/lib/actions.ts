@@ -329,8 +329,20 @@ function sessionIntent(party: string, s: Session): Expected[] {
 			];
 		case 'payout':
 			return [
-				{ party, ...transferIntent(party, s.intent.to, s.intent.amount.toFixed(10)) },
-				{ party, choice: 'PayoutDue_Settle', contractId: s.intent.due, args: {} }
+				{
+					party,
+					choice: 'PayoutDue_Settle',
+					contractId: s.intent.due,
+					args: {
+						transfer: {
+							transfer: {
+								sender: party,
+								receiver: s.intent.to,
+								amount: s.intent.amount.toFixed(10)
+							}
+						}
+					}
+				}
 			];
 		case 'move':
 			return [{ party, ...transferIntent(party, s.intent.to, s.intent.amount.toFixed(10)) }];

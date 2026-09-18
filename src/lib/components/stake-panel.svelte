@@ -11,13 +11,15 @@
 	$effect(() => {
 		if (!store.who) return;
 		const q = remote.myHoldings();
-		q.refresh().then(() => q).then(
-			({ holdings }) =>
-				(locked = holdings
-					.filter((h) => h.lock)
-					.map((h) => ({ amount: h.amount, until: h.lock!.expiresAt }))),
-			() => (locked = [])
-		);
+		q.refresh()
+			.then(() => q)
+			.then(
+				({ holdings }) =>
+					(locked = holdings
+						.filter((h) => h.lock)
+						.map((h) => ({ amount: h.amount, until: h.lock!.expiresAt }))),
+				() => (locked = [])
+			);
 	});
 	const total = $derived(locked?.reduce((s, l) => s + l.amount, 0) ?? 0);
 	const latest = $derived(
