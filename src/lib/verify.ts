@@ -329,8 +329,11 @@ export async function verifyPrepared(
 				`The choice would be exercised by ${exercise.actingParties.join(', ')}, not ${party}`
 			);
 		}
-		if (!covers(want.args, plain(exercise.chosenValue))) {
-			throw new Error('The transaction does not say what you asked for');
+		const got = plain(exercise.chosenValue);
+		if (!covers(want.args, got)) {
+			throw new Error(
+				`The transaction does not say what you asked for: it says ${JSON.stringify(got).slice(0, 400)}, you asked for ${JSON.stringify(want.args).slice(0, 400)}`
+			);
 		}
 	});
 }
