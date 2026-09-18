@@ -212,6 +212,11 @@ function plain(value: Value | undefined): Plain {
 			return new Date(sum.date * 86_400_000).toISOString().slice(0, 10);
 		case 'enum':
 			return sum.enum.constructor;
+		case 'variant':
+			// As the app writes variants: the constructor as `tag`, its payload as `value`.
+			return { tag: sum.variant.constructor, value: plain(sum.variant.value) };
+		case 'genMap':
+			return sum.genMap.entries.map((e) => [plain(e.key), plain(e.value)]);
 		case 'optional':
 			return sum.optional.value ? plain(sum.optional.value) : null;
 		case 'list':
