@@ -38,6 +38,7 @@ async function* live<T>(key: string, load: () => T | Promise<T>): AsyncGenerator
 			// showing a snapshot of something it may no longer see.
 			const status = (e as { status?: number }).status;
 			if (last === '' || status === 401 || status === 403 || status === 404) throw e;
+			console.warn(`Live ${key} kept its last value:`, e instanceof Error ? e.message : e);
 		}
 		await ledger.nextChange(key);
 	}

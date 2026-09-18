@@ -1,9 +1,9 @@
 import { Main } from '@daml.js/model';
-import { operatorParty, sdk, streamActiveContracts, type Created } from './participant';
+import { providerParty, sdk, streamActiveContracts, type Created } from './participant';
 
 /**
- * The operator's copy of the ledger, in memory: every contract of the app's templates, in the
- * maps the pages read. It is filled from the active contracts at startup and kept current from
+ * The provider's copy of the ledger, in memory: every contract of the app's templates (the
+ * provider signs each one, so it sees them all), in the maps the pages read. It is filled from the active contracts at startup and kept current from
  * the update stream, so a read never touches the participant and a DAO of ten thousand costs a
  * map lookup. A page waits on the keys it shows (`nextChange`); a transaction wakes only those.
  */
@@ -375,7 +375,7 @@ export async function applied(updateId: string): Promise<void> {
 async function loadActiveContracts(): Promise<number> {
 	const offset = await (await sdk()).ledger.ledgerEnd();
 	let count = 0;
-	await streamActiveContracts(operatorParty(), TEMPLATES, offset, (c) => {
+	await streamActiveContracts(providerParty(), TEMPLATES, offset, (c) => {
 		created(c);
 		count++;
 	});
@@ -388,7 +388,7 @@ async function followUpdates(from: number): Promise<number> {
 	let offset = from;
 	const ledger = await sdk();
 	for await (const update of ledger.events.updates({
-		partyId: operatorParty(),
+		partyId: providerParty(),
 		templateIds: TEMPLATES,
 		beginOffset: offset,
 		verbose: false
