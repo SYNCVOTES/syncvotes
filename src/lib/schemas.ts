@@ -58,20 +58,15 @@ export const quorum = v.pipe(
 	v.minValue(0, 'The quorum cannot be negative')
 );
 
-export const createDaoForm = v.pipe(
-	v.object({
-		daoName,
-		description: daoDescription,
-		members: partyList(BATCH - 1),
-		admins: partyList(50),
-		voting: votingKind,
-		quorum
-	}),
-	v.check(
-		({ admins, members }) => admins.every((a) => members.includes(a)) || admins.length === 0,
-		'Every admin has to be among the members'
-	)
-);
+// Admins must be members; the creator is one without being listed, so the ledger checks it.
+export const createDaoForm = v.object({
+	daoName,
+	description: daoDescription,
+	members: partyList(BATCH - 1),
+	admins: partyList(50),
+	voting: votingKind,
+	quorum
+});
 export const updateDaoForm = v.object({ dao: id, daoName, description: daoDescription });
 
 export const effectKind = v.picklist(['signal', 'payout', 'members', 'admins']);
