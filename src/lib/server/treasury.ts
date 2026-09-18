@@ -398,7 +398,9 @@ async function build(daoId: string, t: ledger.Treasury, intent: Intent) {
 			break;
 		}
 		case 'payout': {
-			const due = ledger.payouts.get(daoId)?.get(intent.due);
+			const due = [...(ledger.payouts.get(daoId)?.values() ?? [])].find(
+				(d) => d.contractId === intent.due
+			);
 			if (!due) throw error(404, 'No such payout');
 			const [transfer, d] = await splice.transferCommand(
 				t.party,
