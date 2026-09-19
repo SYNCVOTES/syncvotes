@@ -83,7 +83,7 @@
 			</div>
 		</div>
 
-		<Problem message={store.problem} />
+		<div class="mt-8"><Problem message={store.problem} /></div>
 
 		<Facts
 			items={[

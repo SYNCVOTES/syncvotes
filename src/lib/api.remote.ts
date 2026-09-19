@@ -724,6 +724,10 @@ const topUps = new Map<string, { dao: string; amount: number }>();
 export const topUpForm = form(schemas.topUpForm, async ({ dao, amount }) => {
 	const party = session.required();
 	insiderOnly(dao);
+	const free = (await splice.holdings(party)).filter((h) => !h.lock);
+	const have = free.reduce((s, h) => s + h.amount, 0);
+	if (have === 0) error(400, 'Your wallet holds no coin yet — receive some Canton Coin first');
+	if (have < amount) error(400, `Your wallet holds ${have.toFixed(2)} CC, less than that`);
 	const [cmd, disclosed] = await splice.transferCommand(
 		party,
 		participant.providerParty(),
