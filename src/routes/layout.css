@@ -246,6 +246,17 @@
 	samp {
 		font-family: var(--font-mono);
 	}
+
+	/* JetBrains Mono ligates "::" into one glyph; a party id has to read as its characters. */
+	.font-mono,
+	code,
+	pre,
+	kbd,
+	samp,
+	input,
+	textarea {
+		font-variant-ligatures: none;
+	}
 }
 
 @layer components {
