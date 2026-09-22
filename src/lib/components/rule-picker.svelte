@@ -120,8 +120,8 @@
 	{/if}
 
 	<p class="font-mono text-xs text-ink-dim">
-		Passes when {describe(rule)}{needed !== null
-			? ` — ${needed} of ${members} today`
-			: ''}{rule.early ? '' : '. Decided at the deadline only'}.
+		Passes when {describe(rule)}{needed !== null ? ` — ${needed} of the vote` : ''}{rule.early
+			? ''
+			: '. Decided at the deadline only'}.
 	</p>
 </div>
