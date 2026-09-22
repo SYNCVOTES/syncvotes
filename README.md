@@ -208,7 +208,7 @@ submissions. `verify.ts` takes the package name from the same place.
 | `src/lib/server/participant.ts`  | The participant: topology, allocation (single or multi-key), prepare and execute         |
 | `src/lib/server/ledger.ts`       | The provider's copy of the ledger in memory, fed by the update stream, with wake-ups     |
 | `src/lib/server/tally.ts`        | The provider's jobs: Proposal_Tally in batches, DAO_Execute for what passed              |
-| `src/lib/server/splice.ts`       | Canton Coin: the rules, the open round and prices, from public Scan                     |
+| `src/lib/server/splice.ts`       | Canton Coin: the rules, the open round and prices, from public Scan                      |
 | `src/lib/server/treasury.ts`     | A DAO's treasury party: allocation, pre-approval, holdings, transfers, accepting coin    |
 | `src/lib/server/billing.ts`      | Traffic charged to the DAO that caused it; collected from its treasury; the funds gate   |
 | `src/lib/server/session.ts`      | Read sessions: a signed challenge behind an HttpOnly cookie                              |
@@ -216,7 +216,7 @@ submissions. `verify.ts` takes the package name from the same place.
 | `src/routes/+page.svelte`        | The landing (v1's Consensus Engine), Tailwind on the markup, `field.ts`                  |
 | `src/lib/components/ui/`         | shadcn-svelte primitives only (button, badge, input, textarea, label)                    |
 | `src/lib/components/`            | Everything built on them: page column, panels, lists, forms, header, footer, `landing-*` |
-| `src/lib/markdown.ts`            | Markdown as the app renders it: marked, then DOMPurify in the browser                   |
+| `src/lib/markdown.ts`            | Markdown as the app renders it: marked, then DOMPurify in the browser                    |
 | `compose.yaml`                   | The compose project for the servers, Caddy config inline                                 |
 
 The private key exists only inside a closure (`Signer`): the page can ask it to sign, to encrypt

@@ -117,8 +117,10 @@
 			</FormSection>
 
 			<Note mono={false}>
-				Your profile is a contract signed by your key and the app; the traffic it costs is yours,
-				not a DAO's. Everything in it is visible to every member of every DAO you are in.
+				Your profile is a contract signed by your key and the app's provider: only you can set or
+				replace it. No DAO pays for it; the app carries its traffic. It is shown wherever your party
+				appears, so anyone signed in who knows your party id can see it, like a name and a picture
+				on any public profile.
 			</Note>
 
 			<FormActions
