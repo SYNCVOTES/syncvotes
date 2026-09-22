@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Panel from './panel.svelte';
+	import Hint from './hint.svelte';
 	import { fmt } from '$lib/format';
 	import { describe, standing, type Rule } from '$lib/rules';
 
@@ -33,7 +34,11 @@
 </script>
 
 <Panel padding="sm">
-	<h2 class="eyebrow mb-4">Tally</h2>
+	<h2 class="eyebrow mb-4 flex items-center gap-1.5">
+		Tally <Hint
+			text="Everything is a share of the whole vote as it stood when the proposal was made. The bar fills with yes, no and abstentions; the middle figure is what yes has to reach under this proposal's rule. Ballots are checked and counted by the ledger; the page shows what is cast until then."
+		/>
+	</h2>
 	<div class="mb-2 flex h-2 overflow-hidden bg-surface-active">
 		<div class="bg-green" style="width: {pct(yes)}%"></div>
 		<div class="bg-red" style="width: {pct(no)}%"></div>

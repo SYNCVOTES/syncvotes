@@ -16,6 +16,7 @@
 	import MarkdownEditor from '$lib/components/markdown-editor.svelte';
 	import ImageField from '$lib/components/image-field.svelte';
 	import Note from '$lib/components/note.svelte';
+	import Hint from '$lib/components/hint.svelte';
 	import Users from '@lucide/svelte/icons/users';
 	import PieChart from '@lucide/svelte/icons/pie-chart';
 	import { fmt } from '$lib/format';
@@ -33,12 +34,14 @@
 			value: 'equal',
 			title: 'By membership',
 			text: 'One member, one vote. A club, a committee, a collective.',
+			more: 'Every member holds exactly one unit of the vote, so a proposal is decided by heads. Members join and leave by vote. Simple, and impossible to skew: nobody can hold more than anyone else.',
 			icon: Users
 		},
 		{
 			value: 'shares',
 			title: 'By shares',
 			text: 'Members hold units of the vote — 40 of 100, say. A company, a fund, a partnership.',
+			more: "Members hold units of the vote, whole numbers you set, like shares of a company: 60, 30 and 10 units give 60%, 30% and 10% of the vote. A ballot weighs the voter's units. Units move only by vote; pay-ins to the treasury do not change them.",
 			icon: PieChart
 		}
 	] as const;
@@ -146,8 +149,11 @@
 								class="mt-0.5 shrink-0 {mode === m.value ? 'text-orange' : 'text-ink-dim'}"
 								aria-hidden="true"
 							/>
-							<span>
-								<span class="block font-display text-[15px] font-bold">{m.title}</span>
+							<span class="min-w-0">
+								<span class="flex items-center gap-1.5 font-display text-[15px] font-bold"
+									>{m.title}
+									<Hint text={m.more} align={m.value === 'shares' ? 'end' : 'start'} /></span
+								>
 								<span class="mt-1 block text-xs leading-relaxed text-ink-mid">{m.text}</span>
 							</span>
 						</label>

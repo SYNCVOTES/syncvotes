@@ -21,6 +21,7 @@
 	import PartyChips from '$lib/components/party-chips.svelte';
 	import Note from '$lib/components/note.svelte';
 	import RulePicker from '$lib/components/rule-picker.svelte';
+	import Hint from '$lib/components/hint.svelte';
 	import { PRESETS, toLedger, type Rule } from '$lib/rules';
 	import PieChart from '@lucide/svelte/icons/pie-chart';
 	import Users from '@lucide/svelte/icons/users';
@@ -49,6 +50,7 @@
 			value: 'signal',
 			title: 'Decision',
 			text: 'The DAO takes a position. Nothing else changes.',
+			more: "Records the DAO's position on a question: an opinion, an approval, a mandate for someone. Nothing on the ledger changes but the record of the vote itself. For anything that does not need the ledger to act.",
 			icon: MessageSquare
 		},
 		d?.equal
@@ -56,22 +58,37 @@
 					value: 'shares',
 					title: 'Members',
 					text: 'Who is in the DAO: parties join or leave.',
+					more: 'Adds or removes members; every member has one vote. Only the parties you add or remove are put to the vote, everyone else stays as is. A member removed loses their vote the moment this is carried out; on proposals that were already open, their ballot no longer counts.',
 					icon: Users
 				}
 			: {
 					value: 'shares',
 					title: 'Shares',
 					text: 'Who holds what share of the vote: parties join, leave, gain or lose.',
+					more: 'Changes who holds how many units of the vote: parties join with units, leave at zero, or move up or down. Only the parties you touch are put to the vote. A member whose units change cannot vote on proposals that were open before the change was made, so nobody votes twice with two different weights.',
 					icon: PieChart
 				},
 		{
 			value: 'info',
 			title: 'Name & description',
 			text: 'A new name, description or picture.',
+			more: 'Renames the DAO, rewrites its description in Markdown, or changes its picture. The fields start with what is there today; what you leave as is stays as is.',
 			icon: Pencil
 		},
-		{ value: 'payout', title: 'Payout', text: 'Coin from the treasury to a party.', icon: Coins },
-		{ value: 'dissolve', title: 'Dissolve', text: 'The DAO is wound up for good.', icon: Power }
+		{
+			value: 'payout',
+			title: 'Payout',
+			text: 'Coin from the treasury to a party.',
+			more: "Sends Canton Coin from the DAO's treasury to a party, a member or anyone else on the network. Paid the moment the vote passes if the treasury can cover it, otherwise the moment it can. Where the party accepts transfers automatically the coin lands at once; otherwise they accept it in their wallet.",
+			icon: Coins
+		},
+		{
+			value: 'dissolve',
+			title: 'Dissolve',
+			text: 'The DAO is wound up for good.',
+			more: 'Winds the DAO up for good. Carried out only once every other open proposal has settled; then whatever the treasury holds goes to the party you name and the DAO is archived. Its record stays readable; nothing can be proposed again.',
+			icon: Power
+		}
 	] as const);
 
 	// What is there today, to start from.
@@ -318,8 +335,10 @@
 								class="mt-0.5 shrink-0 {kind === k.value ? 'text-orange' : 'text-ink-dim'}"
 								aria-hidden="true"
 							/>
-							<span>
-								<span class="block font-display text-[15px] font-bold">{k.title}</span>
+							<span class="min-w-0">
+								<span class="flex items-center gap-1.5 font-display text-[15px] font-bold"
+									>{k.title} <Hint text={k.more} /></span
+								>
 								<span class="mt-1 block text-xs leading-relaxed text-ink-mid">{k.text}</span>
 							</span>
 						</label>
@@ -425,7 +444,7 @@
 			</FormSection>
 
 			<FormSection title="How it passes">
-				{#key ruleFor}<RulePicker bind:rule />{/key}
+				{#key ruleFor}<RulePicker bind:rule eligible={d.units} equal={d.equal} />{/key}
 			</FormSection>
 
 			<FormSection title="Put it to the vote">
