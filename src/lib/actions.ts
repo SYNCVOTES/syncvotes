@@ -2,6 +2,7 @@ import * as remote from './api.remote';
 import { toBase64, type Signer } from './wallet';
 import { verifyPrepared, verifyTopology, type Expected, type Plain } from './verify';
 import { BATCH } from './schemas';
+import { working } from './wallet-store.svelte';
 
 /**
  * The browser's half of every ledger write. The server prepares a transaction; this file says
@@ -34,7 +35,9 @@ export const topology = (s: Signer, hint: string): Promise<Topology> =>
 
 /** Creates the party for a new key. The key signs its own topology; the server only forwards. */
 export async function enrol(s: Signer, hint: string, topology: Topology): Promise<Identity> {
+	working('Checking the party the ledger would create');
 	await verifyTopology(topology, s.publicKey, hint);
+	working('Signing the party into existence');
 	return remote.enrol({
 		publicKey: toBase64(s.publicKey),
 		hint,
@@ -56,9 +59,16 @@ export const closeSession = () => remote.sessionEnd().catch(() => {});
 
 /** Signs a prepared transaction, once it is verified to do exactly what `intent` says. */
 export async function sign(s: Signer, who: Identity, intent: Intent, prepared: Prepared) {
+	working('Checking what you are about to sign');
 	await verifyPrepared(prepared, { party: who.party, ...intent });
-	await remote.execute({ ...prepared, signature: s.sign(prepared.preparedTransactionHash) });
+	working('Signing with your key');
+	const signature = s.sign(prepared.preparedTransactionHash);
+	working('Waiting for the ledger to confirm');
+	await remote.execute({ ...prepared, signature });
 }
+
+/** Said before every prepare: the server is building the transaction. */
+const preparing = () => working('Preparing the transaction');
 
 /**
  * Members join and leave a batch at a time, each batch its own signed transaction on the DAO
@@ -94,6 +104,7 @@ export async function archiveDao(
 	who: Identity,
 	dao: { id: string; contractId: string }
 ) {
+	preparing();
 	const prepared = await remote.prepareArchiveDao(dao.id);
 	const intent = { choice: 'DAO_Archive', contractId: dao.contractId, args: { admin: who.party } };
 	await sign(s, who, intent, prepared);
@@ -107,6 +118,7 @@ export const addMembers = (
 	progress?: Progress
 ) =>
 	inBatches(parties, daoId, progress, async (batch, contractId) => {
+		preparing();
 		const prepared = await remote.prepareAddMembers({ dao: daoId, parties: batch });
 		const args = { admin: who.party, parties: batch };
 		await sign(s, who, { choice: 'DAO_AddMembers', contractId, args }, prepared);
@@ -120,6 +132,7 @@ export const removeMembers = (
 	progress?: Progress
 ) =>
 	inBatches(memberCids, daoId, progress, async (batch, contractId) => {
+		preparing();
 		const prepared = await remote.prepareRemoveMembers({ dao: daoId, memberCids: batch });
 		const args = { admin: who.party, memberCids: batch };
 		await sign(s, who, { choice: 'DAO_RemoveMembers', contractId, args }, prepared);
@@ -129,6 +142,7 @@ export const removeMembers = (
 
 export async function cancelProposal(s: Signer, who: Identity, proposalId: string) {
 	const { contractId } = await remote.proposal(proposalId);
+	preparing();
 	const { dao, prepared } = await remote.prepareCancelProposal(proposalId);
 	const args = { canceller: who.party, dao };
 	await sign(s, who, { choice: 'Proposal_Cancel', contractId, args }, prepared);
@@ -140,6 +154,7 @@ export type Choice = 'Yes' | 'No' | 'Abstain';
 export async function vote(s: Signer, who: Identity, proposalId: string, choice: Choice) {
 	const { me, closesAt } = await remote.proposal(proposalId);
 	if (!me.membership) throw new Error('You are not a member of this DAO');
+	preparing();
 	const prepared = await remote.prepareVote({ proposal: proposalId, vote: choice });
 	const intent = {
 		choice: 'Member_Vote',

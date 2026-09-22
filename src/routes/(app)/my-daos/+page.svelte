@@ -31,7 +31,11 @@
 		{/snippet}
 	</PageHeader>
 
-	{#if !who || !daos}
+	{#if store.screen.at === 'loading'}
+		<div class="grid gap-3 md:grid-cols-3">
+			{#each [1, 2, 3] as i (i)}<Skeleton height="h-24" />{/each}
+		</div>
+	{:else if !who || !daos}
 		<ConnectPrompt />
 	{:else if daos.error}
 		<QueryError error={daos.error} refresh={() => daos.reconnect()} />

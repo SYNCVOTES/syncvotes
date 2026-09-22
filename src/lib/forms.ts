@@ -1,7 +1,7 @@
 import type { RemoteForm, RemoteFormInput } from '@sveltejs/kit';
 import * as v from 'valibot';
 import * as actions from './actions';
-import { store, flow, describe } from './wallet-store.svelte';
+import { store, flow, describe, working } from './wallet-store.svelte';
 
 /**
  * Every text form works the same way: the browser checks the fields against the schema, the
@@ -21,9 +21,11 @@ export function signedForm<
 	then: (result: Output) => Promise<unknown> | unknown
 ) {
 	return f.preflight(schema).enhance(async ({ submit, element }) => {
+		working('Preparing the transaction');
 		try {
 			await submit();
 		} catch (e) {
+			working(null);
 			store.problem = describe(e);
 			return;
 		}

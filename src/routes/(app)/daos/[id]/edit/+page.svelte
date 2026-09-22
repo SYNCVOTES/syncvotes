@@ -61,7 +61,9 @@
 		description="Changes are signed by your key like everything else. Members are managed on their own page."
 	/>
 
-	{#if !dao}
+	{#if store.screen.at === 'loading'}
+		<Skeleton height="h-64" />
+	{:else if !dao}
 		<ConnectPrompt what="edit this DAO" />
 	{:else if dao.error}
 		<QueryError error={dao.error} refresh={() => dao?.reconnect()} />

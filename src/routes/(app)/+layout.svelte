@@ -3,6 +3,7 @@
 	import { store } from '$lib/wallet-store.svelte';
 	import SiteHeader from '$lib/components/site-header.svelte';
 	import SiteFooter from '$lib/components/site-footer.svelte';
+	import Activity from '$lib/components/activity.svelte';
 
 	let { children } = $props();
 
@@ -33,4 +34,5 @@
 		github={GITHUB}
 		x={X}
 	/>
+	<Activity />
 </div>

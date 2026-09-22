@@ -49,7 +49,9 @@
 		? { href: `/daos/${proposal.current.daoId}`, label: proposal.current.daoName ?? 'DAO' }
 		: undefined}
 >
-	{#if !proposal}
+	{#if store.screen.at === 'loading'}
+		<Skeleton />
+	{:else if !proposal}
 		<ConnectPrompt what="see this proposal" />
 	{:else if proposal.error}
 		<QueryError error={proposal.error} refresh={() => proposal?.reconnect()} />

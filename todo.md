@@ -76,3 +76,11 @@
       the JSON API); today the admins rebuild it and move the coin — an admin API path may
       allow rotation later
 - [ ] the gRPC poller behind the WireGuard peer, if it still talks to the participant
+
+# 2026-09-22
+
+- [x] stripped back to one admin (the creator), no tokens, no treasury: the balance is paid in
+      by memo to the provider from any wallet and credited from the provider's transaction
+      history (`syncvotes-board` 0.8.0). Stake votes, locks, the m-of-n treasury and payouts
+      live in git history (`bb62260`) if wanted again
+- [ ] rethink governance from how a real company works (partners, shares, decisions) — next

@@ -11,6 +11,7 @@
 	import Page from '$lib/components/page.svelte';
 	import PageHeader from '$lib/components/page-header.svelte';
 	import ConnectPrompt from '$lib/components/connect-prompt.svelte';
+	import Skeleton from '$lib/components/skeleton.svelte';
 	import Problem from '$lib/components/problem.svelte';
 	import FormSection from '$lib/components/form-section.svelte';
 	import Field from '$lib/components/field.svelte';
@@ -72,7 +73,9 @@
 		description="Every member gets one vote, Yes or No. The proposal passes when a majority of all members voted Yes, fails when that can no longer happen, and is decided by the ballots cast once the deadline passes."
 	/>
 
-	{#if !store.who}
+	{#if store.screen.at === 'loading'}
+		<Skeleton height="h-64" />
+	{:else if !store.who}
 		<ConnectPrompt what="propose" />
 	{:else if dao?.error}
 		<QueryError error={dao.error} refresh={() => dao?.reconnect()} />
@@ -139,6 +142,8 @@
 				<p class="font-mono text-xs text-ink-dim">
 					The vote opens for the {fmt(dao.current.members)} current members the moment you sign.
 				</p>
+			{:else}
+				<Skeleton height="h-4" />
 			{/if}
 
 			<FormActions

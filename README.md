@@ -4,12 +4,11 @@ On-chain governance for the Canton Network: private DAOs, proposals and votes, s
 only the member holds. MVP v2, running against its own validator on TestNet at
 <https://dev.syncvotes.com>.
 
-A DAO here is private to its members, run by its admins, and decides by member or by stake:
-proposals carry an effect — a signal, a payout from the DAO's treasury, members joining or
-leaving, a new set of admins — that the ledger carries out once the vote has passed. The
-treasury is a party the admins' keys own together, with a threshold of them behind every
-payout. Every transaction a DAO causes is paid from a balance it tops up in Canton Coin, at the
-traffic the network charged for it.
+A DAO here is private to its members and run by the party that created it — its one admin,
+who adds and removes members and keeps the DAO's balance funded. Proposals are decided one
+member, one vote, and may carry an effect — members joining or leaving — that the ledger
+carries out once the vote has passed. Every transaction a DAO causes is paid from that balance,
+at the traffic the network charged for it.
 
 ## Architecture
 
@@ -45,77 +44,51 @@ the token standard's packages are on every validator, so a treasury can be paid 
 
 ### The model
 
-`daml/src/Main.daml`, package `syncvotes-charter`, one idea: every contract a user acts on already
+`daml/src/Main.daml`, package `syncvotes-board`, one idea: every contract a user acts on already
 carries the provider's signature, so the provider is a **confirmer** of every transaction — which
 is what CIP-0104 pays traffic rewards for — while the user's key is the only one that ever signs
 a submission. One constraint: a DAO may have thousands of members and more proposals, so nothing
 lists, nothing grows with history, and a member's vote touches no contract another member's vote
 touches. And one rule of authority: a DAO is signed by its creator and the provider, and that
 pair is the DAO's own authority — the choices only the DAO may exercise (removing a member,
-marking a proposal executed, voiding a payout) are controlled by both, and neither has the other's
-key.
+marking a proposal executed) are controlled by both, and neither has the other's key.
 
-- `Account` — created by the provider once per party, remembering the party's public key; the
-  door through which it creates DAOs. A party is its hint plus its key's fingerprint
-  (`alice::1220…`); a returning key is found by the fingerprint alone. At sign-up the party also
-  accepts a transfer pre-approval the validator offers it, so coin sent to it simply lands.
-- `DAO` — signatory creator and provider, observed by its `admins`: name, description, a stable
-  `id`, a member count, how it votes (`ByMember`, or `ByStake` with an instrument and a quorum),
-  and its treasury if it has one. Any admin changes any of it; admins are chosen at creation
-  (from among the members), by an admin, or by a vote. No member list.
-- `Member` — one per party per DAO, signed by whoever admitted the member (the creator, an admin,
-  or the DAO itself carrying out a vote), so the provider cannot invent members; removed only
-  with the DAO's authority. It is the member's door to proposing — `Member_Propose` reads the DAO
-  of the moment (the app's operator reads alongside the member) and fixes its rules and member
-  count into the proposal — and their ballot box: `Member_Vote` replaces it with a copy that
-  remembers the proposal, so a second ballot is impossible, and creates a `Ballot`. In a stake
-  DAO the vote names the voter's own locked holdings; the ledger reads their weight through the
-  token standard's `Holding` interface and refuses any not locked past the deadline.
-- `Proposal` — signatory proposer and provider; counters, not lists, in `Decimal`; an `Effect`
-  (`Signal`, `Payout`, `SetMembers`, `SetAdmins`); the voting rule and electorate as they were
-  when it was made. A member vote passes at a majority of eligible, fails when no makes that
-  impossible, and is decided by the ballots cast at the deadline; a stake vote is decided at the
-  deadline only, yes against no, once the quorum took part. Cancelled by the proposer or an admin
-  until settled. Once passed, the provider exercises `DAO_Execute`: the ledger checks the proposal
-  did pass and carries the effect out with the DAO's authority — members join or leave, admins
-  change, or a `PayoutDue` appears for the treasury.
-- `Ballot` — one vote with its weight and instrument, signed by the voter and the provider. The
-  provider counts (`Proposal_Tally`, batches of two hundred) and `Ballot_Count` checks each ballot
-  against its proposal: right DAO and proposal, cast before the deadline, by a member of the
-  time, the DAO's instrument, not counted before. The provider can delay a result, never change
-  it.
-- `PayoutDue` — what a passed payout leaves for the treasury. Settling it is the transfer itself:
-  the treasury hands in the coin's transfer factory and the transfer, the ledger checks that
-  transfer is this payout (from the treasury, to the party, for the amount) and makes it through
-  the token standard. Paid exactly once, never anything else.
+- `Account` — created by the provider once per party; the door through which it creates DAOs.
+  A party is its hint plus its key's fingerprint (`alice::1220…`); a returning key is found by
+  the fingerprint alone.
+- `DAO` — signatory creator and provider: name, description, a stable `id`, a member count. The
+  creator is the admin: renames, archives, adds and removes members (`DAO_Update`,
+  `DAO_Archive`, `DAO_AddMembers`, `DAO_RemoveMembers`). No member list.
+- `Member` — one per party per DAO, signed by whoever admitted the member (the creator, or the
+  DAO itself carrying out a vote), so the provider cannot invent members; removed only with the
+  DAO's authority. It is the member's door to proposing — `Member_Propose` reads the DAO of the
+  moment (the app's operator reads alongside the member) and fixes its member count into the
+  proposal as the electorate — and their ballot box: `Member_Vote` replaces it with a copy that
+  remembers the proposal, so a second ballot is impossible, and creates a `Ballot` — Yes, No or
+  Abstain.
+- `Proposal` — signatory proposer and provider; counters, not lists: `eligible`, `yes`, `no`,
+  `abstain`, `outcome`; an `Effect` (`Signal`, or `SetMembers`). It passes at a majority of
+  eligible, fails when no makes that impossible, and is decided by the ballots cast at the
+  deadline. Cancelled by the proposer or the admin until settled. Once passed, the provider
+  exercises `DAO_Execute`: the ledger checks the proposal did pass and carries the effect out
+  with the DAO's authority.
+- `Ballot` — one vote, signed by the voter and the provider. The provider counts
+  (`Proposal_Tally`, batches of two hundred) and `Ballot_Count` checks each ballot against its
+  proposal: right DAO and proposal, cast before the deadline, by a member of the time, not
+  counted before. The provider can delay a result, never change it.
 - `Meter` — the provider's statement of a DAO's account: coin paid in, traffic charged.
 
-### Stake, treasury, balance
+### The balance
 
-**Stake** is coin locked in the voter's own wallet: an `AmuletRules_Transfer` to oneself whose
-output carries a lock with no holders, so nothing but its expiry opens it
-(`LockedAmulet_OwnerExpireLockV2`). It never moves and nobody holds it; a vote weighs the locks
-that outlast the proposal's deadline, so the same coin cannot vote twice. (Token-standard
-allocations were tried first and rejected: the sender can withdraw one at any time.)
-
-**Treasury.** Canton lets a party be owned by several keys with a threshold, and that is what a
-treasury is: `server/treasury.ts` writes the topology by hand from the protos — a root certificate
-per admin, a decentralized namespace they own together, and the party hosted here with their keys
-as its signing set — and every admin's browser (`verify.ts`) checks the bytes say exactly that
-before signing the multi-hash. The validator then offers the new party a transfer pre-approval,
-which a threshold of admins accept, and coin sent to it lands. A prepared transaction lives about
-two minutes on the network and the participant prepares one command at a time, so a payout is a
-**signing session**: the first signer's browser opens it, the others sign the same preparation,
-and it executes the moment the threshold is met. The network offers no way to change a party's
-keys, so when the admins change the treasury is rebuilt and its signers move the coin.
-
-**Balance.** The sending validator pays the network for every byte of traffic, in coin at a
-published price (\$60 per megabyte on TestNet; a vote is a few kilobytes, a coin transfer or a
-lock some thirty, because the rules they disclose travel with them). The participant reports what
-each transaction cost (`paidTrafficCost`), and the DAO it was for is charged that, times
-`BILLING_FACTOR` (one until the rewards this traffic earns are measured). Coin is paid in by
-sending it to the provider from the DAO page; the `Meter` on the ledger holds the account, and a
-write for a DAO with nothing left is refused — except winding it up.
+The sending validator pays the network for every byte of traffic, in coin at a published price
+(\$60 per megabyte on TestNet; a governance transaction is a few kilobytes, about 20–30 cents).
+The participant reports what each transaction cost (`paidTrafficCost`), and the DAO it was for
+is charged that, times `BILLING_FACTOR` (one until the rewards this traffic earns are measured).
+The admin pays in by sending Canton Coin from any wallet to the app's provider party with the
+memo `syncvotes:<dao id>` (shown on the DAO page): `server/billing.ts` reads the provider's own
+transactions through the token standard, sums what carries a memo, and writes the `Meter`. The
+sum is recomputed from the ledger on every start, so nothing is credited twice or lost. A write
+for a DAO with nothing left is refused — except winding it up. Users hold no coin in the app.
 
 ## Setup
 
@@ -198,9 +171,8 @@ submissions. `verify.ts` takes the package name from the same place.
 | `src/lib/server/participant.ts`  | The participant: topology, allocation (single or multi-key), prepare and execute         |
 | `src/lib/server/ledger.ts`       | The provider's copy of the ledger in memory, fed by the update stream, with wake-ups     |
 | `src/lib/server/tally.ts`        | The provider's jobs: Proposal_Tally in batches, DAO_Execute for what passed              |
-| `src/lib/server/splice.ts`       | Canton Coin: Scan, holdings, transfer/lock/release commands, validator pre-approvals     |
-| `src/lib/server/billing.ts`      | Traffic charged to the DAO that caused it; the Meter; the funds gate                     |
-| `src/lib/server/treasury.ts`     | The multi-key party's topology, the setup ceremony, signing sessions                     |
+| `src/lib/server/splice.ts`       | Canton Coin: prices from Scan, and coin that arrived at the provider with a DAO's memo   |
+| `src/lib/server/billing.ts`      | Traffic charged to the DAO that caused it; deposits credited; the Meter; the funds gate  |
 | `src/lib/server/session.ts`      | Read sessions: a signed challenge behind an HttpOnly cookie                              |
 | `src/routes/(app)/`              | My DAOs, DAO, Create DAO, Proposal, Create proposal, Wallet                              |
 | `src/routes/+page.svelte`        | The landing (v1's Consensus Engine), Tailwind on the markup, `field.ts`                  |
@@ -311,10 +283,7 @@ idempotent by package id — so the code and the package it needs always land to
 - A package name and version can be uploaded once, and a later version under the same name must
   be a compatible upgrade (fields can only be added, and as `Optional`). A change that is not —
   a template dropped, a field made mandatory — needs a new package name, which is why the model
-  has changed name with every incompatible step and is `syncvotes-charter` now. The
-  token-standard DARs it depends on are the validator's own (`daml/lib/`), so the package ids
-  match the network's; a `.dalf` fetched from the participant is a bare payload damlc will not
-  take.
+  has changed name with every incompatible step and is `syncvotes-board` now.
 - A `.remote.ts` module may export nothing but remote functions — a shared constant next to
   them fails the build, which is why the batch size lives in `schemas.ts`.
 - The kit's `form.fields.value()` knows only the fields the user touched; `forms.ts` reads the

@@ -22,6 +22,8 @@ export type Screen =
 let screen = $state<Screen>({ at: 'loading' });
 let busy = $state(false);
 let problem = $state<string | null>(null);
+/** What the key or the ledger is doing right now, while `busy`; shown by the activity pill. */
+let phase = $state<string | null>(null);
 let wallets = $state<wallet.StoredWallet[]>([]);
 let selected = $state<string | null>(null);
 
@@ -31,6 +33,9 @@ export const store = {
 	},
 	get busy() {
 		return busy;
+	},
+	get phase() {
+		return phase;
 	},
 	get problem() {
 		return problem;
@@ -53,6 +58,9 @@ export const store = {
 		return selected;
 	}
 };
+
+/** Names the step under way, for the activity pill. Cleared when the action ends. */
+export const working = (what: string | null) => (phase = what);
 
 /** Shows the locked screen for a stored key, or the welcome screen when there is none. */
 function offer(id: string | null) {
@@ -110,6 +118,7 @@ async function run(action: () => Promise<void>) {
 		}
 	} finally {
 		busy = false;
+		phase = null;
 	}
 }
 
@@ -126,12 +135,14 @@ export function describe(error: unknown): string {
 
 /** The read session first, so the pages that open next are allowed to read. */
 async function enter(signer: wallet.Signer, who: actions.Identity) {
+	working('Opening your session');
 	await actions.openSession(signer, who);
 	screen = { at: 'home', signer, who };
 }
 
 /** A key is in hand: does the ledger know it? A known key is signed in; a new one picks a hint. */
 async function identify(signer: wallet.Signer, andThen: 'protect' | 'enter') {
+	working('Looking your party up');
 	// A key is in memory from here on, so the auto-lock is armed from here on too.
 	autoLock.start(lock);
 	const found = await actions.lookup(signer);
@@ -180,6 +191,7 @@ export const flow = {
 		if (screen.at !== 'hint') return;
 		const { signer } = screen;
 		return run(async () => {
+			working('Creating your party on the ledger');
 			const topology = await actions.topology(signer, hint);
 			const who = await actions.enrol(signer, hint, topology);
 			screen = { at: 'protect', signer, who };
@@ -191,6 +203,7 @@ export const flow = {
 		if (screen.at !== 'protect') return;
 		const { signer, who } = screen;
 		return run(async () => {
+			working('Encrypting the key on this device');
 			selected =
 				'passkey' in how
 					? await wallet.lockWithPasskey(signer, who.party)
@@ -211,6 +224,7 @@ export const flow = {
 		const id = selected;
 		const kind = screen.lock;
 		return run(async () => {
+			working('Unlocking your key');
 			const signer =
 				kind === 'passkey'
 					? await wallet.unlockWithPasskey(id)

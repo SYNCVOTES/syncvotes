@@ -9,6 +9,7 @@
 	import Page from '$lib/components/page.svelte';
 	import PageHeader from '$lib/components/page-header.svelte';
 	import ConnectPrompt from '$lib/components/connect-prompt.svelte';
+	import Skeleton from '$lib/components/skeleton.svelte';
 	import Problem from '$lib/components/problem.svelte';
 	import FormSection from '$lib/components/form-section.svelte';
 	import Field from '$lib/components/field.svelte';
@@ -40,7 +41,9 @@
 		description="A DAO is private to its members: only they, and the app as provider, ever see it. You are its admin and first member. Every transaction it makes is paid from a balance you keep funded."
 	/>
 
-	{#if !store.who}
+	{#if store.screen.at === 'loading'}
+		<Skeleton height="h-64" />
+	{:else if !store.who}
 		<ConnectPrompt what="create a DAO" />
 	{:else}
 		<form {...enhanced} class="space-y-8">

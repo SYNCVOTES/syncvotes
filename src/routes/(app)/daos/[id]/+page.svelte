@@ -40,7 +40,9 @@
 <svelte:head><title>{dao?.current?.name ?? 'DAO'} — SyncVotes</title></svelte:head>
 
 <Page width="wide" back={{ href: '/my-daos', label: 'My DAOs' }}>
-	{#if !dao}
+	{#if store.screen.at === 'loading'}
+		<Skeleton />
+	{:else if !dao}
 		<ConnectPrompt what="see this DAO" />
 	{:else if dao.error}
 		<QueryError error={dao.error} refresh={() => dao?.reconnect()} />
