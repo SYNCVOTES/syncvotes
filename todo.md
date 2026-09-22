@@ -84,3 +84,5 @@
       history (`syncvotes-board` 0.8.0). Stake votes, locks, the m-of-n treasury and payouts
       live in git history (`bb62260`) if wanted again
 - [ ] rethink governance from how a real company works (partners, shares, decisions) — next
+- [x] no admin at all: membership, name and dissolution are proposal effects, proposals cannot
+      be withdrawn, the balance is anyone's to fill (`syncvotes-meeting` 0.9.0)
