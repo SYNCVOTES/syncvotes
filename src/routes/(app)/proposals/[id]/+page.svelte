@@ -22,6 +22,7 @@
 	import LoadMore from '$lib/components/load-more.svelte';
 	import SearchInput from '$lib/components/search-input.svelte';
 	import DangerZone from '$lib/components/danger-zone.svelte';
+	import Loader from '@lucide/svelte/icons/loader';
 	import { relative, dateOf } from '$lib/format';
 
 	const id = $derived(page.params.id!);
@@ -32,8 +33,17 @@
 	let limit = $state(20);
 	const ballots = $derived(me ? remote.proposalBallots({ id, offset: 0, limit, q }) : null);
 
-	// Every write lands on this page through the live query; nothing to refresh by hand.
-	const vote = (choice: actions.Choice) => flow.act((s, w) => actions.vote(s, w, id, choice));
+	// Every write lands on this page through the live query; nothing to refresh by hand. The
+	// button pressed says so until the ledger answers; the activity pill says what is happening.
+	let casting = $state<actions.Choice | null>(null);
+	async function vote(choice: actions.Choice) {
+		casting = choice;
+		try {
+			await flow.act((s, w) => actions.vote(s, w, id, choice));
+		} finally {
+			casting = null;
+		}
+	}
 	const tone = (v: string) =>
 		v === 'Yes' ? 'text-green' : v === 'No' ? 'text-red' : 'text-ink-dim';
 	async function cancel(daoId: string) {
@@ -189,12 +199,12 @@
 					{:else if p.me.mayVote}
 						<Panel padding="sm" class="space-y-3">
 							<div class="grid grid-cols-2 gap-3">
-								<Button variant="accent" disabled={store.busy} onclick={() => vote('Yes')}
-									>Yes</Button
-								>
-								<Button variant="destructive" disabled={store.busy} onclick={() => vote('No')}
-									>No</Button
-								>
+								<Button variant="accent" disabled={store.busy} onclick={() => vote('Yes')}>
+									{#if casting === 'Yes'}<Loader size={14} class="animate-spin" />{/if}Yes
+								</Button>
+								<Button variant="destructive" disabled={store.busy} onclick={() => vote('No')}>
+									{#if casting === 'No'}<Loader size={14} class="animate-spin" />{/if}No
+								</Button>
 							</div>
 							<Button
 								variant="ghost"
@@ -203,7 +213,7 @@
 								disabled={store.busy}
 								onclick={() => vote('Abstain')}
 							>
-								Abstain
+								{#if casting === 'Abstain'}<Loader size={14} class="animate-spin" />{/if}Abstain
 							</Button>
 						</Panel>
 					{:else if p.me.membership}
