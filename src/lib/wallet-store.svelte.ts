@@ -123,7 +123,23 @@ async function run(action: () => Promise<void>) {
 }
 
 /** Remote functions rethrow server errors as HttpError; the message is in the body. */
+/**
+ * Whether an error is the server being away rather than saying no: a gateway answer while the
+ * app restarts (a deploy), or no answer at all. Such errors are worth retrying, quietly.
+ */
+export function transient(error: unknown): boolean {
+	const e = error as { status?: number; body?: { message?: string }; message?: string } | null;
+	if (!e || typeof e !== 'object') return false;
+	if (typeof e.status === 'number') return e.status >= 502 && e.status <= 504;
+	const message = e.body?.message ?? e.message ?? '';
+	return (
+		message === '' ||
+		/failed to fetch|networkerror|load failed|network request failed|connection/i.test(message)
+	);
+}
+
 export function describe(error: unknown): string {
+	if (transient(error)) return 'The app is being updated or is out of reach — back in a moment';
 	const body = (error as { body?: { message?: string } })?.body;
 	if (body?.message) return body.message;
 	// WebAuthn's one error for "cancelled", "timed out" and "no such passkey here".
