@@ -49,7 +49,8 @@ const partyId = schemas.partyId;
 const contractId = v.pipe(v.string(), v.nonEmpty());
 const paging = {
 	offset: v.pipe(v.number(), v.integer(), v.minValue(0)),
-	limit: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(100))
+	// A share table takes every holder at once; a batch is the most a DAO changes in one go.
+	limit: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(schemas.BATCH))
 };
 const filter = v.optional(v.pipe(v.string(), v.maxLength(100)), '');
 
