@@ -3,7 +3,7 @@ import { Main } from '@daml.js/model';
 import { BILLING_FACTOR } from '$app/env/private';
 import * as ledger from './ledger';
 import * as splice from './splice';
-import { operatorParty, paidTraffic, providerParty, submitAsProvider } from './participant';
+import { operatorParty, paidTraffic, providerParty, sdk, submitAsProvider } from './participant';
 
 /**
  * Who pays for what. Every transaction a DAO causes costs this validator traffic — bytes the
@@ -161,26 +161,64 @@ export async function flush(): Promise<void> {
 
 /** Coin credited so far, by DAO, as summed from the provider's transactions. */
 const deposited = new Map<string, number>();
+/** Transactions already summed, so a window read twice counts once. */
+const summed = new Set<string>();
+/** The provider's history is read up to here. */
 let seenOffset: number | undefined;
 let watching = false;
 
+function take(found: splice.Deposit[]) {
+	for (const d of found) {
+		if (summed.has(d.updateId)) continue;
+		summed.add(d.updateId);
+		deposited.set(d.daoId, (deposited.get(d.daoId) ?? 0) + d.amount);
+	}
+}
+
 /**
- * Reads the provider's transactions since the last look and credits what carries a memo.
- * The total is a sum over the ledger's history, so a restart recomputes rather than repeats;
- * the meter is written only when its credited figure is behind that sum.
+ * Reads a window of the provider's history, splitting it while the participant says it holds
+ * more than it will list. Returns the oldest record time seen, or null for an empty window.
+ */
+async function window(after: number, before: number): Promise<string | null> {
+	const got = await splice.deposits(after, before);
+	if (got) {
+		take(got.deposits);
+		return got.oldest;
+	}
+	const mid = Math.floor((after + before) / 2);
+	if (mid <= after) return null;
+	const a = await window(mid, before);
+	const b = await window(after, mid);
+	return b ?? a;
+}
+
+/**
+ * On the first look, walks the provider's history back to before the oldest DAO existed, so
+ * the credited sums are the ledger's, not this process's memory. After that, only what is
+ * new. The meter is written only when its credited figure is behind the sum.
  */
 export async function watchDeposits(): Promise<void> {
 	if (watching) return;
 	watching = true;
 	try {
-		const fresh = await splice.deposits(seenOffset);
-		for (const d of fresh) {
-			deposited.set(d.daoId, (deposited.get(d.daoId) ?? 0) + d.amount);
-			seenOffset = Math.max(seenOffset ?? 0, d.offset);
-		}
-		if (fresh.length === 0 && seenOffset === undefined) {
-			// Nothing marked in the whole history: remember where we looked up to.
-			seenOffset = await (await import('./participant')).sdk().then((s) => s.ledger.ledgerEnd());
+		const end = await (await sdk()).ledger.ledgerEnd();
+		if (seenOffset === undefined) {
+			const oldestDao = [...ledger.daos.values()].map((d) => d.createdAt).sort()[0];
+			if (oldestDao) {
+				let to = end;
+				let step = 20_000;
+				while (to > 0) {
+					const from = Math.max(0, to - step);
+					const oldest = await window(from, to);
+					if (oldest && oldest < oldestDao) break;
+					to = from;
+					step = Math.min(step * 2, 200_000);
+				}
+			}
+			seenOffset = end;
+		} else if (end > seenOffset) {
+			await window(seenOffset, end);
+			seenOffset = end;
 		}
 		for (const [daoId, total] of deposited) {
 			const meter = ledger.meters.get(daoId);
