@@ -11,6 +11,7 @@ import * as splice from './server/splice';
 import { fingerprintOf } from './verify';
 import { normaliseHint, hintProblem } from './hint';
 import * as schemas from './schemas';
+import { toLedger, type Rule } from './rules';
 
 /**
  * The server's API as remote functions: pages call these like local functions and SvelteKit
@@ -385,7 +386,22 @@ export const createDaoForm = form(
 
 export const createProposalForm = form(
 	schemas.createProposalForm,
-	async ({ dao, title, description, days, kind, add, remove, newName, newDescription }) => {
+	async ({
+		dao,
+		title,
+		description,
+		days,
+		kind,
+		add,
+		remove,
+		newName,
+		newDescription,
+		basis,
+		threshold,
+		percent,
+		quorum,
+		early
+	}) => {
 		const party = session.required();
 		const membership = memberOnly(dao).contractId;
 		const d = daoOf(dao);
@@ -415,7 +431,21 @@ export const createProposalForm = form(
 			default:
 				action = { tag: 'Signal', value: {} };
 		}
-		const args = { dao: d.contractId, pid, title, description, closesAt, action };
+		const rule: Rule = {
+			basis,
+			threshold: threshold === 'percent' ? { kind: 'percent', percent } : { kind: 'majority' },
+			quorum,
+			early: early === 'yes'
+		};
+		const args = {
+			dao: d.contractId,
+			pid,
+			title,
+			description,
+			closesAt,
+			action,
+			rule: toLedger(rule)
+		};
 		return {
 			pid,
 			membership,

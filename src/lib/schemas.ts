@@ -62,7 +62,22 @@ export const createProposalForm = v.pipe(
 		add: partyList(),
 		remove: partyList(),
 		newName: v.optional(v.string(), ''),
-		newDescription: v.optional(v.string(), '')
+		newDescription: v.optional(v.string(), ''),
+		basis: v.picklist(['all', 'cast']),
+		threshold: v.picklist(['majority', 'percent']),
+		percent: v.pipe(
+			v.optional(v.number('A percentage'), 67),
+			v.integer('Whole percent'),
+			v.minValue(1, 'At least 1%'),
+			v.maxValue(100, 'At most 100%')
+		),
+		quorum: v.pipe(
+			v.optional(v.number('A percentage'), 0),
+			v.integer('Whole percent'),
+			v.minValue(0, 'At least 0%'),
+			v.maxValue(100, 'At most 100%')
+		),
+		early: v.picklist(['yes', 'no'])
 	}),
 	v.forward(
 		v.check(

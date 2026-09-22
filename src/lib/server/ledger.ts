@@ -1,5 +1,6 @@
 import { Main } from '@daml.js/model';
 import { providerParty, sdk, streamActiveContracts, type Created } from './participant';
+import type { Rule } from '$lib/rules';
 
 /**
  * The provider's copy of the ledger, in memory: every contract of the app's templates (the
@@ -43,6 +44,7 @@ export type Proposal = {
 	title: string;
 	description: string;
 	effect: Effect;
+	rule: Rule;
 	createdAt: string;
 	closesAt: string;
 	eligible: number;
@@ -165,6 +167,19 @@ const list = (value: unknown) => (Array.isArray(value) ? value.map(text) : []);
 
 type Tagged = { tag: string; value: Record<string, unknown> };
 
+const rule = (v: unknown): Rule => {
+	const r = v as { basis: string; threshold: Tagged; quorum: unknown; early: boolean };
+	return {
+		basis: r.basis === 'OfCast' ? 'cast' : 'all',
+		threshold:
+			r.threshold.tag === 'Percent'
+				? { kind: 'percent', percent: num(r.threshold.value) }
+				: { kind: 'majority' },
+		quorum: num(r.quorum),
+		early: r.early === true
+	};
+};
+
 const effect = (v: unknown): Effect => {
 	const t = v as Tagged;
 	switch (t.tag) {
@@ -225,6 +240,7 @@ function created({ contractId, templateId, createArgument: a }: Created) {
 				title: text(a.title),
 				description: text(a.description),
 				effect: effect(a.action),
+				rule: rule(a.rule),
 				createdAt: text(a.createdAt),
 				closesAt: text(a.closesAt),
 				eligible: num(a.eligible),

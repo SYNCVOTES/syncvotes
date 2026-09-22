@@ -19,6 +19,8 @@
 	import PartyChips from '$lib/components/party-chips.svelte';
 	import MemberPicker from '$lib/components/remove-picker.svelte';
 	import Note from '$lib/components/note.svelte';
+	import RulePicker from '$lib/components/rule-picker.svelte';
+	import { PRESETS, toLedger, type Rule } from '$lib/rules';
 	import Users from '@lucide/svelte/icons/users';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import Power from '@lucide/svelte/icons/power';
@@ -40,6 +42,17 @@
 	let remove = $state<string[]>([]);
 	let newName = $state('');
 	let newDescription = $state('');
+	let rule = $state<Rule>({ ...PRESETS[0].rule! });
+	// A dissolution starts out unanimous; anything else, a majority of all. The author decides.
+	let ruleFor = $state<Kind>('signal');
+	$effect(() => {
+		if (kind === ruleFor) return;
+		ruleFor = kind;
+		const fallback = PRESETS.find(
+			(p) => p.value === (kind === 'dissolve' ? 'unanimous' : 'majority')
+		)!.rule!;
+		rule = { ...fallback, threshold: { ...fallback.threshold } };
+	});
 	const kinds = [
 		{
 			value: 'signal',
@@ -142,7 +155,7 @@
 	<PageHeader
 		eyebrow="New proposal"
 		title="Propose"
-		description="Every member gets one vote. The proposal passes when a majority of all members say yes, fails when that can no longer happen, and is decided by the ballots cast once the deadline passes. What it does when it passes, the ledger does."
+		description="Every member gets one vote. You choose what passing takes; the ledger counts by that rule, and what the proposal does when it passes, the ledger does."
 	/>
 
 	{#if store.screen.at === 'loading'}
@@ -222,6 +235,10 @@
 				</Note>
 			</FormSection>
 
+			<FormSection title="How it passes">
+				{#key ruleFor}<RulePicker bind:rule {members} />{/key}
+			</FormSection>
+
 			<FormSection title="Put it to the vote">
 				<Field
 					label="Title"
@@ -257,8 +274,7 @@
 
 			{#if dao?.ready}
 				<p class="font-mono text-xs text-ink-dim">
-					The vote opens for the {fmt(dao.current.members)} current members the moment you sign;
-					{fmt(Math.floor(dao.current.members / 2) + 1)} yes will pass it.
+					The vote opens for the {fmt(dao.current.members)} current members the moment you sign.
 				</p>
 			{:else}
 				<Skeleton height="h-4" />

@@ -66,7 +66,6 @@
 		<Skeleton />
 	{:else}
 		{@const p = proposal.current}
-		{@const needed = Math.floor(p.eligible / 2) + 1}
 		{@const ended = new Date(p.closesAt).getTime() < Date.now()}
 
 		<div class="mb-8">
@@ -152,9 +151,9 @@
 					yes={p.yes}
 					no={p.no}
 					abstain={p.abstain}
-					total={p.eligible}
-					{needed}
+					eligible={p.eligible}
 					cast={p.cast}
+					rule={p.rule}
 				/>
 
 				{#if p.outcome}

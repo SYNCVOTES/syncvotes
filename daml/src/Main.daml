@@ -39,6 +39,29 @@ data Effect
   | Dissolve
   deriving (Eq, Show)
 
+-- | What counts as passing, chosen per proposal. Yes is measured against all members, or
+-- against the votes cast (yes and no; an abstention takes part but takes no side), and must be
+-- a majority (strictly more than half) or at least a percentage. A quorum is the share of
+-- members that must take part at all. `early` lets the proposal settle the moment its outcome
+-- can no longer change; otherwise the deadline decides.
+data Basis = OfAll | OfCast
+  deriving (Eq, Show)
+
+data Threshold = Majority | Percent Int
+  deriving (Eq, Show)
+
+data Rule = Rule with
+    basis : Basis
+    threshold : Threshold
+    quorum : Int
+    early : Bool
+  deriving (Eq, Show)
+
+validRule : Rule -> Bool
+validRule r = r.quorum >= 0 && r.quorum <= 100 && case r.threshold of
+  Majority -> True
+  Percent p -> p >= 1 && p <= 100
+
 -- | Members added or removed per transaction; longer lists are split.
 batch : Int
 batch = 200
@@ -160,12 +183,14 @@ template Member
         description : Text
         closesAt : Time
         action : Effect
+        rule : Rule
       controller party
       do
         now <- getTime
         found <- fetch dao
         assertMsg "Not this member's DAO" (found.id == daoId)
         assertMsg "The deadline must be in the future" (closesAt > now)
+        assertMsg "The rule's numbers are out of range" (validRule rule)
         case action of
           Signal -> pure ()
           Dissolve -> pure ()
@@ -175,7 +200,7 @@ template Member
             assertMsg "Too many at once" (length add <= batch && length remove <= batch)
         create Proposal with
           provider; operator; creator; daoId; proposer = party; id = pid; title; description
-          action; createdAt = now; closesAt; eligible = found.members; yes = 0; no = 0
+          action; rule; createdAt = now; closesAt; eligible = found.members; yes = 0; no = 0
           abstain = 0; outcome = None; executedAt = None
 
     -- Nothing here reads the proposal, so a vote never waits on the count or on other voters.
@@ -198,9 +223,10 @@ template Member
           castAt = now; counted = False
 
 -- | A proposal counts; it does not list. Its electorate was fixed when it was made: the members
--- of that moment. It passes once yes reaches a majority of them, fails once no makes that
--- impossible, and is decided by the ballots cast when the deadline has passed. Nobody withdraws
--- it: once made, it is decided. An action is carried out by the DAO once it has passed.
+-- of that moment; its rule says what passing takes. With `early` it settles the moment the
+-- outcome can no longer change; either way the deadline decides by what was cast. Nobody
+-- withdraws it: once made, it is decided. An action is carried out by the DAO once it has
+-- passed.
 template Proposal
   with
     provider : Party
@@ -212,6 +238,7 @@ template Proposal
     title : Text
     description : Text
     action : Effect
+    rule : Rule
     createdAt : Time
     closesAt : Time
     eligible : Int
@@ -244,11 +271,28 @@ template Proposal
               Abstain -> (y, n, a + 1))
           (yes, no, abstain) ballots
         now <- getTime
-        let needed = eligible / 2 + 1
+        let cast = y + n + a
+            outstanding = eligible - cast
+            quorumMet = rule.quorum == 0 || cast * 100 >= eligible * rule.quorum
+            meets yes denom = denom > 0 && case rule.threshold of
+              Majority -> yes * 2 > denom
+              Percent p -> yes * 100 >= denom * p
+            -- What yes is measured against now, and in the worst case still to come.
+            denomNow = case rule.basis of
+              OfAll -> eligible
+              OfCast -> y + n
+            denomWorst = case rule.basis of
+              OfAll -> eligible
+              OfCast -> y + n + outstanding
+            passedNow = quorumMet && meets y denomNow
+            -- Sure: yes wins whatever the rest do. Lost: yes cannot win even if the rest all say yes.
+            sure = quorumMet && meets y denomWorst
+            lost = not (meets (y + outstanding) denomWorst)
+            over = final && now >= closesAt
             decided
-              | y >= needed = Some Passed
-              | eligible - n - a < needed = Some Failed
-              | final && now >= closesAt = Some Failed
+              | rule.early && sure = Some Passed
+              | rule.early && lost = Some Failed
+              | over = Some (if passedNow then Passed else Failed)
               | otherwise = None
         create this with yes = y; no = n; abstain = a; outcome = decided
 

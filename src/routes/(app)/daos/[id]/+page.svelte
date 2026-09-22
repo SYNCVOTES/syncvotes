@@ -19,6 +19,7 @@
 	import LoadMore from '$lib/components/load-more.svelte';
 	import RoleTag from '$lib/components/role-tag.svelte';
 	import EffectLabel from '$lib/components/effect-label.svelte';
+	import { short } from '$lib/rules';
 	import Problem from '$lib/components/problem.svelte';
 	import BillingPanel from '$lib/components/billing-panel.svelte';
 	import Plus from '@lucide/svelte/icons/plus';
@@ -122,9 +123,9 @@
 									<div class="truncate font-display text-[15px] font-bold">{p.title}</div>
 									<div class="mt-1 font-mono text-xs text-ink-dim">
 										by <PartyId party={p.proposer} class="align-middle" /> · {dateOf(p.createdAt)}
-										· <EffectLabel effect={p.effect} /> · {fmt(counted(p))} of {fmt(p.eligible)} · {p.outcome
-											? 'closed'
-											: `closes ${relative(p.closesAt)}`}
+										· <EffectLabel effect={p.effect} /> · {short(p.rule)} · {fmt(counted(p))} of {fmt(
+											p.eligible
+										)} · {p.outcome ? 'closed' : `closes ${relative(p.closesAt)}`}
 									</div>
 								</div>
 								<StatusBadge outcome={p.outcome} closesAt={p.closesAt} executedAt={p.executedAt} />
