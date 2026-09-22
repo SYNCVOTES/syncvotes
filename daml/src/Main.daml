@@ -3,7 +3,7 @@ module Main where
 import DA.Action (foldlA, void, when)
 import DA.Foldable (forA_)
 import DA.List (dedup)
-import DA.Optional (catOptionals, isNone)
+import DA.Optional (isNone, isSome)
 
 -- Every contract a user acts on carries the app provider's signature, so the provider confirms
 -- every transaction (which is what earns traffic rewards) while the user's own key is the only
@@ -15,10 +15,15 @@ import DA.Optional (catOptionals, isNone)
 -- proposal executed) are controlled by both, and neither has the other's key. The creator has
 -- no say of their own beyond that signature: everything a DAO does, it decides by vote.
 --
--- Members hold shares of the vote — percentages that add up to a hundred — and a ballot weighs
--- the voter's share. Shares change only by vote, and a share moved while a proposal is open
--- does not vote on it twice: a ballot is refused if its share changed after the proposal was
--- made.
+-- Members hold shares of the vote, counted in whole units — one each in a DAO that votes by
+-- membership, any number in one that votes by shares — and a ballot weighs the voter's units.
+-- Shares change only by vote, and a share moved while a proposal is open does not vote on it
+-- twice: a ballot is refused if its share changed after the proposal was made.
+--
+-- A DAO's money is a party of its own, the treasury, hosted by the app: anyone pays in by
+-- sending coin to it, its transactions are paid from it, and coin leaves it only as a proposal
+-- decided. The ledger records the decision and the execution; the coin itself moves by the
+-- network's own rules, outside this module.
 --
 -- Built for large DAOs: a member's vote touches only that member's own contract, so thousands
 -- can vote at once, and a proposal holds counters rather than lists. The provider counts the
@@ -32,22 +37,32 @@ data Outcome = Passed | Failed
   deriving (Eq, Show)
 
 -- | What a proposal does when it passes (`Effect`: `Action` is the Prelude's). `Signal`
--- decides and does nothing else; the rest is everything a DAO can change about itself.
+-- decides and does nothing else; the rest is everything a DAO can change about itself. A
+-- share change lists only the parties it touches, zero meaning they leave; carried out in
+-- batches, so one proposal can reshape a DAO of thousands.
 data Effect
   = Signal
   | SetShares with
-      shares : [(Party, Decimal)]
+      changes : [(Party, Int)]
   | SetInfo with
       daoName : Text
       description : Text
-  | Dissolve
+      image : Optional Text
+  | Payout with
+      to : Party
+      amount : Decimal
+      reason : Text
+  | Dissolve with
+      remainderTo : Party
   deriving (Eq, Show)
 
 -- | What counts as passing, chosen per proposal. Yes is measured against all members, or
 -- against the votes cast (yes and no; an abstention takes part but takes no side), and must be
 -- a majority (strictly more than half) or at least a percentage. A quorum is the share of
 -- members that must take part at all. `early` lets the proposal settle the moment its outcome
--- can no longer change; otherwise the deadline decides.
+-- can no longer change; `changeable` lets a voter replace their ballot until the deadline. The
+-- two exclude each other: an outcome that is sure only while nobody changes their mind is not
+-- sure.
 data Basis = OfAll | OfCast
   deriving (Eq, Show)
 
@@ -59,32 +74,37 @@ data Rule = Rule with
     threshold : Threshold
     quorum : Int
     early : Bool
+    changeable : Bool
   deriving (Eq, Show)
 
 validRule : Rule -> Bool
-validRule r = r.quorum >= 0 && r.quorum <= 100 && case r.threshold of
-  Majority -> True
-  Percent p -> p >= 1 && p <= 100
+validRule r =
+  r.quorum >= 0 && r.quorum <= 100
+    && not (r.early && r.changeable)
+    && case r.threshold of
+      Majority -> True
+      Percent p -> p >= 1 && p <= 100
 
--- | Members created or reshared per transaction; longer lists are split.
+-- | Members created, reshared or removed per transaction; longer lists are carried out in
+-- several.
 batch : Int
 batch = 200
 
--- | The whole vote: shares add up to this.
-total : Decimal
-total = 100.0
+-- | The most parties one share change may touch.
+maxChanges : Int
+maxChanges = 2000
 
--- | A share table is whole: every share positive, no party twice, the sum exactly the total.
-validShares : [(Party, Decimal)] -> Bool
-validShares shares =
-  not (null shares)
-    && length shares <= batch
-    && all (\(_, s) -> s > 0.0) shares
-    && dedup (map fst shares) == map fst shares
-    && sum (map snd shares) == total
+-- | A share change names each party once, with a whole number of units, zero to leave. In a
+-- DAO that votes by membership a member holds one unit or none.
+validChanges : Bool -> [(Party, Int)] -> Bool
+validChanges equal changes =
+  not (null changes)
+    && length changes <= maxChanges
+    && all (\(_, units) -> units >= 0 && (not equal || units <= 1)) changes
+    && dedup (map fst changes) == map fst changes
 
 -- | A party's standing with the app: created by the provider once per party, and the door
--- through which the party creates DAOs.
+-- through which the party creates DAOs and keeps a profile.
 template Account
   with
     provider : Party
@@ -94,88 +114,153 @@ template Account
     signatory provider
     observer user, operator
 
+    -- The founding share table: the first batch of members is created here, the rest as a
+    -- proposal already passed, carried out by the provider in batches like any other. The
+    -- treasury is a party the app allocated for this DAO; the creator holds a share.
     nonconsuming choice Account_CreateDAO : ContractId DAO
       with
         id : Text
         daoName : Text
         description : Text
-        shares : [(Party, Decimal)]
+        image : Optional Text
+        equal : Bool
+        treasury : Party
+        shares : [(Party, Int)]
+        more : [(Party, Int)]
       controller user
       do
         now <- getTime
-        assertMsg "Shares must be positive, unique and add up to 100" (validShares shares)
-        forA_ shares \(party, share) ->
+        assertMsg "A DAO needs a name" (daoName /= "")
+        assertMsg "The founding shares must be whole" (validChanges equal (shares ++ more))
+        assertMsg "The first batch is one to a batch" (not (null shares) && length shares <= batch)
+        assertMsg "The founding shares are all positive" (all (\(_, u) -> u > 0) (shares ++ more))
+        assertMsg "The creator holds a share" (user `elem` map fst (shares ++ more))
+        forA_ shares \(party, units) ->
           create Member with
             provider; operator; creator = user; sponsor = user; daoId = id; party; since = now
-            share; shareSince = now; voted = []
+            share = units; shareSince = now; voted = []
+        when (not (null more)) do
+          void $ create Proposal with
+            provider; operator; creator = user; daoId = id; proposer = user; id = id
+            title = "Founding members"; description = ""
+            action = SetShares with changes = more
+            rule = Rule OfAll Majority 0 True False
+            eligible = sum (map snd shares); createdAt = now; closesAt = now
+            yes = 0; no = 0; abstain = 0; outcome = Some Passed; executed = 0; executedAt = None
         create DAO with
-          provider; operator; creator = user; id; name = daoName; description; createdAt = now
-          members = length shares
+          provider; operator; creator = user; treasury; id; name = daoName; description; image
+          equal; createdAt = now; members = length shares; units = sum (map snd shares)
 
--- | A DAO: who created it, what it is called, and how many members it has. The members
--- themselves are `Member` contracts, so a DAO of ten thousand is as small as one of three.
--- Nobody changes it by hand: its one choice carries out what a vote decided. The creator's
--- signature is what keeps the provider from archiving it alone.
+    -- How a party presents itself: a name, a picture, a few words. One per party; replacing
+    -- it hands in the old one.
+    nonconsuming choice Account_SetProfile : ContractId Profile
+      with
+        name : Text
+        avatar : Optional Text
+        bio : Text
+        previous : Optional (ContractId Profile)
+      controller user
+      do
+        assertMsg "A profile needs a name" (name /= "")
+        forA_ previous \cid -> do
+          old <- fetch cid
+          assertMsg "Not this party's profile" (old.user == user)
+          archive cid
+        now <- getTime
+        create Profile with provider; operator; user; name; avatar; bio; updatedAt = now
+
+-- | A DAO: who created it, what it is called, its treasury, and how big its vote is. The
+-- members themselves are `Member` contracts, so a DAO of ten thousand is as small as one of
+-- three. Nobody changes it by hand: its one choice carries out what a vote decided. The
+-- creator's signature is what keeps the provider from archiving it alone.
 template DAO
   with
     provider : Party
     operator : Party
     creator : Party
+    treasury : Party
     id : Text
     name : Text
     description : Text
+    image : Optional Text
+    -- One member, one unit: the vote is by membership rather than by shares.
+    equal : Bool
     createdAt : Time
     members : Int
+    -- The whole vote: what every member's units add up to.
+    units : Int
   where
     signatory creator, provider
     observer operator
 
-    ensure name /= ""
+    ensure name /= "" && members > 0 && units > 0
 
     -- A passed proposal is carried out by the provider, with the DAO's authority and the
-    -- ledger's check that it did pass. A new share table needs every current member's
-    -- contract handed in (a proposal names parties; the ledger checks the count and each one):
-    -- those in the table are reshared, those not in it leave, those new to it join. Dissolving
-    -- archives the DAO and returns nothing.
+    -- ledger's check that it did pass. A share change is carried out a batch at a time, from
+    -- where the proposal says it got to, up to `upTo`: the contracts of the members it touches
+    -- are handed in (the ledger checks each is this DAO's and named in the batch); those with
+    -- a new number of units are reshared, those at zero leave, those without a contract join.
+    -- A payout or a dissolution is recorded here once the coin has moved; dissolving archives
+    -- the DAO and returns nothing.
     choice DAO_Execute : Optional (ContractId DAO)
       with
         proposal : ContractId Proposal
         current : [ContractId Member]
+        upTo : Int
       controller provider
       do
         p <- fetch proposal
         assertMsg "Not this DAO's proposal" (p.daoId == id)
-        exercise proposal Proposal_MarkExecuted
         now <- getTime
         case p.action of
-          Signal -> Some <$> create this
-          SetInfo daoName description -> Some <$> create this with name = daoName; description
-          Dissolve -> pure None
-          SetShares shares -> do
-            assertMsg "Every current member must be handed in" (length current == members)
+          Signal -> do
+            exercise proposal Proposal_Advance with upTo = 1
+            Some <$> create this
+          SetInfo daoName description image -> do
+            exercise proposal Proposal_Advance with upTo = 1
+            Some <$> create this with name = daoName; description; image
+          Payout {} -> do
+            exercise proposal Proposal_Advance with upTo = 1
+            Some <$> create this
+          Dissolve _ -> do
+            exercise proposal Proposal_Advance with upTo = 1
+            pure None
+          SetShares changes -> do
+            let from = p.executed
+                slice = take (upTo - from) (drop from changes)
+            assertMsg "The batch must move on" (upTo > from && upTo <= length changes)
+            assertMsg "A batch is at most a batch" (upTo - from <= batch)
+            exercise proposal Proposal_Advance with upTo
             assertMsg "A member handed in twice" (dedup current == current)
-            kept <- forA current \cid -> do
+            existing <- forA current \cid -> do
               member <- fetch cid
               assertMsg "Not a member of this DAO" (member.daoId == id)
-              case lookup member.party shares of
-                None -> do
-                  exercise cid Member_Remove
-                  pure None
-                Some share -> do
-                  when (share /= member.share) (void (exercise cid Member_Reshare with share))
-                  pure (Some member.party)
-            let staying = catOptionals kept
-                joining = filter (\(party, _) -> party `notElem` staying) shares
-            forA_ joining \(party, share) ->
-              create Member with
-                provider; operator; creator; sponsor = creator; daoId = id; party; since = now
-                share; shareSince = now; voted = []
-            Some <$> create this with members = length shares
+              assertMsg "A member not in this batch" (isSome (lookup member.party slice))
+              pure (member.party, (cid, member.share))
+            (dMembers, dUnits) <- foldlA
+              (\(dm, du) (party, units) -> case lookup party existing of
+                Some (cid, had)
+                  | units == 0 -> do
+                      exercise cid Member_Remove
+                      pure (dm - 1, du - had)
+                  | units == had -> pure (dm, du)
+                  | otherwise -> do
+                      void (exercise cid Member_Reshare with share = units)
+                      pure (dm, du + units - had)
+                None
+                  | units == 0 -> pure (dm, du)
+                  | otherwise -> do
+                      void $ create Member with
+                        provider; operator; creator; sponsor = creator; daoId = id; party
+                        since = now; share = units; shareSince = now; voted = []
+                      pure (dm + 1, du + units))
+              (0, 0) slice
+            Some <$> create this with members = members + dMembers; units = units + dUnits
 
 -- | One party's membership of one DAO, with its share of the vote: the door through which the
--- member proposes, and their ballot box — voting replaces it with a copy that remembers the proposal, which is what makes
--- a second ballot impossible. Signed by whoever admitted the member, so the provider cannot
--- invent members; removed only with the DAO's authority.
+-- member proposes, votes and comments. Voting replaces it with a copy that remembers the
+-- proposal, which is what makes a second ballot impossible. Signed by whoever admitted the
+-- member, so the provider cannot invent members; removed only with the DAO's authority.
 template Member
   with
     provider : Party
@@ -185,7 +270,8 @@ template Member
     daoId : Text
     party : Party
     since : Time
-    share : Decimal
+    -- Units of the vote.
+    share : Int
     shareSince : Time
     -- Proposals voted on whose deadline has not passed, with that deadline. Nothing can be cast
     -- on a proposal after its deadline, so entries past it are forgotten as the next vote is
@@ -201,15 +287,15 @@ template Member
 
     choice Member_Reshare : ContractId Member
       with
-        share : Decimal
+        share : Int
       controller provider, creator
       do
         now <- getTime
         create this with share; shareSince = now
 
-    -- The DAO is read as it is now (the app's operator reads alongside the member): its member
-    -- count is fixed into the proposal as the electorate, and voting is open from this moment.
-    -- What members vote on is what was proposed.
+    -- The DAO is read as it is now (the app's operator reads alongside the member): the size
+    -- of its vote is fixed into the proposal as the electorate, and voting is open from this
+    -- moment. What members vote on is what was proposed.
     nonconsuming choice Member_Propose : ContractId Proposal
       with
         dao : ContractId DAO
@@ -228,39 +314,68 @@ template Member
         assertMsg "The rule's numbers are out of range" (validRule rule)
         case action of
           Signal -> pure ()
-          Dissolve -> pure ()
-          SetInfo daoName _ -> assertMsg "A DAO needs a name" (daoName /= "")
-          SetShares shares ->
-            assertMsg "Shares must be positive, unique and add up to 100" (validShares shares)
+          Dissolve _ -> pure ()
+          SetInfo daoName _ _ -> assertMsg "A DAO needs a name" (daoName /= "")
+          Payout _ amount _ -> assertMsg "A payout is a positive amount" (amount > 0.0)
+          SetShares changes ->
+            assertMsg "The share change must be whole" (validChanges found.equal changes)
         create Proposal with
           provider; operator; creator; daoId; proposer = party; id = pid; title; description
-          action; rule; createdAt = now; closesAt; yes = 0.0; no = 0.0; abstain = 0.0
-          outcome = None; executedAt = None
+          action; rule; eligible = found.units; createdAt = now; closesAt
+          yes = 0; no = 0; abstain = 0; outcome = None; executed = 0; executedAt = None
 
     -- Nothing here reads the proposal, so a vote never waits on the count or on other voters.
     -- Whether the ballot is valid for its proposal (right DAO, member in time, before the
-    -- deadline) is checked when the provider counts it. `closesAt` is the voter's word for the
-    -- deadline; a voter who lies about it only wastes a ballot the count will refuse.
+    -- deadline) is checked when the provider counts it. `closesAt` and `changeable` are the
+    -- voter's word for the proposal's; a voter who lies about them only wastes a ballot the
+    -- count will refuse. On a proposal whose votes may change, a second vote hands in the
+    -- ballot it replaces.
     choice Member_Vote : ContractId Ballot
       with
         proposalId : Text
         closesAt : Time
+        changeable : Bool
         vote : Vote
+        previous : Optional (ContractId Ballot)
       controller party
       do
         now <- getTime
         let open = filter (\(_, deadline) -> deadline > now) voted
-        assertMsg "Already voted" (proposalId `notElem` map fst open)
-        create this with voted = (proposalId, closesAt) :: open
+        if proposalId `elem` map fst open
+          then do
+            assertMsg "Already voted; votes on this proposal cannot be changed" changeable
+            case previous of
+              None -> abort "Already voted; hand in the ballot to replace"
+              Some cid -> do
+                old <- fetch cid
+                assertMsg "Not this member's ballot on this proposal"
+                  (old.voter == party && old.proposalId == proposalId && old.daoId == daoId)
+                exercise cid Ballot_Withdraw
+            void (create this with voted = open)
+          else void (create this with voted = (proposalId, closesAt) :: open)
         create Ballot with
           provider; operator; daoId; proposalId; voter = party; since; vote; weight = share
-          shareSince; closesAt; castAt = now; counted = False
+          shareSince; closesAt; changeable; castAt = now; counted = False
 
--- | A proposal counts; it does not list. Its electorate was fixed when it was made: the shares
--- of that moment, a hundred in all; its rule says what passing takes. With `early` it settles the moment the
+    -- A word on a proposal, from a member. Anyone in the DAO reads it through the app.
+    nonconsuming choice Member_Comment : ContractId Comment
+      with
+        proposalId : Text
+        cid : Text
+        body : Text
+      controller party
+      do
+        assertMsg "A comment says something" (body /= "")
+        now <- getTime
+        create Comment with
+          provider; operator; daoId; proposalId; author = party; id = cid; body
+          createdAt = now; editedAt = None
+
+-- | A proposal counts; it does not list. Its electorate was fixed when it was made: the units
+-- of that moment; its rule says what passing takes. With `early` it settles the moment the
 -- outcome can no longer change; either way the deadline decides by what was cast. Nobody
 -- withdraws it: once made, it is decided. An action is carried out by the DAO once it has
--- passed.
+-- passed, in batches when it is long; `executed` is how far that got.
 template Proposal
   with
     provider : Party
@@ -273,21 +388,24 @@ template Proposal
     description : Text
     action : Effect
     rule : Rule
+    eligible : Int
     createdAt : Time
     closesAt : Time
-    yes : Decimal
-    no : Decimal
-    abstain : Decimal
+    yes : Int
+    no : Int
+    abstain : Int
     outcome : Optional Outcome
+    executed : Int
     executedAt : Optional Time
   where
     signatory proposer, provider
     observer operator
 
-    ensure title /= ""
+    ensure title /= "" && eligible > 0
 
     -- `final` says the deadline has passed and these are the last ballots there are: the one
-    -- thing the ledger takes on the provider's word, since it cannot see what was not handed in.
+    -- thing the ledger takes on the provider's word, since it cannot see what was not handed
+    -- in. Votes that may change are counted only once they no longer can.
     choice Proposal_Tally : ContractId Proposal
       with
         ballots : [ContractId Ballot]
@@ -295,6 +413,8 @@ template Proposal
       controller provider
       do
         assertMsg "Already settled" (isNone outcome)
+        now <- getTime
+        assertMsg "Votes may change until the deadline" (not rule.changeable || now >= closesAt)
         (y, n, a) <- foldlA
           (\(y, n, a) cid -> do
             (vote, weight) <- exercise cid Ballot_Count with proposal = this
@@ -303,19 +423,18 @@ template Proposal
               No -> (y, n + weight, a)
               Abstain -> (y, n, a + weight))
           (yes, no, abstain) ballots
-        now <- getTime
         let cast = y + n + a
-            outstanding = total - cast
-            quorumMet = rule.quorum == 0 || cast >= intToDecimal rule.quorum
-            meets yes denom = denom > 0.0 && case rule.threshold of
-              Majority -> yes * 2.0 > denom
-              Percent p -> yes * 100.0 >= denom * intToDecimal p
+            outstanding = eligible - cast
+            quorumMet = rule.quorum == 0 || cast * 100 >= rule.quorum * eligible
+            meets yes denom = denom > 0 && case rule.threshold of
+              Majority -> yes * 2 > denom
+              Percent p -> yes * 100 >= denom * p
             -- What yes is measured against now, and in the worst case still to come.
             denomNow = case rule.basis of
-              OfAll -> total
+              OfAll -> eligible
               OfCast -> y + n
             denomWorst = case rule.basis of
-              OfAll -> total
+              OfAll -> eligible
               OfCast -> y + n + outstanding
             passedNow = quorumMet && meets y denomNow
             -- Sure: yes wins whatever the rest do. Lost: yes cannot win even if the rest all say yes.
@@ -329,19 +448,28 @@ template Proposal
               | otherwise = None
         create this with yes = y; no = n; abstain = a; outcome = decided
 
-    -- Only the DAO (creator and provider together) marks a proposal executed, and only once.
-    choice Proposal_MarkExecuted : ContractId Proposal
+    -- Only the DAO (creator and provider together) records progress on a passed proposal:
+    -- how many of its entries are carried out, and the moment the last one was.
+    choice Proposal_Advance : ContractId Proposal
+      with
+        upTo : Int
       controller provider, creator
       do
         assertMsg "The proposal did not pass" (outcome == Some Passed)
         assertMsg "Already executed" (isNone executedAt)
+        let size = case action of
+              SetShares changes -> length changes
+              _ -> 1
+        assertMsg "Progress only goes forward" (upTo > executed && upTo <= size)
         now <- getTime
-        create this with executedAt = Some now
+        create this with
+          executed = upTo
+          executedAt = if upTo == size then Some now else None
 
--- | One vote, weighing the voter's share. Signed by the voter and the provider; `since` and
--- `shareSince` are copied from the voter's membership, so the count can tell whether they were a
--- member, with that share, when the vote opened. Counting marks it rather than removing it, so
--- who voted how stays on the ledger.
+-- | One vote, weighing the voter's units. Signed by the voter and the provider; `since` and
+-- `shareSince` are copied from the voter's membership, so the count can tell whether they were
+-- a member, with that share, when the vote opened. Counting marks it rather than removing it,
+-- so who voted how stays on the ledger; a changed vote withdraws it instead.
 template Ballot
   with
     provider : Party
@@ -351,16 +479,17 @@ template Ballot
     voter : Party
     since : Time
     vote : Vote
-    weight : Decimal
+    weight : Int
     shareSince : Time
     closesAt : Time
+    changeable : Bool
     castAt : Time
     counted : Bool
   where
     signatory voter, provider
     observer operator
 
-    choice Ballot_Count : (Vote, Decimal)
+    choice Ballot_Count : (Vote, Int)
       with
         proposal : Proposal
       controller provider
@@ -369,32 +498,89 @@ template Ballot
         assertMsg "A ballot for another proposal" (proposalId == proposal.id && daoId == proposal.daoId)
         assertMsg "Cast after the deadline" (castAt < proposal.closesAt)
         assertMsg "Cast against another deadline" (closesAt == proposal.closesAt)
+        assertMsg "Cast against another rule" (changeable == proposal.rule.changeable)
         assertMsg "Joined after the vote opened" (since <= proposal.createdAt)
         assertMsg "The share changed after the vote opened" (shareSince <= proposal.createdAt)
         create this with counted = True
         pure (vote, weight)
 
--- | The provider's statement of a DAO's account: what was paid in, and what its
--- transactions have cost so far. Rewritten as the numbers move; one contract per DAO,
--- whatever its history.
+    -- The voter takes it back to cast another; only where votes may change, and only before
+    -- it was counted.
+    choice Ballot_Withdraw : ()
+      controller voter
+      do
+        assertMsg "Votes on this proposal cannot be changed" changeable
+        assertMsg "Already counted" (not counted)
+        pure ()
+
+-- | A member's comment on a proposal. The author edits or removes it; nobody else does.
+template Comment
+  with
+    provider : Party
+    operator : Party
+    daoId : Text
+    proposalId : Text
+    author : Party
+    id : Text
+    body : Text
+    createdAt : Time
+    editedAt : Optional Time
+  where
+    signatory provider, author
+    observer operator
+
+    ensure body /= ""
+
+    choice Comment_Edit : ContractId Comment
+      with
+        newBody : Text
+      controller author
+      do
+        assertMsg "A comment says something" (newBody /= "")
+        now <- getTime
+        create this with body = newBody; editedAt = Some now
+
+    choice Comment_Delete : ()
+      controller author
+      do pure ()
+
+-- | How a party presents itself to the DAOs it is in.
+template Profile
+  with
+    provider : Party
+    operator : Party
+    user : Party
+    name : Text
+    avatar : Optional Text
+    bio : Text
+    updatedAt : Time
+  where
+    signatory provider, user
+    observer operator
+
+    ensure name /= ""
+
+-- | The provider's statement of a DAO's account with it: what its transactions have cost so
+-- far, and what of that the treasury has paid. The balance is the treasury's coin less the
+-- difference. Rewritten as the numbers move; one contract per DAO, whatever its history.
 template Meter
   with
     provider : Party
     operator : Party
     daoId : Text
-    creator : Party
-    credited : Decimal
+    treasury : Party
     charged : Decimal
+    collected : Decimal
     updatedAt : Time
   where
     signatory provider
-    observer operator, creator
+    observer operator
 
     choice Meter_Update : ContractId Meter
       with
-        newCredited : Decimal
         newCharged : Decimal
+        newCollected : Decimal
       controller provider
       do
         now <- getTime
-        create this with credited = newCredited; charged = newCharged; updatedAt = now
+        create this with charged = newCharged; collected = newCollected; updatedAt = now

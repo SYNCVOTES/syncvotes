@@ -194,6 +194,7 @@
 			</Panel>
 			<div class="flex flex-wrap gap-3">
 				<Button href="/my-daos">My DAOs</Button>
+				<Button href="/profile" variant="outline">Profile</Button>
 				<Button variant="outline" onclick={lock}>Lock</Button>
 			</div>
 			<p class="text-xs text-ink-dim">

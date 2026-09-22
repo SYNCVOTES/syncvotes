@@ -6,7 +6,8 @@
 		description,
 		members,
 		openProposals,
-		role
+		role,
+		image = null
 	}: {
 		id: string;
 		name: string;
@@ -14,7 +15,9 @@
 		members: number;
 		openProposals: number;
 		role: 'creator' | 'member';
+		image?: string | null;
 	} = $props();
+	import { excerpt } from '$lib/markdown';
 
 	const monogram = $derived(name.slice(0, 3).toUpperCase());
 </script>
@@ -24,11 +27,15 @@
 	class="group flex flex-col border border-border bg-surface px-[26px] pt-[26px] pb-5 transition-colors hover:border-border-hover hover:bg-surface-hover"
 >
 	<div class="mb-[18px] flex items-start justify-between gap-3">
-		<div
-			class="flex size-[46px] shrink-0 items-center justify-center border border-orange/30 bg-orange-dim font-mono text-xs font-bold tracking-[0.08em] text-orange"
-		>
-			{monogram}
-		</div>
+		{#if image}
+			<img src={image} alt="" class="size-[46px] shrink-0 border border-border object-cover" />
+		{:else}
+			<div
+				class="flex size-[46px] shrink-0 items-center justify-center border border-orange/30 bg-orange-dim font-mono text-xs font-bold tracking-[0.08em] text-orange"
+			>
+				{monogram}
+			</div>
+		{/if}
 		<span
 			class="pt-1 font-mono text-xs font-bold tracking-[0.18em] uppercase {role === 'creator'
 				? 'text-amber'
@@ -44,7 +51,7 @@
 	<div
 		class="mb-[22px] line-clamp-3 flex-1 text-[12.5px] leading-relaxed [overflow-wrap:anywhere] text-ink-mid"
 	>
-		{description || 'No description provided.'}
+		{excerpt(description) || 'No description provided.'}
 	</div>
 
 	<div class="flex items-center gap-6 border-t border-border pt-3.5">

@@ -4,10 +4,9 @@
 	import * as remote from '$lib/api.remote';
 	import { store } from '$lib/wallet-store.svelte';
 	import { signedForm } from '$lib/forms';
-	import { createProposalForm as schema } from '$lib/schemas';
+	import { createProposalForm as schema, shareChanges, BATCH } from '$lib/schemas';
 	import type { Plain } from '$lib/verify';
 	import { Input } from '$lib/components/ui/input';
-	import { Textarea } from '$lib/components/ui/textarea';
 	import Page from '$lib/components/page.svelte';
 	import PageHeader from '$lib/components/page-header.svelte';
 	import ConnectPrompt from '$lib/components/connect-prompt.svelte';
@@ -16,112 +15,157 @@
 	import Field from '$lib/components/field.svelte';
 	import FormActions from '$lib/components/form-actions.svelte';
 	import QueryError from '$lib/components/query-error.svelte';
-	import ShareTable, { type Row } from '$lib/components/share-table.svelte';
+	import MemberEditor, { type Row, type Summary } from '$lib/components/member-editor.svelte';
+	import MarkdownEditor from '$lib/components/markdown-editor.svelte';
+	import ImageField from '$lib/components/image-field.svelte';
+	import PartyChips from '$lib/components/party-chips.svelte';
 	import Note from '$lib/components/note.svelte';
 	import RulePicker from '$lib/components/rule-picker.svelte';
 	import { PRESETS, toLedger, type Rule } from '$lib/rules';
 	import PieChart from '@lucide/svelte/icons/pie-chart';
+	import Users from '@lucide/svelte/icons/users';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import Power from '@lucide/svelte/icons/power';
+	import Coins from '@lucide/svelte/icons/coins';
 	import MessageSquare from '@lucide/svelte/icons/message-square';
-	import { fmt } from '$lib/format';
-	import { shareTable } from '$lib/schemas';
+	import { fmt, coin } from '$lib/format';
 	import * as v from 'valibot';
-
-	const parsed = (raw: string) => v.parse(shareTable, raw);
 
 	const id = $derived(page.params.id!);
 	const dao = $derived(store.who ? remote.dao(id) : null);
+	const d = $derived(dao?.current ?? null);
+	const billing = $derived(store.who ? remote.daoBilling(id) : null);
 
 	/**
 	 * A proposal is what happens when it passes, first; the words come after. The kind is picked
-	 * up top, its own fields follow, and before signing the page says in one sentence what the
-	 * ledger will do — the same sentence the voters will read.
+	 * up top, its own fields follow — filled in with what is there today, so a change starts
+	 * from the truth — and before signing the page says in one sentence what the ledger will
+	 * do: the same sentence the voters will read.
 	 */
-	type Kind = 'signal' | 'shares' | 'info' | 'dissolve';
+	type Kind = 'signal' | 'shares' | 'info' | 'payout' | 'dissolve';
 	let kind = $state<Kind>('signal');
-	let newName = $state('');
-	let newDescription = $state('');
-	let rule = $state<Rule>({ ...PRESETS[0].rule! });
-	// A dissolution starts out unanimous; anything else, a majority of all. The author decides.
-	let ruleFor = $state<Kind>('signal');
-	$effect(() => {
-		if (kind === ruleFor) return;
-		ruleFor = kind;
-		const fallback = PRESETS.find(
-			(p) => p.value === (kind === 'dissolve' ? 'unanimous' : 'majority')
-		)!.rule!;
-		rule = { ...fallback, threshold: { ...fallback.threshold } };
-	});
-	const kinds = [
+	const kinds = $derived([
 		{
 			value: 'signal',
 			title: 'Decision',
 			text: 'The DAO takes a position. Nothing else changes.',
 			icon: MessageSquare
 		},
+		d?.equal
+			? {
+					value: 'shares',
+					title: 'Members',
+					text: 'Who is in the DAO: parties join or leave.',
+					icon: Users
+				}
+			: {
+					value: 'shares',
+					title: 'Shares',
+					text: 'Who holds what share of the vote: parties join, leave, gain or lose.',
+					icon: PieChart
+				},
 		{
-			value: 'shares',
-			title: 'Shares',
-			text: 'Who holds what share of the vote: parties join, leave, gain or lose.',
-			icon: PieChart
+			value: 'info',
+			title: 'Name & description',
+			text: 'A new name, description or picture.',
+			icon: Pencil
 		},
-		{ value: 'info', title: 'Name', text: 'A new name and description.', icon: Pencil },
+		{ value: 'payout', title: 'Payout', text: 'Coin from the treasury to a party.', icon: Coins },
 		{ value: 'dissolve', title: 'Dissolve', text: 'The DAO is wound up for good.', icon: Power }
-	] as const;
+	] as const);
 
-	const members = $derived(dao?.current?.members ?? 0);
-	// The share table starts as today's table, read once; the rest is the proposer's.
-	const today = $derived(store.who ? remote.daoMembers({ id, offset: 0, limit: 200 }) : null);
-	let rows = $state<Row[]>([]);
+	// What is there today, to start from.
+	let newName = $state('');
+	let newDescription = $state('');
+	let newImage = $state('');
+	let remainderTo = $state<string[]>([]);
 	let seeded = $state(false);
 	$effect(() => {
-		const t = today?.current;
-		if (!t || seeded) return;
-		rows = t.items.map((m) => ({ party: m.party, share: m.share }));
+		if (!d || seeded) return;
 		seeded = true;
+		newName = d.name;
+		newDescription = d.description;
+		newImage = d.image ?? '';
+		remainderTo = [d.creator];
 	});
-	const whole = $derived(
-		rows.length > 0 &&
-			rows.every((r) => r.share > 0) &&
-			Math.round(rows.reduce((s, r) => s + r.share, 0) * 100) === 10000
+	let payoutTo = $state<string[]>([]);
+	let payoutAmount = $state<number | undefined>(undefined);
+	let payoutReason = $state('');
+
+	let rule = $state<Rule>({ ...PRESETS[0].rule! });
+	// A dissolution or a payout starts out unanimous / two thirds; anything else, a majority of
+	// all. The author decides.
+	let ruleFor = $state<Kind>('signal');
+	$effect(() => {
+		if (kind === ruleFor) return;
+		ruleFor = kind;
+		const preset = kind === 'dissolve' ? 'unanimous' : kind === 'payout' ? 'twoThirds' : 'majority';
+		const fallback = PRESETS.find((p) => p.value === preset)!.rule!;
+		rule = { ...fallback, threshold: { ...fallback.threshold } };
+	});
+
+	// The share editor starts as today's table, read once; the rest is the proposer's.
+	const today = $derived(store.who && kind === 'shares' ? remote.daoShares(id) : null);
+	let rows = $state<Row[]>([]);
+	let baseline = $state<Row[]>([]);
+	let rowsSeeded = $state(false);
+	$effect(() => {
+		const t = today?.current;
+		if (!t || rowsSeeded) return;
+		baseline = t.map((m) => ({ party: m.party, share: m.share, who: m.who }));
+		rows = baseline.map((r) => ({ ...r }));
+		rowsSeeded = true;
+	});
+	let summary = $state<Summary>({
+		members: 0,
+		units: 0,
+		joins: 0,
+		leaves: 0,
+		moved: 0,
+		changes: 0,
+		valid: false
+	});
+
+	const infoChanged = $derived(
+		!!d &&
+			(newName.trim() !== d.name ||
+				newDescription !== d.description ||
+				(newImage.trim() || null) !== d.image)
 	);
-	const changes = $derived.by(() => {
-		const now = new Map((today?.current?.items ?? []).map((m) => [m.party, m.share]));
-		const joins = rows.filter((r) => !now.has(r.party)).length;
-		const leaves = [...now.keys()].filter((p) => !rows.some((r) => r.party === p)).length;
-		const moved = rows.filter((r) => now.has(r.party) && now.get(r.party) !== r.share).length;
-		return { joins, leaves, moved };
-	});
+	const holdings = $derived(billing?.current?.holdings ?? null);
+
 	/** What the ledger will do, in the voters' words. */
 	const outcome = $derived.by(() => {
 		switch (kind) {
 			case 'shares': {
-				if (!whole)
-					return 'The table has to add up to exactly 100% before it can be put to the vote.';
+				if (!summary.valid && summary.changes === 0)
+					return 'Nothing changes yet — edit the table below.';
+				if (!summary.valid)
+					return 'The change is not whole: a DAO keeps at least one member with a share.';
 				const parts = [];
-				if (changes.joins)
+				if (summary.joins)
 					parts.push(
-						`${fmt(changes.joins)} ${changes.joins === 1 ? 'party joins' : 'parties join'}`
+						`${fmt(summary.joins)} ${summary.joins === 1 ? 'party joins' : 'parties join'}`
 					);
-				if (changes.leaves)
+				if (summary.leaves)
 					parts.push(
-						`${fmt(changes.leaves)} ${changes.leaves === 1 ? 'member leaves' : 'members leave'}`
+						`${fmt(summary.leaves)} ${summary.leaves === 1 ? 'member leaves' : 'members leave'}`
 					);
-				if (changes.moved)
+				if (summary.moved)
 					parts.push(
-						`${fmt(changes.moved)} ${changes.moved === 1 ? 'share changes' : 'shares change'}`
+						`${fmt(summary.moved)} ${summary.moved === 1 ? 'share changes' : 'shares change'}`
 					);
-				return parts.length
-					? `${parts.join(', ')}; ${fmt(rows.length)} holders after.`
-					: 'Nothing changes yet — edit the table below.';
+				return `${parts.join(', ')}; ${fmt(summary.members)} ${summary.members === 1 ? 'member' : 'members'} after${d?.equal ? '' : `, ${fmt(summary.units)} units in all`}.${summary.changes > BATCH ? ` Carried out in ${Math.ceil(summary.changes / BATCH)} batches.` : ''}`;
 			}
 			case 'info':
-				return newName.trim()
-					? `The DAO is renamed to “${newName.trim()}”${newDescription.trim() ? ' with a new description' : ' and its description is cleared'}.`
-					: 'Give the DAO its new name below.';
+				if (!newName.trim()) return 'Give the DAO its name below.';
+				if (!infoChanged) return 'Nothing changes yet — edit the name, description or picture.';
+				return `The DAO is ${newName.trim() !== d?.name ? `renamed to “${newName.trim()}”` : 'kept as is'}${newDescription !== d?.description ? ', with a new description' : ''}${(newImage.trim() || null) !== d?.image ? (newImage.trim() ? ', with a new picture' : ', without a picture') : ''}.`;
+			case 'payout':
+				if (!payoutTo[0] || !payoutAmount) return 'Say who is paid, and how much.';
+				return `${coin(payoutAmount)} leaves the treasury for ${payoutTo[0].split('::')[0]} the moment this passes${holdings !== null && payoutAmount > holdings ? ' — more than the treasury holds today; it waits until it can be paid' : ''}.`;
 			case 'dissolve':
-				return 'The DAO is dissolved once every other vote has settled. Its record stays readable; nothing new can be proposed.';
+				return `The DAO is dissolved once every other vote has settled; whatever the treasury holds goes to ${remainderTo[0]?.split('::')[0] ?? 'the party named below'}. Its record stays readable; nothing new can be proposed.`;
 			default:
 				return 'The decision is recorded on the ledger. Nothing else changes.';
 		}
@@ -130,9 +174,15 @@
 	const suggested = $derived.by(() => {
 		switch (kind) {
 			case 'shares':
-				return 'Change the shares';
+				return d?.equal ? 'Change the members' : 'Change the shares';
 			case 'info':
-				return newName.trim() ? `Rename to ${newName.trim()}` : 'Rename the DAO';
+				return newName.trim() && newName.trim() !== d?.name
+					? `Rename to ${newName.trim()}`
+					: 'Update the description';
+			case 'payout':
+				return payoutAmount
+					? `Pay ${coin(payoutAmount)}${payoutTo[0] ? ` to ${payoutTo[0].split('::')[0]}` : ''}`
+					: 'Payout';
 			case 'dissolve':
 				return 'Dissolve the DAO';
 			default:
@@ -143,36 +193,63 @@
 	// One signature, from the member's own contract; the vote opens as it lands.
 	const f = remote.createProposalForm;
 	let title = $state('');
+	let description = $state('');
 	const enhanced = signedForm(
 		f,
 		schema,
-		(fields, { pid, membership, dao: daoCid, closesAt }) => {
+		(fields, { pid, membership, args }) => {
 			const action: Plain =
 				fields.kind === 'shares'
 					? {
 							tag: 'SetShares',
 							value: {
-								shares: parsed(fields.shares).map((r) => ({ _1: r.party, _2: r.share.toFixed(10) }))
+								changes: v
+									.parse(shareChanges, fields.shares)
+									.map((r) => ({ _1: r.party, _2: String(r.share) }))
 							}
 						}
 					: fields.kind === 'info'
 						? {
 								tag: 'SetInfo',
-								value: { daoName: fields.newName.trim(), description: fields.newDescription }
+								value: {
+									daoName: fields.newName.trim(),
+									description: fields.newDescription,
+									image: fields.newImage || null
+								}
 							}
-						: fields.kind === 'dissolve'
-							? { tag: 'Dissolve', value: {} }
-							: { tag: 'Signal', value: {} };
+						: fields.kind === 'payout'
+							? {
+									tag: 'Payout',
+									value: {
+										to: fields.payoutTo.trim(),
+										amount: fields.payoutAmount.toFixed(10),
+										reason: fields.payoutReason
+									}
+								}
+							: fields.kind === 'dissolve'
+								? { tag: 'Dissolve', value: { remainderTo: fields.remainderTo.trim() } }
+								: { tag: 'Signal', value: {} };
+			const rule: Rule = {
+				basis: fields.basis,
+				threshold:
+					fields.threshold === 'percent'
+						? { kind: 'percent', percent: fields.percent }
+						: { kind: 'majority' },
+				quorum: fields.quorum,
+				early: fields.early === 'yes',
+				changeable: fields.changeable === 'yes'
+			};
 			return {
 				choice: 'Member_Propose',
 				contractId: membership,
 				args: {
-					dao: daoCid,
+					dao: args.dao,
 					pid,
 					title: fields.title,
 					description: fields.description,
-					closesAt,
-					action
+					closesAt: args.closesAt,
+					action,
+					rule: toLedger(rule)
 				}
 			};
 		},
@@ -183,11 +260,26 @@
 	$effect(() => {
 		if (f.fields.days.value() === undefined) f.fields.days.set(7);
 	});
+	const ready = $derived.by(() => {
+		if (!d) return false;
+		switch (kind) {
+			case 'shares':
+				return summary.valid;
+			case 'info':
+				return newName.trim().length >= 2 && infoChanged;
+			case 'payout':
+				return !!payoutTo[0] && !!payoutAmount && payoutAmount > 0;
+			case 'dissolve':
+				return !!remainderTo[0];
+			default:
+				return true;
+		}
+	});
 </script>
 
 <svelte:head><title>New proposal — SyncVotes</title></svelte:head>
 
-<Page width="narrow" back={{ href: `/daos/${id}`, label: dao?.current?.name ?? 'DAO' }}>
+<Page width="narrow" back={{ href: `/daos/${id}`, label: d?.name ?? 'DAO' }}>
 	<PageHeader
 		eyebrow="New proposal"
 		title="Propose"
@@ -200,11 +292,15 @@
 		<ConnectPrompt what="propose" />
 	{:else if dao?.error}
 		<QueryError error={dao.error} refresh={() => dao?.reconnect()} />
+	{:else if !d}
+		<Skeleton height="h-64" />
 	{:else}
 		<form {...enhanced} class="space-y-8">
 			<input {...f.fields.dao.as('hidden', id)} />
 			<input type="hidden" name="kind" value={kind} />
 			<input type="hidden" name="title" value={title.trim() || suggested} />
+			<input type="hidden" name="payoutTo" value={payoutTo[0] ?? ''} />
+			<input type="hidden" name="remainderTo" value={remainderTo[0] ?? ''} />
 
 			<FormSection title="What happens when it passes">
 				<div class="grid gap-3 sm:grid-cols-2">
@@ -232,40 +328,91 @@
 
 				{#if kind === 'shares'}
 					<Field
-						label="The table after"
+						label={d.equal ? 'The members after' : 'The table after'}
 						id="shares"
-						hint="Today's holders and shares to start from. Add, remove, move; it must add up to 100."
+						hint={d.equal
+							? "Today's members to start from. Add or remove; only what changes is put to the vote."
+							: "Today's holders and units to start from. Add, remove, move; only what changes is put to the vote."}
 						issues={f.fields.shares.issues()}
 					>
-						{#if seeded}
-							<ShareTable name="shares" dao={id} busy={store.busy} bind:rows />
+						{#if rowsSeeded}
+							<MemberEditor
+								mode={d.equal ? 'equal' : 'shares'}
+								name="shares"
+								emit="diff"
+								dao={id}
+								busy={store.busy}
+								{baseline}
+								bind:rows
+								bind:summary
+							/>
 						{:else}
 							<Skeleton height="h-24" />
 						{/if}
 					</Field>
 				{:else if kind === 'info'}
-					<Field label="New name" id="newName" issues={f.fields.newName.issues()}>
+					<Field label="Name" id="newName" issues={f.fields.newName.issues()}>
 						<Input
 							{...f.fields.newName.as('text')}
 							id="newName"
 							maxlength={60}
-							placeholder={dao?.current?.name ?? ''}
 							bind:value={newName}
 						/>
 					</Field>
-					<Field
-						label="New description"
-						id="newDescription"
-						issues={f.fields.newDescription.issues()}
-					>
-						<Textarea
-							{...f.fields.newDescription.as('text')}
+					<Field label="Description" id="newDescription" issues={f.fields.newDescription.issues()}>
+						<MarkdownEditor
+							name="newDescription"
 							id="newDescription"
-							rows={4}
-							maxlength={2000}
-							placeholder={dao?.current?.description || 'Leave empty to clear it'}
 							bind:value={newDescription}
+							maxlength={10_000}
+							placeholder="Leave empty to clear it"
+							disabled={store.busy}
 						/>
+					</Field>
+					<Field label="Picture" id="newImage" issues={f.fields.newImage.issues()}>
+						<ImageField name="newImage" id="newImage" bind:value={newImage} disabled={store.busy} />
+					</Field>
+				{:else if kind === 'payout'}
+					<Field
+						label="Paid to"
+						id="payoutTo"
+						hint="Any party on the network; a member or not. Coin lands directly where the party accepts transfers, otherwise it waits for them to accept."
+						issues={f.fields.payoutTo.issues()}
+					>
+						<PartyChips busy={store.busy} placeholder="Party id" bind:parties={payoutTo} />
+					</Field>
+					<Field
+						label="Amount, CC"
+						id="payoutAmount"
+						hint={holdings !== null ? `The treasury holds ${coin(holdings)} today.` : undefined}
+						issues={f.fields.payoutAmount.issues()}
+					>
+						<Input
+							{...f.fields.payoutAmount.as('number')}
+							id="payoutAmount"
+							min={0.0001}
+							step="0.0001"
+							class="w-48"
+							bind:value={payoutAmount}
+						/>
+					</Field>
+					<Field label="For" id="payoutReason" issues={f.fields.payoutReason.issues()}>
+						<Input
+							{...f.fields.payoutReason.as('text')}
+							id="payoutReason"
+							maxlength={500}
+							placeholder="Hosting for Q4"
+							bind:value={payoutReason}
+						/>
+					</Field>
+				{:else if kind === 'dissolve'}
+					<Field
+						label="What is left goes to"
+						id="remainderTo"
+						hint="Whatever the treasury holds when the DAO dissolves is sent here."
+						issues={f.fields.remainderTo.issues()}
+					>
+						<PartyChips busy={store.busy} placeholder="Party id" bind:parties={remainderTo} />
 					</Field>
 				{/if}
 
@@ -296,12 +443,13 @@
 					/>
 				</Field>
 				<Field label="Description" id="description" issues={f.fields.description.issues()}>
-					<Textarea
-						{...f.fields.description.as('text')}
+					<MarkdownEditor
+						name="description"
 						id="description"
-						rows={5}
-						maxlength={5000}
-						placeholder="What is being decided, and why."
+						bind:value={description}
+						maxlength={20_000}
+						placeholder="What is being decided, and why. Markdown; pictures by link."
+						disabled={store.busy}
 					/>
 				</Field>
 				<Field
@@ -314,20 +462,16 @@
 				</Field>
 			</FormSection>
 
-			{#if dao?.ready}
-				<p class="font-mono text-xs text-ink-dim">
-					The vote opens for the {fmt(dao.current.members)} current holders the moment you sign.
-				</p>
-			{:else}
-				<Skeleton height="h-4" />
-			{/if}
+			<p class="font-mono text-xs text-ink-dim">
+				The vote opens for the {fmt(d.members)} current {d.members === 1
+					? 'member'
+					: 'members'}{d.equal ? '' : `, ${fmt(d.units)} units`}, the moment you sign.
+			</p>
 
 			<FormActions
 				label="Create proposal"
 				busy={store.busy || f.pending > 0}
-				disabled={!dao?.ready ||
-					(kind === 'shares' && (!whole || changes.joins + changes.leaves + changes.moved === 0)) ||
-					(kind === 'info' && newName.trim().length < 2)}
+				disabled={!ready}
 				cancelHref="/daos/{id}"
 				problem={store.problem}
 			/>

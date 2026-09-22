@@ -15,8 +15,10 @@
 	},
 	"dependencies": {
 		"@canton-network/wallet-sdk": "^1.5.0",
-		"@daml.js/model": "workspace:@daml.js/syncvotes-shares-0.11.0@*",
-		"@daml/types": "3.5.2"
+		"@daml.js/model": "workspace:@daml.js/syncvotes-treasury-0.12.0@*",
+		"@daml/types": "3.5.2",
+		"dompurify": "^3.4.15",
+		"marked": "^18.0.13"
 	},
 	"devDependencies": {
 		"@canton-network/core-ledger-proto": "1.10.0",

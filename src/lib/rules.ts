@@ -11,6 +11,8 @@ export type Rule = {
 	quorum: number;
 	/** Settle the moment the outcome can no longer change. */
 	early: boolean;
+	/** A voter may replace their ballot until the deadline; excludes `early`. */
+	changeable: boolean;
 };
 
 export type Preset = 'majority' | 'cast' | 'twoThirds' | 'unanimous' | 'custom';
@@ -20,27 +22,55 @@ export const PRESETS: { value: Preset; title: string; text: string; rule?: Rule 
 		value: 'majority',
 		title: 'Majority of the vote',
 		text: 'More than half of the whole vote says yes. Settles early once it is sure.',
-		rule: { basis: 'all', threshold: { kind: 'majority' }, quorum: 0, early: true }
+		rule: {
+			basis: 'all',
+			threshold: { kind: 'majority' },
+			quorum: 0,
+			early: true,
+			changeable: false
+		}
 	},
 	{
 		value: 'cast',
 		title: 'Majority of votes cast',
 		text: 'More yes than no among those who vote, if at least a quarter take part.',
-		rule: { basis: 'cast', threshold: { kind: 'majority' }, quorum: 25, early: true }
+		rule: {
+			basis: 'cast',
+			threshold: { kind: 'majority' },
+			quorum: 25,
+			early: true,
+			changeable: false
+		}
 	},
 	{
 		value: 'twoThirds',
 		title: 'Two thirds of the vote',
 		text: 'At least 67% of the whole vote says yes.',
-		rule: { basis: 'all', threshold: { kind: 'percent', percent: 67 }, quorum: 0, early: true }
+		rule: {
+			basis: 'all',
+			threshold: { kind: 'percent', percent: 67 },
+			quorum: 0,
+			early: true,
+			changeable: false
+		}
 	},
 	{
 		value: 'unanimous',
 		title: 'Unanimous',
 		text: 'The whole vote says yes; one no or abstention fails it.',
-		rule: { basis: 'all', threshold: { kind: 'percent', percent: 100 }, quorum: 0, early: true }
+		rule: {
+			basis: 'all',
+			threshold: { kind: 'percent', percent: 100 },
+			quorum: 0,
+			early: true,
+			changeable: false
+		}
 	},
-	{ value: 'custom', title: 'Custom', text: 'Your own basis, threshold, quorum and timing.' }
+	{
+		value: 'custom',
+		title: 'Custom',
+		text: 'Your own basis, threshold, quorum, timing and whether votes may change.'
+	}
 ];
 
 /** The preset a rule is, if it is one exactly. */
@@ -51,6 +81,7 @@ const same = (a: Rule, b: Rule) =>
 	a.basis === b.basis &&
 	a.quorum === b.quorum &&
 	a.early === b.early &&
+	a.changeable === b.changeable &&
 	a.threshold.kind === b.threshold.kind &&
 	(a.threshold.kind !== 'percent' ||
 		b.threshold.kind !== 'percent' ||
@@ -72,7 +103,7 @@ export function short(r: Rule): string {
 	return `${amount} ${of}${r.quorum > 0 ? ` · quorum ${r.quorum}%` : ''}`;
 }
 
-/** Where a count stands against its rule, in the tally's words. */
+/** Where a count stands against its rule: the numbers are units of the vote. */
 export function standing(
 	r: Rule,
 	yes: number,
@@ -82,15 +113,16 @@ export function standing(
 ): { needed: number; denominator: number; quorumMet: boolean; note: string } {
 	const cast = yes + no + abstain;
 	const denominator = r.basis === 'all' ? eligible : yes + no;
-	// Shares are percents with two decimals; "needed" is the smallest weight that passes.
+	// The smallest number of units that passes.
 	const needed =
 		r.threshold.kind === 'majority'
-			? Math.floor(denominator * 50) / 100 + 0.01
-			: (denominator * r.threshold.percent) / 100;
+			? Math.floor(denominator / 2) + 1
+			: Math.ceil((denominator * r.threshold.percent) / 100);
 	const quorumMet = r.quorum === 0 || cast * 100 >= eligible * r.quorum;
+	const pct = (n: number) => (eligible > 0 ? Math.round((n / eligible) * 1000) / 10 : 0);
 	const note = quorumMet
 		? ''
-		: `quorum not met: ${cast.toFixed(2)}% took part, ${r.quorum}% needed`;
+		: `quorum not met: ${pct(cast)}% of the vote took part, ${r.quorum}% needed`;
 	return { needed, denominator, quorumMet, note };
 }
 
@@ -102,5 +134,6 @@ export const toLedger = (r: Rule) => ({
 			? { tag: 'Majority', value: {} }
 			: { tag: 'Percent', value: String(r.threshold.percent) },
 	quorum: String(r.quorum),
-	early: r.early
+	early: r.early,
+	changeable: r.changeable
 });

@@ -10,6 +10,7 @@
 	import ConnectPrompt from '$lib/components/connect-prompt.svelte';
 	import PartyId from '$lib/components/party-id.svelte';
 	import Monogram from '$lib/components/monogram.svelte';
+	import Who from '$lib/components/who.svelte';
 	import Facts from '$lib/components/facts.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import List from '$lib/components/list.svelte';
@@ -20,9 +21,11 @@
 	import RoleTag from '$lib/components/role-tag.svelte';
 	import EffectLabel from '$lib/components/effect-label.svelte';
 	import ShareBar from '$lib/components/share-bar.svelte';
+	import Markdown from '$lib/components/markdown.svelte';
+	import Note from '$lib/components/note.svelte';
 	import { short } from '$lib/rules';
 	import Problem from '$lib/components/problem.svelte';
-	import BillingPanel from '$lib/components/billing-panel.svelte';
+	import TreasuryPanel from '$lib/components/treasury-panel.svelte';
 	import Plus from '@lucide/svelte/icons/plus';
 	import ArrowRight from '@lucide/svelte/icons/arrow-right';
 	import { relative, dateOf, fmt, coin } from '$lib/format';
@@ -35,9 +38,9 @@
 	let status = $state<'open' | 'closed' | undefined>(undefined);
 	let limit = $state(20);
 	const proposals = $derived(me ? remote.daoProposals({ id, offset: 0, limit, status }) : null);
-	const preview = $derived(me ? remote.daoMembers({ id, offset: 0, limit: 200 }) : null);
+	const preview = $derived(me ? remote.daoMembers({ id, offset: 0, limit: 8, q: '' }) : null);
 
-	const counted = (p: { yes: number; no: number; abstain: number }) => p.yes + p.no + p.abstain;
+	const pct = (units: number, of: number) => (of > 0 ? Math.round((units / of) * 1000) / 10 : 0);
 </script>
 
 <svelte:head><title>{dao?.current?.name ?? 'DAO'} — SyncVotes</title></svelte:head>
@@ -54,23 +57,24 @@
 	{:else}
 		{@const d = dao.current}
 
+		{#if d.image}
+			<div class="-mt-2 mb-8 h-44 w-full overflow-hidden border border-border md:h-56">
+				<img src={d.image} alt="" class="size-full object-cover" />
+			</div>
+		{/if}
+
 		<div class="flex flex-wrap items-start justify-between gap-6">
 			<div class="flex items-start gap-5">
-				<Monogram name={d.name} size="lg" />
+				{#if !d.image}<Monogram name={d.name} size="lg" />{/if}
 				<div class="min-w-0">
 					<h1 class="display text-3xl md:text-4xl">{d.name}</h1>
 					<div class="mt-3 flex flex-wrap items-center gap-2">
 						<Badge variant="accent">Private</Badge>
-						<Badge>Majority</Badge>
+						<Badge>{d.equal ? 'By membership' : 'By shares'}</Badge>
 						{#if d.me.creator}<Badge variant="amber">You created it</Badge>{:else}<Badge
 								variant="green">Member</Badge
 							>{/if}
 					</div>
-					<p
-						class="mt-4 max-w-[600px] text-sm leading-relaxed [overflow-wrap:anywhere] text-ink-mid"
-					>
-						{d.description || 'No description provided.'}
-					</p>
 				</div>
 			</div>
 			<div class="flex shrink-0 items-center gap-2">
@@ -79,13 +83,24 @@
 			</div>
 		</div>
 
+		<div class="mt-6 max-w-[720px]">
+			<Markdown text={d.description} fallback="No description provided." />
+		</div>
+
 		<div class="mt-8"><Problem message={store.problem} /></div>
+		{#if d.founding}
+			<div class="mt-4">
+				<Note mono={false}
+					>The founding table is still being carried out; members are joining in batches.</Note
+				>
+			</div>
+		{/if}
 
 		<Facts
 			items={[
 				{ label: 'Members', value: fmt(d.members) },
 				{ label: 'Open', value: fmt(d.openProposals), accent: d.openProposals > 0 },
-				{ label: 'Balance', value: coin(d.balance), accent: d.balance <= 0 },
+				{ label: 'To spend', value: coin(d.balance), accent: d.balance <= 0 },
 				{ label: 'Established', value: dateOf(d.createdAt) }
 			]}
 		/>
@@ -124,8 +139,10 @@
 									<div class="truncate font-display text-[15px] font-bold">{p.title}</div>
 									<div class="mt-1 font-mono text-xs text-ink-dim">
 										by <PartyId party={p.proposer} class="align-middle" /> · {dateOf(p.createdAt)}
-										· <EffectLabel effect={p.effect} /> · {short(p.rule)} · {counted(p).toFixed(0)}%
-										cast · {p.outcome ? 'closed' : `closes ${relative(p.closesAt)}`}
+										· <EffectLabel effect={p.effect} equal={d.equal} /> · {short(p.rule)} · {pct(
+											p.yes + p.no + p.abstain,
+											p.eligible
+										)}% counted · {p.outcome ? 'closed' : `closes ${relative(p.closesAt)}`}
 									</div>
 								</div>
 								<StatusBadge outcome={p.outcome} closesAt={p.closesAt} executedAt={p.executedAt} />
@@ -147,21 +164,22 @@
 			</section>
 
 			<aside class="space-y-6">
-				<BillingPanel dao={d.id} />
+				<TreasuryPanel dao={d.id} />
 
 				<div>
-					<SectionTitle title="Shares of the vote" count={fmt(d.members)} />
+					<SectionTitle title={d.equal ? 'Members' : 'Shares of the vote'} count={fmt(d.members)} />
 					{#if preview?.ready}
-						<div class="mb-3"><ShareBar members={preview.current.items} {me} /></div>
+						{#if !d.equal}
+							<div class="mb-3">
+								<ShareBar members={preview.current.items} units={d.units} {me} />
+							</div>
+						{/if}
 						<List>
 							{#each preview.current.items.slice(0, 6) as m (m.party)}
 								<ListItem class="flex items-center justify-between gap-3 font-mono text-xs">
-									<PartyId
-										party={m.party}
-										class={m.party === me ? '[&>span>span:first-child]:text-orange' : ''}
-									/>
-									<span class="flex items-center gap-2">
-										<span class="text-ink">{m.share}%</span>
+									<Who who={m.who} me={m.party === me} class="min-w-0 flex-1" />
+									<span class="flex shrink-0 items-center gap-2">
+										{#if !d.equal}<span class="text-ink">{pct(m.share, d.units)}%</span>{/if}
 										{#if m.party === d.creator}<RoleTag role="creator" />{/if}
 									</span>
 								</ListItem>

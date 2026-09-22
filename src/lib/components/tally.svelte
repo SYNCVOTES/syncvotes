@@ -5,7 +5,8 @@
 
 	/**
 	 * Yes, no and abstentions against the proposal's own rule: what it takes, how far it is,
-	 * whether the quorum is met. An abstention takes part but takes no side.
+	 * whether the quorum is met. Everything is in units of the vote, shown as a share of the
+	 * whole. An abstention takes part but takes no side.
 	 */
 	let {
 		yes,
@@ -13,13 +14,22 @@
 		abstain,
 		eligible,
 		cast,
-		rule
-	}: { yes: number; no: number; abstain: number; eligible: number; cast: number; rule: Rule } =
-		$props();
-	const counted = $derived(yes + no + abstain);
+		rule,
+		counted = true
+	}: {
+		yes: number;
+		no: number;
+		abstain: number;
+		eligible: number;
+		cast: number;
+		rule: Rule;
+		/** Whether these are the ledger's figures, or what is cast and not yet counted. */
+		counted?: boolean;
+	} = $props();
+	const taken = $derived(yes + no + abstain);
 	const s = $derived(standing(rule, yes, no, abstain, eligible));
 	const pct = (n: number) => (eligible > 0 ? (n / eligible) * 100 : 0);
-	const w = (n: number) => `${Math.round(n * 100) / 100}%`;
+	const w = (n: number) => `${Math.round(pct(n) * 100) / 100}%`;
 </script>
 
 <Panel padding="sm">
@@ -39,11 +49,15 @@
 		<span class="text-red">{w(no)} no</span>
 	</div>
 	<p class="mt-3 font-mono text-xs text-ink-dim">
-		{fmt(cast)} voted, {w(counted)} of the vote{abstain ? `, ${w(abstain)} abstaining` : ''}.
+		{fmt(cast)} voted, {w(taken)} of the vote{abstain ? `, ${w(abstain)} abstaining` : ''}{counted
+			? ''
+			: ' (cast, not yet counted)'}.
 	</p>
 	<p class="mt-2 text-xs text-ink-dim">
-		Passes when {describe(rule)}{rule.early ? '' : '; decided at the deadline only'}.{s.note
-			? ` Now ${s.note}.`
-			: ''}
+		Passes when {describe(rule)}{rule.early
+			? ''
+			: rule.changeable
+				? '; votes may change, so decided at the deadline only'
+				: '; decided at the deadline only'}.{s.note ? ` Now ${s.note}.` : ''}
 	</p>
 </Panel>

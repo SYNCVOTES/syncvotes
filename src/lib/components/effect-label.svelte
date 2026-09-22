@@ -1,34 +1,47 @@
 <script lang="ts">
 	import PieChart from '@lucide/svelte/icons/pie-chart';
+	import Users from '@lucide/svelte/icons/users';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import Power from '@lucide/svelte/icons/power';
+	import Coins from '@lucide/svelte/icons/coins';
 	import MessageSquare from '@lucide/svelte/icons/message-square';
-	import { fmt } from '$lib/format';
+	import { coin, fmt } from '$lib/format';
+	import type { Effect } from './effect-card.svelte';
 
 	/** What a proposal does, in a glance: an icon and a few words, for lists. */
-	type Effect =
-		| { kind: 'signal' }
-		| { kind: 'shares'; shares: { party: string; share: number }[] }
-		| { kind: 'info'; name: string; description: string }
-		| { kind: 'dissolve' };
-	let { effect }: { effect: Effect } = $props();
-	const text = $derived(
-		effect.kind === 'shares'
-			? `shares of ${fmt(effect.shares.length)}`
-			: effect.kind === 'info'
-				? `rename to ${effect.name}`
-				: effect.kind === 'dissolve'
-					? 'dissolve'
-					: 'decision'
-	);
+	let { effect, equal = false }: { effect: Effect; equal?: boolean } = $props();
+	const text = $derived.by(() => {
+		switch (effect.kind) {
+			case 'shares': {
+				const joins = effect.changes.filter((c) => c.share > 0).length;
+				const leaves = effect.changes.length - joins;
+				return equal
+					? [joins && `+${fmt(joins)}`, leaves && `−${fmt(leaves)}`].filter(Boolean).join(' ') +
+							' members'
+					: `${fmt(effect.changes.length)} ${effect.changes.length === 1 ? 'share' : 'shares'}`;
+			}
+			case 'info':
+				return `rename to ${effect.name}`;
+			case 'payout':
+				return `pay ${coin(effect.amount)}`;
+			case 'dissolve':
+				return 'dissolve';
+			default:
+				return 'decision';
+		}
+	});
 	const Icon = $derived(
 		effect.kind === 'shares'
-			? PieChart
+			? equal
+				? Users
+				: PieChart
 			: effect.kind === 'info'
 				? Pencil
-				: effect.kind === 'dissolve'
-					? Power
-					: MessageSquare
+				: effect.kind === 'payout'
+					? Coins
+					: effect.kind === 'dissolve'
+						? Power
+						: MessageSquare
 	);
 </script>
 

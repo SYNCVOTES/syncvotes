@@ -17,12 +17,27 @@ const trimmed = (label: string, min: number, max: number) =>
 export const daoName = trimmed('The name', 2, 60);
 export const daoDescription = v.pipe(
 	v.string(),
-	v.maxLength(2000, 'The description is at most 2000 characters')
+	v.maxLength(10_000, 'The description is at most 10 000 characters')
 );
 export const proposalTitle = trimmed('The title', 2, 120);
 export const proposalDescription = v.pipe(
 	v.string(),
-	v.maxLength(5000, 'The description is at most 5000 characters')
+	v.maxLength(20_000, 'The description is at most 20 000 characters')
+);
+export const commentBody = v.pipe(
+	v.string('A comment is required'),
+	v.trim(),
+	v.minLength(1, 'A comment says something'),
+	v.maxLength(5000, 'A comment is at most 5000 characters')
+);
+export const profileName = trimmed('The name', 1, 60);
+export const profileBio = v.pipe(v.string(), v.maxLength(2000, 'At most 2000 characters'));
+/** A picture, by link: the ledger keeps the link, the picture stays where it is. */
+export const imageUrl = v.pipe(
+	v.optional(v.string(), ''),
+	v.trim(),
+	v.maxLength(2000, 'A link is at most 2000 characters'),
+	v.check((s) => s === '' || /^https:\/\/\S+$/i.test(s), 'A link starting with https://')
 );
 export const votingDays = v.pipe(
 	v.number('The voting period is a number of days'),
@@ -32,9 +47,12 @@ export const votingDays = v.pipe(
 );
 export const id = v.pipe(v.string(), v.nonEmpty());
 export const partyId = v.pipe(v.string(), v.includes('::'), v.maxLength(300));
+export const yesNo = v.picklist(['yes', 'no']);
 
-/** Members added or removed per transaction; longer lists are split. */
+/** Members created or reshared per transaction; longer lists are carried out in several. */
 export const BATCH = 200;
+/** The most parties one share change may touch. */
+export const MAX_CHANGES = 2000;
 
 /** Party ids as a chips field submits them: separated by whitespace, in the order typed. */
 export const partyList = (max = BATCH) =>
@@ -45,10 +63,10 @@ export const partyList = (max = BATCH) =>
 	);
 
 /**
- * A share table as the table submits it: one `party=percent` per line. Percents have at most
- * two decimals and add up to exactly 100; the ledger checks the same.
+ * A share change as the editor submits it: one `party=units` per line, units a whole number,
+ * zero to leave. The ledger checks the same.
  */
-export const shareTable = v.pipe(
+export const shareChanges = v.pipe(
 	v.string('Shares are required'),
 	v.transform((raw) =>
 		raw
@@ -56,31 +74,71 @@ export const shareTable = v.pipe(
 			.map((l) => l.trim())
 			.filter(Boolean)
 			.map((l) => {
-				const [party, pct] = l.split('=');
-				return { party: party.trim(), share: Math.round(Number(pct) * 100) / 100 };
+				const [party, units] = l.split('=');
+				return { party: party.trim(), share: Number(units) };
 			})
 	),
-	v.minLength(1, 'At least one holder'),
-	v.maxLength(BATCH, `At most ${BATCH} holders at once`),
+	v.minLength(1, 'At least one member'),
+	v.maxLength(MAX_CHANGES, `At most ${MAX_CHANGES} members in one change`),
 	v.check((rows) => rows.every((r) => r.party.includes('::')), 'A row has no party id'),
-	v.check((rows) => rows.every((r) => r.share > 0), 'Every share must be more than zero'),
+	v.check(
+		(rows) => rows.every((r) => Number.isInteger(r.share) && r.share >= 0 && r.share <= 1e9),
+		'Shares are whole numbers'
+	),
 	v.check(
 		(rows) => new Set(rows.map((r) => r.party)).size === rows.length,
 		'A party is listed twice'
-	),
-	v.check(
-		(rows) => Math.round(rows.reduce((s, r) => s + r.share, 0) * 100) === 10000,
-		'The shares must add up to exactly 100%'
 	)
 );
 
-export const createDaoForm = v.object({
-	daoName,
-	description: daoDescription,
-	shares: shareTable
-});
+export const createDaoForm = v.pipe(
+	v.object({
+		daoName,
+		description: daoDescription,
+		image: imageUrl,
+		equal: yesNo,
+		shares: shareChanges
+	}),
+	v.forward(
+		v.check((f) => f.shares.every((r) => r.share > 0), 'Every founding member holds a share'),
+		['shares']
+	),
+	v.forward(
+		v.check(
+			(f) => f.equal === 'no' || f.shares.every((r) => r.share === 1),
+			'By membership, every member holds one unit'
+		),
+		['shares']
+	)
+);
 
-export const effectKind = v.picklist(['signal', 'shares', 'info', 'dissolve']);
+export const effectKind = v.picklist(['signal', 'shares', 'info', 'payout', 'dissolve']);
+
+const ruleFields = {
+	basis: v.picklist(['all', 'cast']),
+	threshold: v.picklist(['majority', 'percent']),
+	percent: v.pipe(
+		v.optional(v.number('A percentage'), 67),
+		v.integer('Whole percent'),
+		v.minValue(1, 'At least 1%'),
+		v.maxValue(100, 'At most 100%')
+	),
+	quorum: v.pipe(
+		v.optional(v.number('A percentage'), 0),
+		v.integer('Whole percent'),
+		v.minValue(0, 'At least 0%'),
+		v.maxValue(100, 'At most 100%')
+	),
+	early: yesNo,
+	changeable: yesNo
+};
+
+export const coinAmount = v.pipe(
+	v.number('An amount of coin'),
+	v.minValue(0.0001, 'More than zero'),
+	v.maxValue(1e9, 'Too much'),
+	v.check((n) => Math.round(n * 10_000) === n * 10_000, 'At most four decimals')
+);
 
 export const createProposalForm = v.pipe(
 	v.object({
@@ -92,26 +150,17 @@ export const createProposalForm = v.pipe(
 		shares: v.optional(v.string(), ''),
 		newName: v.optional(v.string(), ''),
 		newDescription: v.optional(v.string(), ''),
-		basis: v.picklist(['all', 'cast']),
-		threshold: v.picklist(['majority', 'percent']),
-		percent: v.pipe(
-			v.optional(v.number('A percentage'), 67),
-			v.integer('Whole percent'),
-			v.minValue(1, 'At least 1%'),
-			v.maxValue(100, 'At most 100%')
-		),
-		quorum: v.pipe(
-			v.optional(v.number('A percentage'), 0),
-			v.integer('Whole percent'),
-			v.minValue(0, 'At least 0%'),
-			v.maxValue(100, 'At most 100%')
-		),
-		early: v.picklist(['yes', 'no'])
+		newImage: imageUrl,
+		payoutTo: v.optional(v.string(), ''),
+		payoutAmount: v.optional(v.number('An amount of coin'), 0),
+		payoutReason: v.optional(v.pipe(v.string(), v.maxLength(500, 'At most 500 characters')), ''),
+		remainderTo: v.optional(v.string(), ''),
+		...ruleFields
 	}),
 	v.forward(
 		v.check(
-			(f) => f.kind !== 'shares' || v.safeParse(shareTable, f.shares).success,
-			'The share table is not whole'
+			(f) => f.kind !== 'shares' || v.safeParse(shareChanges, f.shares).success,
+			'The share change is not whole'
 		),
 		['shares']
 	),
@@ -130,7 +179,39 @@ export const createProposalForm = v.pipe(
 		['newName']
 	),
 	v.forward(
-		v.check((f) => f.newDescription.length <= 2000, 'The description is at most 2000 characters'),
+		v.check(
+			(f) => f.newDescription.length <= 10_000,
+			'The description is at most 10 000 characters'
+		),
 		['newDescription']
+	),
+	v.forward(
+		v.check((f) => f.kind !== 'payout' || f.payoutTo.includes('::'), 'A party id to pay'),
+		['payoutTo']
+	),
+	v.forward(
+		v.check(
+			(f) => f.kind !== 'payout' || v.safeParse(coinAmount, f.payoutAmount).success,
+			'An amount of coin, more than zero, at most four decimals'
+		),
+		['payoutAmount']
+	),
+	v.forward(
+		v.check(
+			(f) => f.kind !== 'dissolve' || f.remainderTo.includes('::'),
+			'A party id to receive what is left'
+		),
+		['remainderTo']
+	),
+	v.forward(
+		v.check(
+			(f) => !(f.early === 'yes' && f.changeable === 'yes'),
+			'Votes that may change cannot settle early'
+		),
+		['changeable']
 	)
 );
+
+export const commentForm = v.object({ proposal: id, body: commentBody });
+export const editCommentForm = v.object({ comment: id, body: commentBody });
+export const profileForm = v.object({ name: profileName, avatar: imageUrl, bio: profileBio });

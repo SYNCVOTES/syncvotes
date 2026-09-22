@@ -62,6 +62,7 @@
 						id={dao.id}
 						name={dao.name}
 						description={dao.description}
+						image={dao.image}
 						members={dao.members}
 						openProposals={dao.openProposals}
 						role={dao.creator === who.party ? 'creator' : 'member'}

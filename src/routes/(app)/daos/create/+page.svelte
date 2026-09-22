@@ -3,9 +3,8 @@
 	import * as remote from '$lib/api.remote';
 	import { store } from '$lib/wallet-store.svelte';
 	import { signedForm } from '$lib/forms';
-	import { createDaoForm as schema } from '$lib/schemas';
+	import { createDaoForm as schema, BATCH } from '$lib/schemas';
 	import { Input } from '$lib/components/ui/input';
-	import { Textarea } from '$lib/components/ui/textarea';
 	import Page from '$lib/components/page.svelte';
 	import PageHeader from '$lib/components/page-header.svelte';
 	import ConnectPrompt from '$lib/components/connect-prompt.svelte';
@@ -13,34 +12,79 @@
 	import FormSection from '$lib/components/form-section.svelte';
 	import Field from '$lib/components/field.svelte';
 	import FormActions from '$lib/components/form-actions.svelte';
-	import ShareTable, { type Row } from '$lib/components/share-table.svelte';
+	import MemberEditor, { type Row, type Summary } from '$lib/components/member-editor.svelte';
+	import MarkdownEditor from '$lib/components/markdown-editor.svelte';
+	import ImageField from '$lib/components/image-field.svelte';
+	import Note from '$lib/components/note.svelte';
+	import Users from '@lucide/svelte/icons/users';
+	import PieChart from '@lucide/svelte/icons/pie-chart';
+	import { fmt } from '$lib/format';
 
 	const f = remote.createDaoForm;
-	// The creator holds it all until others are added; the table must add up to a hundred.
+	/**
+	 * Two kinds of DAO, chosen once: by membership, where every member has one vote, or by
+	 * shares, where members hold units of the vote. The founding table is the creator's to
+	 * write; from then on it changes only by vote.
+	 */
+	type Mode = 'equal' | 'shares';
+	let mode = $state<Mode>('equal');
+	const modes = [
+		{
+			value: 'equal',
+			title: 'By membership',
+			text: 'One member, one vote. A club, a committee, a collective.',
+			icon: Users
+		},
+		{
+			value: 'shares',
+			title: 'By shares',
+			text: 'Members hold units of the vote — 40 of 100, say. A company, a fund, a partnership.',
+			icon: PieChart
+		}
+	] as const;
 	let rows = $state<Row[]>([]);
-	$effect(() => {
-		if (store.who && rows.length === 0) rows = [{ party: store.who.party, share: 100 }];
+	let summary = $state<Summary>({
+		members: 0,
+		units: 0,
+		joins: 0,
+		leaves: 0,
+		moved: 0,
+		changes: 0,
+		valid: false
 	});
-	const whole = $derived(
-		rows.length > 0 &&
-			rows.every((r) => r.share > 0) &&
-			Math.round(rows.reduce((s, r) => s + r.share, 0) * 100) === 10000
-	);
+	$effect(() => {
+		if (store.who && rows.length === 0) rows = [{ party: store.who.party, share: 1 }];
+	});
+	let description = $state('');
+	let image = $state('');
 
-	// A share is a Daml Decimal: ten places on the ledger, two in the table.
+	// The intent is the founding table as the ledger reads it: the first batch of rows, and the
+	// rest as a proposal already passed. The server orders the creator first; so does this.
 	const enhanced = signedForm(
 		f,
 		schema,
-		({ daoName, description, shares }, { id }) => ({
-			choice: 'Account_CreateDAO',
-			contractId: store.who!.account,
-			args: {
-				id,
-				daoName,
-				description,
-				shares: shares.map((r) => ({ _1: r.party, _2: r.share.toFixed(10) }))
-			}
-		}),
+		({ daoName, description, image, equal, shares }, { id, args }) => {
+			const me = store.who!.party;
+			const ordered = [
+				...shares.filter((r) => r.party === me),
+				...shares.filter((r) => r.party !== me)
+			];
+			const tuple = (r: { party: string; share: number }) => ({ _1: r.party, _2: String(r.share) });
+			return {
+				choice: 'Account_CreateDAO',
+				contractId: store.who!.account,
+				args: {
+					id,
+					daoName,
+					description,
+					image: image || null,
+					equal: equal === 'yes',
+					treasury: args.treasury,
+					shares: ordered.slice(0, BATCH).map(tuple),
+					more: ordered.slice(BATCH).map(tuple)
+				}
+			};
+		},
 		({ id }) => goto(`/daos/${id}`)
 	);
 </script>
@@ -51,7 +95,7 @@
 	<PageHeader
 		eyebrow="New organisation"
 		title="Create DAO"
-		description="A DAO is private to its members: only they, and the app as provider, ever see it. Its members hold shares of the vote that add up to a hundred; from here on, shares change only by vote. Every transaction it makes is paid from a balance anyone can fill."
+		description="A DAO is private to its members: only they, and the app as provider, ever see it. It gets a treasury of its own — an address anyone can send Canton Coin to — which pays for everything it does, and which it spends only by vote. From here on, everything about it changes by vote."
 	/>
 
 	{#if store.screen.at === 'loading'}
@@ -60,6 +104,8 @@
 		<ConnectPrompt what="create a DAO" />
 	{:else}
 		<form {...enhanced} class="space-y-8">
+			<input type="hidden" name="equal" value={mode === 'equal' ? 'yes' : 'no'} />
+
 			<FormSection title="Basic information">
 				<Field label="Name" id="daoName" issues={f.fields.daoName.issues()}>
 					<Input
@@ -70,36 +116,80 @@
 					/>
 				</Field>
 				<Field label="Description" id="description" issues={f.fields.description.issues()}>
-					<Textarea
-						{...f.fields.description.as('text')}
+					<MarkdownEditor
+						name="description"
 						id="description"
-						rows={4}
-						maxlength={2000}
-						placeholder="Governs protocol upgrades and technical parameters..."
+						bind:value={description}
+						maxlength={10_000}
+						placeholder="What this DAO is for, in Markdown. Pictures by link."
+						disabled={store.busy}
 					/>
+				</Field>
+				<Field label="Picture" id="image" issues={f.fields.image.issues()}>
+					<ImageField name="image" id="image" bind:value={image} disabled={store.busy} />
 				</Field>
 			</FormSection>
 
-			<FormSection title="Who holds the vote">
+			<FormSection title="How it votes">
+				<div class="grid gap-3 sm:grid-cols-2">
+					{#each modes as m (m.value)}
+						{@const Icon = m.icon}
+						<label
+							class="flex cursor-pointer items-start gap-3 border p-4 transition-colors {mode ===
+							m.value
+								? 'border-orange bg-orange/5'
+								: 'border-border hover:border-border-hover'}"
+						>
+							<input type="radio" class="sr-only" value={m.value} bind:group={mode} />
+							<Icon
+								size={18}
+								class="mt-0.5 shrink-0 {mode === m.value ? 'text-orange' : 'text-ink-dim'}"
+								aria-hidden="true"
+							/>
+							<span>
+								<span class="block font-display text-[15px] font-bold">{m.title}</span>
+								<span class="mt-1 block text-xs leading-relaxed text-ink-mid">{m.text}</span>
+							</span>
+						</label>
+					{/each}
+				</div>
+				<Note mono={false}>
+					This cannot be changed later: a DAO by membership stays one, and so does one by shares.
+					Who is in it, and with how many units, changes by vote.
+				</Note>
+			</FormSection>
+
+			<FormSection title={mode === 'equal' ? 'Founding members' : 'Founding shares'}>
 				<Field
-					label="Shares"
+					label={mode === 'equal' ? 'Members' : 'Members and their units'}
 					id="shares"
-					hint="You, and whoever else holds a share of the vote. Percents, to two decimals, adding up to 100."
+					hint={mode === 'equal'
+						? 'You, and whoever else is in from the start. Each has one vote.'
+						: 'You, and whoever else holds the vote. Units are whole numbers; a share is units over the total.'}
 					issues={f.fields.shares.issues()}
 				>
-					<ShareTable
+					<MemberEditor
+						{mode}
 						name="shares"
 						busy={store.busy}
 						bind:rows
+						bind:summary
 						fixed={store.who ? [store.who.party] : []}
 					/>
 				</Field>
+				{#if summary.members > BATCH}
+					<Note mono={false}>
+						The first {fmt(BATCH)} are in from the moment you sign; the other {fmt(
+							summary.members - BATCH
+						)} are added right after, in batches, as the founding table is carried out.
+					</Note>
+				{/if}
 			</FormSection>
 
 			<FormActions
 				label="Create DAO"
 				busy={store.busy || f.pending > 0}
-				disabled={!whole}
+				disabled={!summary.valid}
 				cancelHref="/my-daos"
 				problem={store.problem}
 			/>

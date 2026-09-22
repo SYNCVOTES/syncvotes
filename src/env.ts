@@ -55,6 +55,10 @@ export const variables = defineEnvVars({
 		description: 'What a DAO pays per byte of traffic, as a multiple of the network price',
 		schema: v.optional(v.string(), '1')
 	},
+	STATE_DIR: {
+		description: 'Where the app keeps what is not on the ledger: the payout record',
+		schema: v.optional(v.string(), '/data')
+	},
 	NETWORK: {
 		description: 'The Canton network this deployment is on, as shown to users: TestNet or MainNet',
 		public: true,

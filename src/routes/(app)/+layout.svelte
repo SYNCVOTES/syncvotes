@@ -12,6 +12,7 @@
 
 	const nav = [
 		{ href: '/my-daos', label: 'My DAOs' },
+		{ href: '/profile', label: 'Profile' },
 		{ href: '/wallet', label: 'Wallet' }
 	];
 	const GITHUB = 'https://github.com/SYNCVOTES/syncvotes';

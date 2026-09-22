@@ -27,10 +27,14 @@ services:
       LEDGER_AUTH_SCOPE: daml_ledger_api
       SCAN_URL: ${SCAN_URL:?set in the env file}
       BILLING_FACTOR: ${BILLING_FACTOR:-1}
+      # The payout record lives here (a volume), so a restart cannot pay a payout twice.
+      STATE_DIR: /data
       # Shown to users; the ledger does not care.
       NETWORK: ${NETWORK:-TestNet}
       # A signed transaction that issues a hundred voting rights comes back as a ~1 MB request.
       BODY_SIZE_LIMIT: 8M
+    volumes:
+      - app-data:/data
     depends_on:
       keycloak:
         condition: service_healthy
@@ -125,6 +129,7 @@ configs:
       }
 
 volumes:
+  app-data:
   caddy-data:
   caddy-config:
   keycloak-db:

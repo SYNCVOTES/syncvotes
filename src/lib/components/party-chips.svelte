@@ -1,4 +1,5 @@
 <script lang="ts">
+	/* eslint-disable no-useless-assignment -- `checking` is bound out and written by an effect */
 	import * as remote from '$lib/api.remote';
 	import { Input } from '$lib/components/ui/input';
 	import PartyId from './party-id.svelte';

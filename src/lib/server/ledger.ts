@@ -13,9 +13,10 @@ export type Vote = 'Yes' | 'No' | 'Abstain';
 export type Outcome = 'Passed' | 'Failed';
 export type Effect =
 	| { kind: 'signal' }
-	| { kind: 'shares'; shares: { party: string; share: number }[] }
-	| { kind: 'info'; name: string; description: string }
-	| { kind: 'dissolve' };
+	| { kind: 'shares'; changes: { party: string; share: number }[] }
+	| { kind: 'info'; name: string; description: string; image: string | null }
+	| { kind: 'payout'; to: string; amount: number; reason: string }
+	| { kind: 'dissolve'; remainderTo: string };
 
 export type Account = { contractId: string; party: string };
 export type Dao = {
@@ -23,10 +24,17 @@ export type Dao = {
 	id: string;
 	/** Who created it; no powers come with that. */
 	creator: string;
+	/** The DAO's own coin address. */
+	treasury: string;
 	name: string;
 	description: string;
+	image: string | null;
+	/** One member, one unit of the vote. */
+	equal: boolean;
 	createdAt: string;
 	members: number;
+	/** The whole vote, in units. */
+	units: number;
 };
 export type Member = {
 	contractId: string;
@@ -34,7 +42,7 @@ export type Member = {
 	party: string;
 	sponsor: string;
 	since: string;
-	/** Percent of the vote. */
+	/** Units of the vote. */
 	share: number;
 	shareSince: string;
 };
@@ -48,12 +56,16 @@ export type Proposal = {
 	description: string;
 	effect: Effect;
 	rule: Rule;
+	/** The whole vote when it was made, in units. */
+	eligible: number;
 	createdAt: string;
 	closesAt: string;
 	yes: number;
 	no: number;
 	abstain: number;
 	outcome: Outcome | null;
+	/** Entries of the effect carried out so far. */
+	executed: number;
 	executedAt: string | null;
 };
 export type Ballot = {
@@ -66,14 +78,34 @@ export type Ballot = {
 	weight: number;
 	shareSince: string;
 	closesAt: string;
+	changeable: boolean;
 	castAt: string;
 	counted: boolean;
+};
+export type Comment = {
+	contractId: string;
+	id: string;
+	daoId: string;
+	proposalId: string;
+	author: string;
+	body: string;
+	createdAt: string;
+	editedAt: string | null;
+};
+export type Profile = {
+	contractId: string;
+	party: string;
+	name: string;
+	avatar: string | null;
+	bio: string;
+	updatedAt: string;
 };
 export type Meter = {
 	contractId: string;
 	daoId: string;
-	credited: number;
+	treasury: string;
 	charged: number;
+	collected: number;
 	updatedAt: string;
 };
 
@@ -103,6 +135,10 @@ export const proposals = new Map<string, Proposal>();
 export const proposalsOf = new Map<string, Map<string, Proposal>>();
 /** by proposal id, then voter */
 export const ballots = new Map<string, Map<string, Ballot>>();
+/** by proposal id, then comment id */
+export const comments = new Map<string, Map<string, Comment>>();
+/** by party */
+export const profiles = new Map<string, Profile>();
 /** by DAO id */
 export const meters = new Map<string, Meter>();
 
@@ -172,12 +208,17 @@ function track(contractId: string, touches: string[], ...removals: (() => void)[
 const templateName = (templateId: string) => templateId.split(':').pop();
 const text = (value: unknown) => String(value);
 const num = (value: unknown) => Number(value);
-const list = (value: unknown) => (Array.isArray(value) ? value.map(text) : []);
 
 type Tagged = { tag: string; value: Record<string, unknown> };
 
 const rule = (v: unknown): Rule => {
-	const r = v as { basis: string; threshold: Tagged; quorum: unknown; early: boolean };
+	const r = v as {
+		basis: string;
+		threshold: Tagged;
+		quorum: unknown;
+		early: boolean;
+		changeable: boolean;
+	};
 	return {
 		basis: r.basis === 'OfCast' ? 'cast' : 'all',
 		threshold:
@@ -185,9 +226,12 @@ const rule = (v: unknown): Rule => {
 				? { kind: 'percent', percent: num(r.threshold.value) }
 				: { kind: 'majority' },
 		quorum: num(r.quorum),
-		early: r.early === true
+		early: r.early === true,
+		changeable: r.changeable === true
 	};
 };
+
+const optional = (value: unknown) => (value == null ? null : text(value));
 
 const effect = (v: unknown): Effect => {
 	const t = v as Tagged;
@@ -195,15 +239,27 @@ const effect = (v: unknown): Effect => {
 		case 'SetShares':
 			return {
 				kind: 'shares',
-				shares: (t.value.shares as { _1: string; _2: unknown }[]).map((e) => ({
+				changes: (t.value.changes as { _1: string; _2: unknown }[]).map((e) => ({
 					party: text(e._1),
 					share: num(e._2)
 				}))
 			};
 		case 'SetInfo':
-			return { kind: 'info', name: text(t.value.daoName), description: text(t.value.description) };
+			return {
+				kind: 'info',
+				name: text(t.value.daoName),
+				description: text(t.value.description),
+				image: optional(t.value.image)
+			};
+		case 'Payout':
+			return {
+				kind: 'payout',
+				to: text(t.value.to),
+				amount: num(t.value.amount),
+				reason: text(t.value.reason)
+			};
 		case 'Dissolve':
-			return { kind: 'dissolve' };
+			return { kind: 'dissolve', remainderTo: text(t.value.remainderTo) };
 		default:
 			return { kind: 'signal' };
 	}
@@ -221,10 +277,14 @@ function created({ contractId, templateId, createArgument: a }: Created) {
 				contractId,
 				id: text(a.id),
 				creator: text(a.creator),
+				treasury: text(a.treasury),
 				name: text(a.name),
 				description: text(a.description),
+				image: optional(a.image),
+				equal: a.equal === true,
 				createdAt: text(a.createdAt),
-				members: num(a.members)
+				members: num(a.members),
+				units: num(a.units)
 			};
 			track(contractId, [keys.dao(row.id), keys.party(row.creator)], put(daos, row.id, row));
 			break;
@@ -258,13 +318,15 @@ function created({ contractId, templateId, createArgument: a }: Created) {
 				description: text(a.description),
 				effect: effect(a.action),
 				rule: rule(a.rule),
+				eligible: num(a.eligible),
 				createdAt: text(a.createdAt),
 				closesAt: text(a.closesAt),
 				yes: num(a.yes),
 				no: num(a.no),
 				abstain: num(a.abstain),
 				outcome: (a.outcome as Outcome | null | undefined) ?? null,
-				executedAt: a.executedAt == null ? null : text(a.executedAt)
+				executed: num(a.executed),
+				executedAt: optional(a.executedAt)
 			};
 			track(
 				contractId,
@@ -285,6 +347,7 @@ function created({ contractId, templateId, createArgument: a }: Created) {
 				weight: num(a.weight),
 				shareSince: text(a.shareSince),
 				closesAt: text(a.closesAt),
+				changeable: a.changeable === true,
 				castAt: text(a.castAt),
 				counted: a.counted === true
 			};
@@ -295,12 +358,43 @@ function created({ contractId, templateId, createArgument: a }: Created) {
 			);
 			break;
 		}
+		case 'Comment': {
+			const row: Comment = {
+				contractId,
+				id: text(a.id),
+				daoId: text(a.daoId),
+				proposalId: text(a.proposalId),
+				author: text(a.author),
+				body: text(a.body),
+				createdAt: text(a.createdAt),
+				editedAt: optional(a.editedAt)
+			};
+			track(
+				contractId,
+				[keys.proposal(row.proposalId)],
+				put(inner(comments, row.proposalId), row.id, row)
+			);
+			break;
+		}
+		case 'Profile': {
+			const row: Profile = {
+				contractId,
+				party: text(a.user),
+				name: text(a.name),
+				avatar: optional(a.avatar),
+				bio: text(a.bio),
+				updatedAt: text(a.updatedAt)
+			};
+			track(contractId, [keys.party(row.party), keys.all], put(profiles, row.party, row));
+			break;
+		}
 		case 'Meter': {
 			const row: Meter = {
 				contractId,
 				daoId: text(a.daoId),
-				credited: num(a.credited),
+				treasury: text(a.treasury),
 				charged: num(a.charged),
+				collected: num(a.collected),
 				updatedAt: text(a.updatedAt)
 			};
 			track(contractId, [keys.dao(row.daoId)], put(meters, row.daoId, row));
@@ -316,9 +410,16 @@ function archived(contractId: string) {
 
 // ---- following the ledger ------------------------------------------------------------------
 
-const TEMPLATES = [Main.Account, Main.DAO, Main.Member, Main.Proposal, Main.Ballot, Main.Meter].map(
-	(t) => t.templateId
-);
+const TEMPLATES = [
+	Main.Account,
+	Main.DAO,
+	Main.Member,
+	Main.Proposal,
+	Main.Ballot,
+	Main.Comment,
+	Main.Profile,
+	Main.Meter
+].map((t) => t.templateId);
 
 type Event =
 	{ CreatedEvent: Created } | { ArchivedEvent: { contractId: string } } | Record<string, never>;

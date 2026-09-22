@@ -2,12 +2,11 @@
 	import { page } from '$app/state';
 	import * as remote from '$lib/api.remote';
 	import { store } from '$lib/wallet-store.svelte';
-	import { Button } from '$lib/components/ui/button';
 	import Page from '$lib/components/page.svelte';
 	import PageHeader from '$lib/components/page-header.svelte';
 	import QueryError from '$lib/components/query-error.svelte';
 	import ConnectPrompt from '$lib/components/connect-prompt.svelte';
-	import PartyId from '$lib/components/party-id.svelte';
+	import Who from '$lib/components/who.svelte';
 	import List from '$lib/components/list.svelte';
 	import ListItem from '$lib/components/list-item.svelte';
 	import EmptyState from '$lib/components/empty-state.svelte';
@@ -24,6 +23,7 @@
 	let q = $state('');
 	let limit = $state(50);
 	const members = $derived(me ? remote.daoMembers({ id, offset: 0, limit, q }) : null);
+	const pct = (units: number, of: number) => (of > 0 ? Math.round((units / of) * 1000) / 10 : 0);
 </script>
 
 <svelte:head><title>Members — {dao?.current?.name ?? 'DAO'} — SyncVotes</title></svelte:head>
@@ -42,14 +42,14 @@
 		<PageHeader
 			eyebrow="Membership"
 			title="Members"
-			description="{fmt(d.members)} {d.members === 1
-				? 'party'
-				: 'parties'} hold this DAO's vote, in shares that add up to 100; the shares change by vote. Each is named by the hint it chose and the fingerprint of its key."
+			description={d.equal
+				? `${fmt(d.members)} ${d.members === 1 ? 'party holds' : 'parties hold'} this DAO's vote, one vote each. Who is in changes by vote.`
+				: `${fmt(d.members)} ${d.members === 1 ? 'party holds' : 'parties hold'} this DAO's vote, in ${fmt(d.units)} units. Who holds what changes by vote.`}
 		/>
 
 		<div class="mb-4 flex flex-wrap items-center justify-between gap-3">
 			<div class="w-full max-w-sm">
-				<SearchInput bind:value={q} placeholder="Filter by party id" />
+				<SearchInput bind:value={q} placeholder="Filter by name or party id" />
 			</div>
 		</div>
 
@@ -63,13 +63,12 @@
 			<List>
 				{#each members.current.items as m (m.party)}
 					<ListItem class="flex items-center gap-3 font-mono text-xs">
-						<PartyId
-							party={m.party}
-							size="md"
-							class="min-w-0 flex-1 {m.party === me ? '[&>span>span:first-child]:text-orange' : ''}"
-						/>
+						<Who who={m.who} me={m.party === me} size="md" class="min-w-0 flex-1" />
 						<span class="hidden text-ink-dim sm:inline">since {dateOf(m.since)}</span>
-						<span class="w-16 text-right text-ink">{m.share}%</span>
+						{#if !d.equal}
+							<span class="w-20 text-right text-ink-dim">{fmt(m.share)} units</span>
+							<span class="w-16 text-right text-ink">{pct(m.share, d.units)}%</span>
+						{/if}
 						{#if m.party === d.creator}<RoleTag role="creator" />{/if}
 					</ListItem>
 				{/each}

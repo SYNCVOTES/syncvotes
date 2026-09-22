@@ -12,11 +12,17 @@ importers:
         specifier: ^1.5.0
         version: 1.5.0
       '@daml.js/model':
-        specifier: workspace:@daml.js/syncvotes-shares-0.11.0@*
-        version: link:daml.js/syncvotes-shares-0.11.0
+        specifier: workspace:@daml.js/syncvotes-treasury-0.12.0@*
+        version: link:daml.js/syncvotes-treasury-0.12.0
       '@daml/types':
         specifier: 3.5.2
         version: 3.5.2
+      dompurify:
+        specifier: ^3.4.15
+        version: 3.4.15
+      marked:
+        specifier: ^18.0.13
+        version: 18.0.13
     devDependencies:
       '@canton-network/core-ledger-proto':
         specifier: 1.10.0
@@ -241,7 +247,7 @@ importers:
         specifier: ^3.1.0
         version: 3.1.0
 
-  daml.js/syncvotes-shares-0.11.0:
+  daml.js/syncvotes-treasury-0.12.0:
     dependencies:
       '@daml.js/daml-prim-DA-Types-1.0.0':
         specifier: file:../daml-prim-DA-Types-1.0.0
@@ -1122,6 +1128,9 @@ packages:
   '@types/resolve@1.20.2':
     resolution: {integrity: sha512-60BCwRFOZCQhDncwQdxxeOEEkbc5dIMccYLwbxsS4TUNeVECQ/pBJ0j09mrHOl/JJvpRPGwO9SvE4nR2Nb/a4Q==}
 
+  '@types/trusted-types@2.0.7':
+    resolution: {integrity: sha512-ScaPdn1dQczgbl0QFTeTOmVHFULt394XJgOQNoyVhZ6r2vLnMLJfBPd53SB52T/3G36VI1/g2MZaX0cwDuXsfw==}
+
   '@typescript-eslint/eslint-plugin@8.68.0':
     resolution: {integrity: sha512-WASHDpCm6qO5jj9g1a+8NiW5+GCkAyLReR56/4VruYmNgfUmqpxOfZ2Yfb8xGfJPWv5Qi6LSD8sXdces3vbp/Q==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
@@ -1306,6 +1315,9 @@ packages:
 
   devalue@5.9.2:
     resolution: {integrity: sha512-po4PAY5c53tw5XMocSnf8A/5OHhbbUftpr93aEN6BBoAdntUmK7vu7wOATqvt7cXO7m1Cl4gMVn6p7n6n4mj0w==}
+
+  dompurify@3.4.15:
+    resolution: {integrity: sha512-EUBjM+B+lkDE41iE82DDSCfkoPGfXx8IxFxPMjNzm/Uk4xDet77rTN9wqlxlVg71kK7XGuUMv6wUxJUwwv+Xyw==}
 
   end-of-stream@1.4.5:
     resolution: {integrity: sha512-ooEGc6HP26xXq/N+GCGOT0JKCLDGrq2bQUZrQ7gyrJiZANJ/8YDTxTpQBXGMn+WbIQXNVpyWymm7KYVICQnyOg==}
@@ -1742,6 +1754,11 @@ packages:
   map-obj@6.0.0:
     resolution: {integrity: sha512-PwDvwt/tK70+luLw5k9ySLtzLAzwf7tZTY9GBj63Y010nHRPjwHcQTpTd5JwQqITC2ty7prtxBo71iwyYY0TAg==}
     engines: {node: '>=20'}
+
+  marked@18.0.13:
+    resolution: {integrity: sha512-xTxVzZsBFwunP6HDmtBkabUQEYArnP7/rMDGmPj9SlrKlQ4i8MdYVow+nJL0eOqwpUqhzBoTBRADGN6uYwPyOw==}
+    engines: {node: '>= 20'}
+    hasBin: true
 
   micro-ftch@0.3.1:
     resolution: {integrity: sha512-/0LLxhzP0tfiR5hcQebtudP56gUurs2CLkGarnCiB/OqEyUFQ6U3paQi/tgLv0hBJYt2rnr9MNpxz4fiiugstg==}
@@ -3113,6 +3130,9 @@ snapshots:
 
   '@types/resolve@1.20.2': {}
 
+  '@types/trusted-types@2.0.7':
+    optional: true
+
   '@typescript-eslint/eslint-plugin@8.68.0(@typescript-eslint/parser@8.68.0(eslint@10.9.1(jiti@2.7.0))(typescript@6.0.3))(eslint@10.9.1(jiti@2.7.0))(typescript@6.0.3)':
     dependencies:
       '@eslint-community/regexpp': 4.12.2
@@ -3298,6 +3318,10 @@ snapshots:
   detect-libc@2.1.2: {}
 
   devalue@5.9.2: {}
+
+  dompurify@3.4.15:
+    optionalDependencies:
+      '@types/trusted-types': 2.0.7
 
   end-of-stream@1.4.5:
     dependencies:
@@ -3699,6 +3723,8 @@ snapshots:
       '@jridgewell/sourcemap-codec': 1.6.0
 
   map-obj@6.0.0: {}
+
+  marked@18.0.13: {}
 
   micro-ftch@0.3.1: {}
 

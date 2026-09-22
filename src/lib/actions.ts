@@ -1,6 +1,6 @@
 import * as remote from './api.remote';
 import { toBase64, type Signer } from './wallet';
-import { verifyPrepared, verifyTopology, type Expected, type Plain } from './verify';
+import { verifyPrepared, verifyTopology, type Expected } from './verify';
 import { working } from './wallet-store.svelte';
 
 /**
@@ -75,8 +75,9 @@ export type Choice = 'Yes' | 'No' | 'Abstain';
 
 /**
  * A ballot is cast from the voter's own membership contract, which the proposal page names
- * along with the deadline it shows — what the page knows already is not fetched again, since
- * every round trip is felt.
+ * along with the deadline and rule it shows — what the page knows already is not fetched
+ * again, since every round trip is felt. Where votes may change, the ballot being replaced is
+ * handed in.
  */
 export async function vote(
 	s: Signer,
@@ -84,14 +85,64 @@ export async function vote(
 	proposalId: string,
 	choice: Choice,
 	membership: string,
-	closesAt: string
+	closesAt: string,
+	changeable: boolean,
+	previous: string | null
 ) {
 	preparing();
 	const prepared = await remote.prepareVote({ proposal: proposalId, vote: choice });
 	const intent = {
 		choice: 'Member_Vote',
 		contractId: membership,
-		args: { proposalId, closesAt, vote: choice }
+		args: { proposalId, closesAt, changeable, vote: choice, previous }
 	};
 	await sign(s, who, intent, prepared);
+}
+
+// ---- Comments -----------------------------------------------------------------------------
+
+/** A comment, from the member's own contract; the page hands back what the server prepared. */
+export async function comment(
+	s: Signer,
+	who: Identity,
+	prepared: Prepared & { cid: string; membership: string; proposalId: string; body: string }
+) {
+	const { cid, membership, proposalId, body, ...tx } = prepared;
+	const intent = {
+		choice: 'Member_Comment',
+		contractId: membership,
+		args: { proposalId, cid, body }
+	};
+	await sign(s, who, intent, tx);
+}
+
+export async function editComment(
+	s: Signer,
+	who: Identity,
+	prepared: Prepared & { comment: string; body: string }
+) {
+	const { comment, body, ...tx } = prepared;
+	await sign(s, who, { choice: 'Comment_Edit', contractId: comment, args: { newBody: body } }, tx);
+}
+
+export async function deleteComment(s: Signer, who: Identity, comment: string) {
+	preparing();
+	const prepared = await remote.prepareDeleteComment({ comment });
+	await sign(s, who, { choice: 'Comment_Delete', contractId: comment, args: {} }, prepared);
+}
+
+// ---- Profile ------------------------------------------------------------------------------
+
+export async function setProfile(
+	s: Signer,
+	who: Identity,
+	prepared: Prepared & { name: string; avatar: string | null; bio: string; previous: string | null }
+) {
+	const { name, avatar, bio, previous, ...tx } = prepared;
+	const intent = {
+		choice: 'Account_SetProfile',
+		contractId: who.account,
+		args: { name, avatar, bio, previous }
+	};
+	await sign(s, who, intent, tx);
 }

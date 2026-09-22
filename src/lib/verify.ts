@@ -40,8 +40,12 @@ type Home = { template: string; pkg: string; iface?: string };
 /** The only choices a user is ever asked to sign, and where each lives. */
 const CHOICES: Record<string, Home> = {
 	Account_CreateDAO: { template: 'Main:Account', pkg: PACKAGE_NAME },
+	Account_SetProfile: { template: 'Main:Account', pkg: PACKAGE_NAME },
 	Member_Propose: { template: 'Main:Member', pkg: PACKAGE_NAME },
-	Member_Vote: { template: 'Main:Member', pkg: PACKAGE_NAME }
+	Member_Vote: { template: 'Main:Member', pkg: PACKAGE_NAME },
+	Member_Comment: { template: 'Main:Member', pkg: PACKAGE_NAME },
+	Comment_Edit: { template: 'Main:Comment', pkg: PACKAGE_NAME },
+	Comment_Delete: { template: 'Main:Comment', pkg: PACKAGE_NAME }
 };
 
 // ---- Sign-up: the party topology --------------------------------------------------------

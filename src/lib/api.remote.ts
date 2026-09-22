@@ -8,6 +8,8 @@ import * as ledger from './server/ledger';
 import * as session from './server/session';
 import * as billing from './server/billing';
 import * as splice from './server/splice';
+import * as treasury from './server/treasury';
+import * as tally from './server/tally';
 import { fingerprintOf } from './verify';
 import { normaliseHint, hintProblem } from './hint';
 import * as schemas from './schemas';
@@ -19,7 +21,7 @@ import { toLedger, type Rule } from './rules';
  * value, then sends it again whenever what it shows changed — and need a read session (a
  * challenge signed by the party's key, `server/session.ts`) plus membership. Writes are
  * prepared here, signed in the browser and executed here; the ledger accepts them only with the
- * acting party's own signature. A DAO's writes are refused once its balance is spent.
+ * acting party's own signature. A DAO's writes are refused once its treasury is spent.
  */
 
 /** Runs `load` now and whenever `key` changes, yielding only when the result changed. */
@@ -49,7 +51,6 @@ const partyId = schemas.partyId;
 const contractId = v.pipe(v.string(), v.nonEmpty());
 const paging = {
 	offset: v.pipe(v.number(), v.integer(), v.minValue(0)),
-	// A share table takes every holder at once; a batch is the most a DAO changes in one go.
 	limit: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(schemas.BATCH))
 };
 const filter = v.optional(v.pipe(v.string(), v.maxLength(100)), '');
@@ -60,14 +61,29 @@ const page = <T>(all: T[], offset: number, limit: number): Page<T> => ({
 	total: all.length,
 	offset
 });
-const matches = (needle: string) => (party: string) =>
-	!needle || party.toLowerCase().includes(needle.trim().toLowerCase());
+
+/** A party as the pages show it: with the name and picture it gave itself, if any. */
+export type Who = { party: string; name: string | null; avatar: string | null };
+const who = (party: string): Who => {
+	const profile = ledger.profiles.get(party);
+	return { party, name: profile?.name ?? null, avatar: profile?.avatar ?? null };
+};
+const matches = (needle: string) => (party: string) => {
+	const q = needle.trim().toLowerCase();
+	if (!q) return true;
+	return (
+		party.toLowerCase().includes(q) ||
+		(ledger.profiles.get(party)?.name.toLowerCase().includes(q) ?? false)
+	);
+};
 
 /** The parties and prices the browser shows and checks against. Public, nothing secret. */
 export const config = query(async () => ({
 	provider: participant.providerParty(),
 	operator: participant.operatorParty(),
-	prices: await splice.prices()
+	prices: await splice.prices(),
+	batch: schemas.BATCH,
+	maxChanges: schemas.MAX_CHANGES
 }));
 
 // ---- Identity ----------------------------------------------------------------------------
@@ -190,7 +206,7 @@ const proposalsOf = (daoId: string) =>
 		b.createdAt.localeCompare(a.createdAt)
 	);
 const openProposals = (daoId: string) => proposalsOf(daoId).filter((p) => !p.outcome).length;
-/** The caller's membership of this DAO, or 403. The admin is a member like any other. */
+/** The caller's membership of this DAO, or 403. */
 const memberOnly = (daoId: string): ledger.Member => {
 	const membership = ledger.members.get(daoId)?.get(session.required());
 	if (!membership) error(403, 'Only members can see this DAO');
@@ -217,12 +233,14 @@ export const myDaos = query.live(partyId, (party) =>
 
 /** A DAO with its counts and the caller's standing in it. The lists are paged separately. */
 export const dao = query.live(contractId, (id) =>
-	live(ledger.keys.dao(id), () => {
+	live(ledger.keys.dao(id), async () => {
 		const membership = memberOnly(id);
 		const d = daoOf(id);
 		return {
 			...summarise(d),
-			balance: billing.balance(id),
+			balance: await billing.balance(id),
+			// A founding table still being carried out: the DAO is not whole yet.
+			founding: !!ledger.proposals.get(id) && !ledger.proposals.get(id)?.executedAt,
 			me: {
 				creator: d.creator === membership.party,
 				membership: membership.contractId,
@@ -232,7 +250,7 @@ export const dao = query.live(contractId, (id) =>
 	})
 );
 
-/** Members, alphabetically by party id, filtered by a substring of it. */
+/** Members, by name or party id, filtered by a substring of either; biggest share first. */
 export const daoMembers = query.live(
 	v.object({ id: contractId, ...paging, q: filter }),
 	({ id, offset, limit, q }) =>
@@ -240,10 +258,19 @@ export const daoMembers = query.live(
 			memberOnly(id);
 			const all = membersOf(id)
 				.filter((m) => matches(q)(m.party))
-				.sort((a, b) => a.party.localeCompare(b.party));
+				.sort((a, b) => b.share - a.share || a.party.localeCompare(b.party))
+				.map((m) => ({ ...m, who: who(m.party) }));
 			return page(all, offset, limit);
 		})
 );
+
+/** The whole share table, for the editor: every member with their units. */
+export const daoShares = query(contractId, (id) => {
+	memberOnly(id);
+	return membersOf(id)
+		.sort((a, b) => b.share - a.share || a.party.localeCompare(b.party))
+		.map((m) => ({ party: m.party, share: m.share, who: who(m.party) }));
+});
 
 export const daoProposals = query.live(
 	v.object({ id: contractId, ...paging, status: v.optional(v.picklist(['open', 'closed'])) }),
@@ -266,7 +293,7 @@ export type PartyCheck = 'addable' | 'already' | 'unknown';
 export const checkParties = query(
 	v.object({
 		dao: v.optional(contractId),
-		parties: v.pipe(v.array(partyId), v.maxLength(100))
+		parties: v.pipe(v.array(partyId), v.maxLength(schemas.MAX_CHANGES))
 	}),
 	({ dao, parties }): Record<string, PartyCheck> => {
 		if (dao) memberOnly(dao);
@@ -295,16 +322,27 @@ const proposalReader = (p: ledger.Proposal): ledger.Member | null => {
 	return membership ?? null;
 };
 
-/** Whether this member may vote on this proposal: a ballot cast now would count, and none was. */
-const mayVote = (p: ledger.Proposal, m: ledger.Member | null) =>
-	!!m &&
-	!p.outcome &&
-	ledger.eligible(p, {
-		since: m.since,
-		shareSince: m.shareSince,
-		castAt: new Date().toISOString()
-	}) &&
-	!ledger.ballots.get(p.id)?.has(m.party);
+/** Whether this member may cast a ballot now: none cast, or one that may still be replaced. */
+const mayVote = (p: ledger.Proposal, m: ledger.Member | null) => {
+	if (!m || p.outcome) return false;
+	const now = new Date().toISOString();
+	if (!ledger.eligible(p, { since: m.since, shareSince: m.shareSince, castAt: now })) return false;
+	const mine = ledger.ballots.get(p.id)?.get(m.party);
+	return !mine || (p.rule.changeable && !mine.counted);
+};
+
+/** Ballots that would count, summed by vote: the live tally where the ledger counts last. */
+const summed = (p: ledger.Proposal) => {
+	const sum = { yes: 0, no: 0, abstain: 0 };
+	for (const b of ledger.ballots.get(p.id)?.values() ?? []) {
+		if (b.daoId !== p.daoId || b.changeable !== p.rule.changeable || !ledger.eligible(p, b))
+			continue;
+		if (b.vote === 'Yes') sum.yes += b.weight;
+		else if (b.vote === 'No') sum.no += b.weight;
+		else sum.abstain += b.weight;
+	}
+	return sum;
+};
 
 /** A proposal with its tally and the caller's standing: a ballot cast, a vote to cast, or neither. */
 export const proposal = query.live(contractId, (id) =>
@@ -313,14 +351,26 @@ export const proposal = query.live(contractId, (id) =>
 		const me = proposalReader(p);
 		const dao = ledger.daos.get(p.daoId);
 		const mine = me && ledger.ballots.get(id)?.get(me.party);
+		// Until the ledger has counted, the page shows what has been cast.
+		const counted = p.yes + p.no + p.abstain;
+		const shown =
+			counted > 0 && !p.rule.changeable ? { yes: p.yes, no: p.no, abstain: p.abstain } : summed(p);
 		return {
 			...p,
+			...shown,
+			counted,
 			daoName: dao?.name ?? null,
+			daoEqual: dao?.equal ?? false,
 			members: ledger.members.get(p.daoId)?.size ?? 0,
 			cast: ledger.ballots.get(id)?.size ?? 0,
+			comments: ledger.comments.get(id)?.size ?? 0,
+			proposedBy: who(p.proposer),
+			paidBy: tally.paid.get(id) ?? null,
 			me: {
+				party: me?.party ?? session.required(),
 				membership: me?.contractId ?? null,
 				vote: mine?.vote ?? null,
+				ballot: mine?.contractId ?? null,
 				weight: mine?.weight ?? me?.share ?? null,
 				mayVote: mayVote(p, me),
 				reshared: !!me && ledger.time(me.shareSince) > ledger.time(p.createdAt)
@@ -329,7 +379,7 @@ export const proposal = query.live(contractId, (id) =>
 	})
 );
 
-/** Ballots, newest first, filtered by a substring of the voter's party id. */
+/** Ballots, newest first, filtered by a substring of the voter's party id or name. */
 export const proposalBallots = query.live(
 	v.object({ id: contractId, ...paging, q: filter }),
 	({ id, offset, limit, q }) =>
@@ -337,16 +387,37 @@ export const proposalBallots = query.live(
 			proposalReader(proposalOf(id));
 			const all = [...(ledger.ballots.get(id)?.values() ?? [])]
 				.filter((b) => matches(q)(b.voter))
-				.sort((a, b) => b.castAt.localeCompare(a.castAt));
+				.sort((a, b) => b.castAt.localeCompare(a.castAt))
+				.map((b) => ({ ...b, who: who(b.voter) }));
 			return page(all, offset, limit);
 		})
 );
 
-/** The DAO's account: paid in, spent, what a byte costs it. */
+/** Comments, oldest first, with who wrote them. */
+export const proposalComments = query.live(contractId, (id) =>
+	live(ledger.keys.proposal(id), () => {
+		const p = proposalOf(id);
+		const me = proposalReader(p);
+		return [...(ledger.comments.get(id)?.values() ?? [])]
+			.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+			.map((c) => ({ ...c, who: who(c.author), mine: c.author === (me?.party ?? p.proposer) }));
+	})
+);
+
+/** The DAO's account: what its treasury holds, what it owes, what a byte costs it. */
 export const daoBilling = query.live(contractId, (id) =>
 	live(ledger.keys.dao(id), () => {
 		memberOnly(id);
 		return billing.statement(id);
+	})
+);
+
+/** A party's profile, as anyone signed in may see it. */
+export const profile = query.live(partyId, (party) =>
+	live(ledger.keys.party(party), () => {
+		session.required();
+		const p = ledger.profiles.get(party);
+		return p ? { ...p, exists: true as const } : { party, exists: false as const };
 	})
 );
 
@@ -357,7 +428,7 @@ export const daoBilling = query.live(contractId, (id) =>
  * signs only if that is the contract it is looking at (`verify.ts`), so a change that landed
  * in between is caught before anything is signed. A DAO's writes need its balance.
  */
-const prepare = (
+const prepare = async (
 	party: string,
 	template: { templateId: string },
 	contractId: string,
@@ -365,7 +436,7 @@ const prepare = (
 	choiceArgument: unknown,
 	dao: string | null
 ) => {
-	if (dao) billing.funded(dao);
+	if (dao) await billing.funded(dao);
 	return participant.prepare(
 		party,
 		[{ ExerciseCommand: { templateId: template.templateId, contractId, choice, choiceArgument } }],
@@ -373,19 +444,21 @@ const prepare = (
 	);
 };
 
+/** A coin amount as the ledger writes a Decimal: ten places. */
+const decimal = (n: number) => n.toFixed(10);
+/** A share table as the ledger reads it: tuples of party and units, the Int as text. */
+const shareRows = (rows: { party: string; share: number }[]) =>
+	rows.map((r) => ({ _1: r.party, _2: String(r.share) }));
+const nullable = (s: string) => (s === '' ? null : s);
+
 /**
  * The text forms: each field is checked against the shared schema — in the browser before
  * submitting, so issues show under the field, and here again — then the transaction is
  * prepared. The browser verifies it says what the form said, signs it and executes it.
  */
-/** A share as the ledger writes a Decimal: ten places. */
-const decimal = (n: number) => n.toFixed(10);
-const shareRows = (rows: { party: string; share: number }[]) =>
-	rows.map((r) => ({ _1: r.party, _2: decimal(r.share) }));
-
 export const createDaoForm = form(
 	schemas.createDaoForm,
-	async ({ daoName, description, shares }) => {
+	async ({ daoName, description, image, equal, shares }) => {
 		const party = session.required();
 		const account = accountOf(party).contractId;
 		if (!shares.some((r) => r.party === party)) error(400, 'You have to hold a share yourself');
@@ -393,96 +466,184 @@ export const createDaoForm = form(
 			if (!ledger.accounts.has(r.party)) error(404, `${r.party} is not registered with the app`);
 		}
 		const id = crypto.randomUUID();
-		const args = { id, daoName, description, shares: shareRows(shares) };
+		// The creator's own share is in the first batch, so the DAO is theirs from the start.
+		const ordered = [
+			...shares.filter((r) => r.party === party),
+			...shares.filter((r) => r.party !== party)
+		];
+		const treasuryParty = await treasury.allocate(id);
+		const args = {
+			id,
+			daoName,
+			description,
+			image: nullable(image),
+			equal: equal === 'yes',
+			treasury: treasuryParty,
+			shares: shareRows(ordered.slice(0, schemas.BATCH)),
+			more: shareRows(ordered.slice(schemas.BATCH))
+		};
 		return {
 			id,
+			args,
 			prepared: await prepare(party, Main.Account, account, 'Account_CreateDAO', args, null)
 		};
 	}
 );
 
-export const createProposalForm = form(
-	schemas.createProposalForm,
-	async ({
-		dao,
-		title,
-		description,
-		days,
-		kind,
-		shares,
-		newName,
-		newDescription,
-		basis,
-		threshold,
-		percent,
-		quorum,
-		early
-	}) => {
-		const party = session.required();
-		const membership = memberOnly(dao).contractId;
-		const d = daoOf(dao);
-		const pid = crypto.randomUUID();
-		const closesAt = new Date(Date.now() + days * 86_400_000).toISOString();
-		let action: { tag: string; value: unknown };
-		switch (kind) {
-			case 'info':
-				action = {
-					tag: 'SetInfo',
-					value: { daoName: newName.trim(), description: newDescription }
-				};
-				break;
-			case 'dissolve':
-				action = { tag: 'Dissolve', value: {} };
-				break;
-			case 'shares': {
-				const rows = v.parse(schemas.shareTable, shares);
-				for (const r of rows) {
-					if (!ledger.accounts.has(r.party))
-						error(404, `${r.party} is not registered with the app`);
+export const createProposalForm = form(schemas.createProposalForm, async (f) => {
+	const party = session.required();
+	const membership = memberOnly(f.dao).contractId;
+	const d = daoOf(f.dao);
+	const pid = crypto.randomUUID();
+	const closesAt = new Date(Date.now() + f.days * 86_400_000).toISOString();
+	let action: { tag: string; value: unknown };
+	switch (f.kind) {
+		case 'info':
+			action = {
+				tag: 'SetInfo',
+				value: {
+					daoName: f.newName.trim(),
+					description: f.newDescription,
+					image: nullable(f.newImage)
 				}
-				action = { tag: 'SetShares', value: { shares: shareRows(rows) } };
-				break;
+			};
+			break;
+		case 'dissolve':
+			action = { tag: 'Dissolve', value: { remainderTo: f.remainderTo.trim() } };
+			break;
+		case 'payout':
+			action = {
+				tag: 'Payout',
+				value: { to: f.payoutTo.trim(), amount: decimal(f.payoutAmount), reason: f.payoutReason }
+			};
+			break;
+		case 'shares': {
+			const rows = v.parse(schemas.shareChanges, f.shares);
+			const members = ledger.members.get(f.dao);
+			for (const r of rows) {
+				if (!ledger.accounts.has(r.party)) error(404, `${r.party} is not registered with the app`);
+				if (d.equal && r.share > 1) error(400, 'By membership, a member holds one unit');
+				if (r.share === 0 && !members?.has(r.party)) error(400, `${r.party} is not a member`);
 			}
-			default:
-				action = { tag: 'Signal', value: {} };
+			// A change that leaves nobody, or no units, is refused before it is signed.
+			let units = d.units;
+			let count = d.members;
+			for (const r of rows) {
+				const had = members?.get(r.party)?.share ?? 0;
+				units += r.share - had;
+				if (had === 0 && r.share > 0) count++;
+				if (had > 0 && r.share === 0) count--;
+			}
+			if (count <= 0 || units <= 0) error(400, 'A DAO keeps at least one member with a share');
+			action = { tag: 'SetShares', value: { changes: shareRows(rows) } };
+			break;
 		}
-		const rule: Rule = {
-			basis,
-			threshold: threshold === 'percent' ? { kind: 'percent', percent } : { kind: 'majority' },
-			quorum,
-			early: early === 'yes'
-		};
-		const args = {
-			dao: d.contractId,
-			pid,
-			title,
-			description,
-			closesAt,
-			action,
-			rule: toLedger(rule)
-		};
-		return {
-			pid,
-			membership,
-			dao: d.contractId,
-			closesAt,
-			action,
-			prepared: await prepare(party, Main.Member, membership, 'Member_Propose', args, dao)
-		};
+		default:
+			action = { tag: 'Signal', value: {} };
 	}
-);
+	const rule: Rule = {
+		basis: f.basis,
+		threshold:
+			f.threshold === 'percent' ? { kind: 'percent', percent: f.percent } : { kind: 'majority' },
+		quorum: f.quorum,
+		early: f.early === 'yes',
+		changeable: f.changeable === 'yes'
+	};
+	const args = {
+		dao: d.contractId,
+		pid,
+		title: f.title,
+		description: f.description,
+		closesAt,
+		action,
+		rule: toLedger(rule)
+	};
+	return {
+		pid,
+		membership,
+		args,
+		prepared: await prepare(party, Main.Member, membership, 'Member_Propose', args, f.dao)
+	};
+});
 
-/** A ballot, cast from the voter's own membership contract. */
+/** A ballot, cast from the voter's own membership contract; a replaced one is handed in. */
 export const prepareVote = command(
 	v.object({ proposal: contractId, vote: v.picklist(['Yes', 'No', 'Abstain']) }),
 	({ proposal, vote }) => {
 		const p = proposalOf(proposal);
 		const me = proposalReader(p);
 		if (!me || !mayVote(p, me)) error(409, 'You have no vote on this proposal');
-		const args = { proposalId: proposal, closesAt: p.closesAt, vote };
+		const previous = ledger.ballots.get(proposal)?.get(me.party)?.contractId ?? null;
+		const args = {
+			proposalId: proposal,
+			closesAt: p.closesAt,
+			changeable: p.rule.changeable,
+			vote,
+			previous
+		};
 		return prepare(me.party, Main.Member, me.contractId, 'Member_Vote', args, p.daoId);
 	}
 );
+
+export const commentForm = form(schemas.commentForm, async ({ proposal, body }) => {
+	const p = proposalOf(proposal);
+	const me = proposalReader(p);
+	if (!me) error(403, 'Only members comment');
+	const cid = crypto.randomUUID();
+	const args = { proposalId: proposal, cid, body };
+	return {
+		cid,
+		membership: me.contractId,
+		proposalId: proposal,
+		body,
+		prepared: await prepare(me.party, Main.Member, me.contractId, 'Member_Comment', args, p.daoId)
+	};
+});
+
+const myComment = (id: string): ledger.Comment => {
+	const me = session.required();
+	for (const thread of ledger.comments.values()) {
+		const c = thread.get(id);
+		if (c) {
+			if (c.author !== me) error(403, 'Not your comment');
+			return c;
+		}
+	}
+	error(404, 'No such comment');
+};
+
+export const editCommentForm = form(schemas.editCommentForm, async ({ comment, body }) => {
+	const c = myComment(comment);
+	return {
+		comment: c.contractId,
+		body,
+		prepared: await prepare(
+			c.author,
+			Main.Comment,
+			c.contractId,
+			'Comment_Edit',
+			{ newBody: body },
+			c.daoId
+		)
+	};
+});
+
+export const prepareDeleteComment = command(v.object({ comment: contractId }), ({ comment }) => {
+	const c = myComment(comment);
+	return prepare(c.author, Main.Comment, c.contractId, 'Comment_Delete', {}, c.daoId);
+});
+
+/** The caller's profile: created or replaced from their Account. Their own cost, not a DAO's. */
+export const profileForm = form(schemas.profileForm, async ({ name, avatar, bio }) => {
+	const party = session.required();
+	const account = accountOf(party).contractId;
+	const previous = ledger.profiles.get(party)?.contractId ?? null;
+	const args = { name, avatar: nullable(avatar), bio, previous };
+	return {
+		...args,
+		prepared: await prepare(party, Main.Account, account, 'Account_SetProfile', args, null)
+	};
+});
 
 /** The signed hash comes back; the participant submits, and the reply waits for the pages. */
 export const execute = command(
