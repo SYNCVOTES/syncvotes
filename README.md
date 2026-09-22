@@ -216,6 +216,7 @@ submissions. `verify.ts` takes the package name from the same place.
 | `src/routes/+page.svelte`        | The landing (v1's Consensus Engine), Tailwind on the markup, `field.ts`                  |
 | `src/lib/components/ui/`         | shadcn-svelte primitives only (button, badge, input, textarea, label)                    |
 | `src/lib/components/`            | Everything built on them: page column, panels, lists, forms, header, footer, `landing-*` |
+| `src/lib/components/profile-form.svelte` | The party's name, picture and words, on the wallet page                         |
 | `src/lib/markdown.ts`            | Markdown as the app renders it: marked, then DOMPurify in the browser                    |
 | `compose.yaml`                   | The compose project for the servers, Caddy config inline                                 |
 
