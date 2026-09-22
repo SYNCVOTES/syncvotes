@@ -21,7 +21,10 @@ export const init: ServerInit = async () => {
 	if (dars.length !== 1) throw new Error(`Expected one DAR in ${DAR_DIR}, found ${dars.length}`);
 	await (await sdk()).ledger.dar.upload(await readFile(join(DAR_DIR, dars[0])), packageId);
 	console.log(`Daml package ${packageId.slice(0, 8)}… is on the participant (${dars[0]})`);
+	// No request is answered before the ledger copy exists: a page asking during the load
+	// would be told its DAO does not exist.
 	ledger.start();
+	await ledger.ready();
 	tally.start();
 	billing.start();
 };

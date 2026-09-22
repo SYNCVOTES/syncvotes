@@ -478,6 +478,11 @@ async function followUpdates(from: number): Promise<number> {
 }
 
 let started = false;
+let loaded: () => void = () => {};
+const firstLoad = new Promise<void>((resolve) => (loaded = resolve));
+
+/** Resolves once the copy holds the active contracts: before that, a read would say "no such DAO". */
+export const ready = () => firstLoad;
 
 /** Loads the active contracts, then follows the stream for the life of the process. */
 export function start(): void {
@@ -488,6 +493,7 @@ export function start(): void {
 		for (;;) {
 			try {
 				offset ??= await loadActiveContracts();
+				loaded();
 				offset = await followUpdates(offset);
 				console.warn('Ledger update stream ended; reconnecting');
 			} catch (e) {
