@@ -90,20 +90,29 @@ validRule r =
       Majority -> True
       Percent p -> p >= 1 && p <= 100
 
+-- | A threshold as a level, in tenths of a percent: a majority is just over half.
+level : Threshold -> Int
+level Majority = 505
+level (Percent p) = p * 10
+
+-- | How much of the whole vote a rule needs to see, in tenths of a percent: its quorum, or,
+-- measured against the whole vote, its threshold if that is more (yes from 67% of all is
+-- 67% taking part).
+turnout : Rule -> Int
+turnout r = case r.basis of
+  OfAll -> max (r.quorum * 10) (level r.threshold)
+  OfCast -> r.quorum * 10
+
 -- | Whether a proposal's rule asks at least as much as the DAO's own: never measured against
--- less (the votes cast where the DAO says the whole vote), never a lower threshold (a majority
--- is just over half: more than any percentage up to fifty), never a smaller quorum, and never
--- settled early where the DAO waits for the deadline. Letting votes change asks nothing less.
+-- less (the votes cast where the DAO says the whole vote), never a lower threshold, never
+-- less of the vote taking part, and never settled early where the DAO waits for the
+-- deadline. Letting votes change asks nothing less.
 atLeast : Rule -> Rule -> Bool
 atLeast charter r =
   (charter.basis == OfCast || r.basis == OfAll)
-    && r.quorum >= charter.quorum
+    && level r.threshold >= level charter.threshold
+    && turnout r >= turnout charter
     && (charter.early || not r.early)
-    && case (charter.threshold, r.threshold) of
-      (Majority, Majority) -> True
-      (Majority, Percent q) -> q > 50
-      (Percent p, Percent q) -> q >= p
-      (Percent p, Majority) -> p <= 50
 
 -- | Members created, reshared or removed per transaction; longer lists are carried out in
 -- several.

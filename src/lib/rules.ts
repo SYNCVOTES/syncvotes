@@ -126,19 +126,24 @@ export function standing(
 	return { needed, denominator, quorumMet, note };
 }
 
+/** A threshold as a level, in tenths of a percent: a majority is just over half. */
+const level = (t: Rule['threshold']) => (t.kind === 'majority' ? 505 : t.percent * 10);
+/** How much of the whole vote a rule needs to see: its quorum, or its threshold if that is more. */
+const turnout = (r: Rule) =>
+	r.basis === 'all' ? Math.max(r.quorum * 10, level(r.threshold)) : r.quorum * 10;
+
 /**
  * Whether `r` asks at least as much as `charter`, as the ledger checks it: never measured
- * against less, never a lower threshold (a majority is just over half), never a smaller
- * quorum, never settled early where the charter waits. Letting votes change asks nothing less.
+ * against less, never a lower threshold, never less of the vote taking part, never settled
+ * early where the charter waits. Letting votes change asks nothing less.
  */
 export function atLeast(charter: Rule, r: Rule): boolean {
-	if (charter.basis === 'all' && r.basis !== 'all') return false;
-	if (r.quorum < charter.quorum) return false;
-	if (!charter.early && r.early) return false;
-	const c = charter.threshold;
-	const t = r.threshold;
-	if (c.kind === 'majority') return t.kind === 'majority' || t.percent > 50;
-	return t.kind === 'percent' ? t.percent >= c.percent : c.percent <= 50;
+	return (
+		(charter.basis === 'cast' || r.basis === 'all') &&
+		level(r.threshold) >= level(charter.threshold) &&
+		turnout(r) >= turnout(charter) &&
+		(charter.early || !r.early)
+	);
 }
 
 /** The rule as the ledger's JSON writes it: enums as text, ints as text, the variant tagged. */
