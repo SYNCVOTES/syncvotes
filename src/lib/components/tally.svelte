@@ -30,19 +30,16 @@
 		<div class="bg-ink-dim" style="width: {pct(abstain)}%"></div>
 	</div>
 	<div class="flex justify-between gap-2 font-mono text-xs">
-		<span class="text-green">{fmt(yes)} yes</span>
+		<span class="text-green">{w(yes)} yes</span>
 		<span class="text-ink-dim">
 			{rule.basis === 'all'
-				? `${fmt(s.needed)} of ${fmt(eligible)} to pass`
-				: `${fmt(s.needed)} of ${fmt(s.denominator)} cast to pass`}
+				? `${w(s.needed)} to pass`
+				: `${w(s.needed)} of ${w(s.denominator)} cast to pass`}
 		</span>
-		<span class="text-red">{fmt(no)} no</span>
+		<span class="text-red">{w(no)} no</span>
 	</div>
 	<p class="mt-3 font-mono text-xs text-ink-dim">
-		{fmt(cast)} of {fmt(eligible)} voted{abstain ? `, ${fmt(abstain)} abstained` : ''}{cast >
-		counted
-			? `, ${fmt(cast - counted)} being counted`
-			: ''}.
+		{fmt(cast)} voted, {w(counted)} of the vote{abstain ? `, ${w(abstain)} abstaining` : ''}.
 	</p>
 	<p class="mt-2 text-xs text-ink-dim">
 		Passes when {describe(rule)}{rule.early ? '' : '; decided at the deadline only'}.{s.note

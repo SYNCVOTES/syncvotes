@@ -6,7 +6,7 @@
 	 * How a proposal passes: a preset, or the four dials behind them. The rule travels in the
 	 * form as hidden fields, so what is signed is what was picked.
 	 */
-	let { rule = $bindable(), members }: { rule: Rule; members: number } = $props();
+	let { rule = $bindable() }: { rule: Rule } = $props();
 	let preset = $state<Preset>(presetOf(rule));
 	const pick = (p: Preset) => {
 		preset = p;
@@ -14,12 +14,10 @@
 		if (found) rule = { ...found, threshold: { ...found.threshold } };
 	};
 	const percent = $derived(rule.threshold.kind === 'percent' ? rule.threshold.percent : 67);
-	/** What it takes with today's members, so the numbers are concrete. */
+	/** What share of the vote it takes, as a number. */
 	const needed = $derived.by(() => {
 		if (rule.basis !== 'all') return null;
-		return rule.threshold.kind === 'majority'
-			? Math.floor(members / 2) + 1
-			: Math.ceil((members * rule.threshold.percent) / 100);
+		return rule.threshold.kind === 'majority' ? 'more than 50%' : `${rule.threshold.percent}%`;
 	});
 </script>
 

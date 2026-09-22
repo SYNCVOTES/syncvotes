@@ -7,7 +7,7 @@ export type Rule = {
 	basis: 'all' | 'cast';
 	/** Strictly more than half, or at least this many percent. */
 	threshold: { kind: 'majority' } | { kind: 'percent'; percent: number };
-	/** Percent of members that must take part (abstentions count); 0 for none. */
+	/** Percent of the vote that must take part (abstentions count); 0 for none. */
 	quorum: number;
 	/** Settle the moment the outcome can no longer change. */
 	early: boolean;
@@ -18,8 +18,8 @@ export type Preset = 'majority' | 'cast' | 'twoThirds' | 'unanimous' | 'custom';
 export const PRESETS: { value: Preset; title: string; text: string; rule?: Rule }[] = [
 	{
 		value: 'majority',
-		title: 'Majority of all members',
-		text: 'More than half of everyone says yes. Settles early once it is sure.',
+		title: 'Majority of the vote',
+		text: 'More than half of the whole vote says yes. Settles early once it is sure.',
 		rule: { basis: 'all', threshold: { kind: 'majority' }, quorum: 0, early: true }
 	},
 	{
@@ -30,14 +30,14 @@ export const PRESETS: { value: Preset; title: string; text: string; rule?: Rule 
 	},
 	{
 		value: 'twoThirds',
-		title: 'Two thirds of all members',
-		text: 'At least 67% of everyone says yes.',
+		title: 'Two thirds of the vote',
+		text: 'At least 67% of the whole vote says yes.',
 		rule: { basis: 'all', threshold: { kind: 'percent', percent: 67 }, quorum: 0, early: true }
 	},
 	{
 		value: 'unanimous',
 		title: 'Unanimous',
-		text: 'Everyone says yes; one no or abstention fails it.',
+		text: 'The whole vote says yes; one no or abstention fails it.',
 		rule: { basis: 'all', threshold: { kind: 'percent', percent: 100 }, quorum: 0, early: true }
 	},
 	{ value: 'custom', title: 'Custom', text: 'Your own basis, threshold, quorum and timing.' }
@@ -60,8 +60,8 @@ const same = (a: Rule, b: Rule) =>
 export function describe(r: Rule): string {
 	const amount =
 		r.threshold.kind === 'majority' ? 'more than half' : `at least ${r.threshold.percent}%`;
-	const of = r.basis === 'all' ? 'of all members' : 'of the votes cast';
-	const quorum = r.quorum > 0 ? `, if ${r.quorum}% take part` : '';
+	const of = r.basis === 'all' ? 'of the whole vote' : 'of the votes cast';
+	const quorum = r.quorum > 0 ? `, if ${r.quorum}% of the vote takes part` : '';
 	return `${amount} ${of} say yes${quorum}`;
 }
 

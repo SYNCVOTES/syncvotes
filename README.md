@@ -5,10 +5,11 @@ only the member holds. MVP v2, running against its own validator on TestNet at
 <https://dev.syncvotes.com>.
 
 A DAO here is private to its members and run by nobody: everything it changes about itself —
-who is in it, what it is called, whether it goes on — it decides by vote, one member one vote,
-and the ledger carries the decision out. The party that created it is just that, the creator.
-Nobody withdraws a proposal once it is made. Every transaction a DAO causes is paid from a
-balance anyone can fill, at the traffic the network charged for it.
+who holds what share of the vote, what it is called, whether it goes on — it decides by vote,
+each member weighing their share, under a rule the proposer picks, and the ledger carries the
+decision out. The party that created it is just that, the creator. Nobody withdraws a proposal
+once it is made. Every transaction a DAO causes is paid from a balance anyone can fill, at the
+traffic the network charged for it.
 
 ## Architecture
 
@@ -44,7 +45,7 @@ the token standard's packages are on every validator, so a treasury can be paid 
 
 ### The model
 
-`daml/src/Main.daml`, package `syncvotes-meeting`, one idea: every contract a user acts on already
+`daml/src/Main.daml`, package `syncvotes-shares`, one idea: every contract a user acts on already
 carries the provider's signature, so the provider is a **confirmer** of every transaction — which
 is what CIP-0104 pays traffic rewards for — while the user's key is the only one that ever signs
 a submission. One constraint: a DAO may have thousands of members and more proposals, so nothing
@@ -58,24 +59,31 @@ marking a proposal executed) are controlled by both, and neither has the other's
   the fingerprint alone.
 - `DAO` — signatory creator and provider: name, description, a stable `id`, a member count. One
   choice, `DAO_Execute`, which carries out what a vote decided; nobody changes it by hand. No
-  member list.
-- `Member` — one per party per DAO, signed by whoever admitted the member (the creator at the
-  founding, or the DAO itself carrying out a vote), so the provider cannot invent members;
-  removed only with the DAO's authority. It is the member's door to proposing — `Member_Propose` reads the DAO of the
+  member list. Founded with a share table — parties and percents adding up to exactly 100.
+- `Member` — one per party per DAO, with its `share` of the vote and when that share last
+  changed, signed by whoever admitted the member (the creator at the founding, or the DAO itself
+  carrying out a vote), so the provider cannot invent members; reshared or removed only with the
+  DAO's authority. It is the member's door to proposing — `Member_Propose` reads the DAO of the
   moment (the app's operator reads alongside the member) and fixes its member count into the
   proposal as the electorate — and their ballot box: `Member_Vote` replaces it with a copy that
   remembers the proposal, so a second ballot is impossible, and creates a `Ballot` — Yes, No or
   Abstain.
-- `Proposal` — signatory proposer and provider; counters, not lists: `eligible`, `yes`, `no`,
-  `abstain`, `outcome`; an `Effect`: `Signal`, `SetMembers`, `SetInfo` (name and description)
-  or `Dissolve`. It passes at a majority of eligible, fails when no makes that impossible, and
-  is decided by the ballots cast at the deadline. Nobody cancels it. Once passed, the provider
-  exercises `DAO_Execute`: the ledger checks the proposal did pass and carries the effect out
-  with the DAO's authority; a dissolution waits until every other vote has settled.
-- `Ballot` — one vote, signed by the voter and the provider. The provider counts
-  (`Proposal_Tally`, batches of two hundred) and `Ballot_Count` checks each ballot against its
-  proposal: right DAO and proposal, cast before the deadline, by a member of the time, not
-  counted before. The provider can delay a result, never change it.
+- `Proposal` — signatory proposer and provider; counters, not lists: `yes`, `no`, `abstain`
+  (shares, out of 100), `outcome`; an `Effect`: `Signal`, `SetShares` (the whole new table:
+  parties join, leave, gain or lose in one decision; the ledger checks the sum and that every
+  current member was handed in), `SetInfo` (name and description) or `Dissolve`; and a `Rule`
+  the proposer picked: yes measured against all of the vote or against the votes cast, a
+  majority or a percentage, a quorum of the vote that must take part, and whether it settles the
+  moment the outcome cannot change (the formulas are v1's and DAO DAO's). Nobody cancels it.
+  Once passed, the provider exercises `DAO_Execute`: the ledger checks the proposal did pass and
+  carries the effect out with the DAO's authority; a dissolution waits until every other vote
+  has settled.
+- `Ballot` — one vote weighing the voter's share, signed by the voter and the provider. The
+  provider counts (`Proposal_Tally`, batches of two hundred) and `Ballot_Count` checks each
+  ballot against its proposal: right DAO and proposal, cast before the deadline, by a member of
+  the time whose share has not changed since the proposal was made — so a share moved during a
+  vote never votes twice — not counted before. The provider can delay a result, never change
+  it.
 - `Meter` — the provider's statement of a DAO's account: coin paid in, traffic charged.
 
 ### The balance
@@ -283,7 +291,7 @@ idempotent by package id — so the code and the package it needs always land to
 - A package name and version can be uploaded once, and a later version under the same name must
   be a compatible upgrade (fields can only be added, and as `Optional`). A change that is not —
   a template dropped, a field made mandatory — needs a new package name, which is why the model
-  has changed name with every incompatible step and is `syncvotes-meeting` now.
+  has changed name with every incompatible step and is `syncvotes-shares` now.
 - A `.remote.ts` module may export nothing but remote functions — a shared constant next to
   them fails the build, which is why the batch size lives in `schemas.ts`.
 - The kit's `form.fields.value()` knows only the fields the user touched; `forms.ts` reads the

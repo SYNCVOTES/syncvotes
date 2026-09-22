@@ -86,3 +86,7 @@
 - [ ] rethink governance from how a real company works (partners, shares, decisions) — next
 - [x] no admin at all: membership, name and dissolution are proposal effects, proposals cannot
       be withdrawn, the balance is anyone's to fill (`syncvotes-meeting` 0.9.0)
+- [x] a decision rule per proposal (all vs cast, majority vs percent, quorum, early settle), presets
+      after v1 and DAO DAO (`syncvotes-rules` 0.10.0)
+- [x] shares of the vote: a table at the founding, moved only by a share proposal; ballots weigh
+      shares; a share changed mid-vote casts no ballot (`syncvotes-shares` 0.11.0)

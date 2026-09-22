@@ -191,7 +191,7 @@
 	<PageHeader
 		eyebrow="New proposal"
 		title="Propose"
-		description="Every member gets one vote. You choose what passing takes; the ledger counts by that rule, and what the proposal does when it passes, the ledger does."
+		description="Every member votes with their share. You choose what passing takes; the ledger counts by that rule, and what the proposal does when it passes, the ledger does."
 	/>
 
 	{#if store.screen.at === 'loading'}
@@ -278,7 +278,7 @@
 			</FormSection>
 
 			<FormSection title="How it passes">
-				{#key ruleFor}<RulePicker bind:rule {members} />{/key}
+				{#key ruleFor}<RulePicker bind:rule />{/key}
 			</FormSection>
 
 			<FormSection title="Put it to the vote">
@@ -316,7 +316,7 @@
 
 			{#if dao?.ready}
 				<p class="font-mono text-xs text-ink-dim">
-					The vote opens for the {fmt(dao.current.members)} current members the moment you sign.
+					The vote opens for the {fmt(dao.current.members)} current holders the moment you sign.
 				</p>
 			{:else}
 				<Skeleton height="h-4" />
