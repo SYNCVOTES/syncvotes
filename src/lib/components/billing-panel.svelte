@@ -3,9 +3,7 @@
 	import { store } from '$lib/wallet-store.svelte';
 	import Panel from './panel.svelte';
 	import Skeleton from './skeleton.svelte';
-	import PartyId from './party-id.svelte';
-	import Copy from '@lucide/svelte/icons/copy';
-	import Check from '@lucide/svelte/icons/check';
+	import CopyField from './copy-field.svelte';
 	import { coin } from '$lib/format';
 
 	/**
@@ -15,12 +13,6 @@
 	 */
 	let { dao, admin }: { dao: string; admin: boolean } = $props();
 	const billing = $derived(store.who ? remote.daoBilling(dao) : null);
-	let copied = $state(false);
-	async function copy(text: string) {
-		await navigator.clipboard.writeText(text);
-		copied = true;
-		setTimeout(() => (copied = false), 1500);
-	}
 </script>
 
 <Panel padding="sm" class="space-y-3">
@@ -41,27 +33,13 @@
 			</p>
 		{/if}
 		{#if admin}
-			<div class="space-y-2 border-t border-border pt-3 text-[13px] text-ink-mid">
-				<p>
+			<div class="space-y-3 border-t border-border pt-3">
+				<p class="text-[13px] text-ink-mid">
 					To pay in, send Canton Coin from any wallet to the app's provider with this memo. It is
 					credited within a minute of landing.
 				</p>
-				<div class="font-mono text-xs">
-					<div class="text-ink-dim">To</div>
-					<PartyId party={b.payTo} size="md" />
-				</div>
-				<div class="font-mono text-xs">
-					<div class="text-ink-dim">Memo</div>
-					<button
-						type="button"
-						class="inline-flex items-center gap-1.5 text-ink hover:text-orange"
-						onclick={() => copy(b.memo)}
-						title="Copy the memo"
-					>
-						<span class="break-all">{b.memo}</span>
-						{#if copied}<Check size={12} />{:else}<Copy size={12} />{/if}
-					</button>
-				</div>
+				<CopyField label="To" value={b.payTo} />
+				<CopyField label="Memo" value={b.memo} />
 			</div>
 		{:else}
 			<p class="text-[13px] text-ink-dim">The admin keeps this balance funded.</p>
