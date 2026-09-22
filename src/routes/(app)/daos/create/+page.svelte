@@ -10,7 +10,6 @@
 	import PageHeader from '$lib/components/page-header.svelte';
 	import ConnectPrompt from '$lib/components/connect-prompt.svelte';
 	import Skeleton from '$lib/components/skeleton.svelte';
-	import Problem from '$lib/components/problem.svelte';
 	import FormSection from '$lib/components/form-section.svelte';
 	import Field from '$lib/components/field.svelte';
 	import FormActions from '$lib/components/form-actions.svelte';
@@ -47,8 +46,6 @@
 		<ConnectPrompt what="create a DAO" />
 	{:else}
 		<form {...enhanced} class="space-y-8">
-			<Problem message={store.problem} />
-
 			<FormSection title="Basic information">
 				<Field label="Name" id="daoName" issues={f.fields.daoName.issues()}>
 					<Input
@@ -85,6 +82,7 @@
 				busy={store.busy || f.pending > 0}
 				disabled={checking}
 				cancelHref="/my-daos"
+				problem={store.problem}
 			/>
 		</form>
 	{/if}

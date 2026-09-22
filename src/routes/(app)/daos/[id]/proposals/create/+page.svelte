@@ -12,7 +12,6 @@
 	import PageHeader from '$lib/components/page-header.svelte';
 	import ConnectPrompt from '$lib/components/connect-prompt.svelte';
 	import Skeleton from '$lib/components/skeleton.svelte';
-	import Problem from '$lib/components/problem.svelte';
 	import FormSection from '$lib/components/form-section.svelte';
 	import Field from '$lib/components/field.svelte';
 	import FormActions from '$lib/components/form-actions.svelte';
@@ -154,7 +153,6 @@
 		<QueryError error={dao.error} refresh={() => dao?.reconnect()} />
 	{:else}
 		<form {...enhanced} class="space-y-8">
-			<Problem message={store.problem} />
 			<input {...f.fields.dao.as('hidden', id)} />
 			<input type="hidden" name="kind" value={kind} />
 			<input type="hidden" name="title" value={title.trim() || suggested} />
@@ -274,6 +272,7 @@
 					(kind === 'members' && add.length + remove.length === 0) ||
 					(kind === 'info' && newName.trim().length < 2)}
 				cancelHref="/daos/{id}"
+				problem={store.problem}
 			/>
 		</form>
 	{/if}

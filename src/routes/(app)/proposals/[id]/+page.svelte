@@ -35,9 +35,12 @@
 	// button pressed says so until the ledger answers; the activity pill says what is happening.
 	let casting = $state<actions.Choice | null>(null);
 	async function vote(choice: actions.Choice) {
+		const p = proposal?.current;
+		if (!p?.me.membership) return;
+		const membership = p.me.membership;
 		casting = choice;
 		try {
-			await flow.act((s, w) => actions.vote(s, w, id, choice));
+			await flow.act((s, w) => actions.vote(s, w, id, choice, membership, p.closesAt));
 		} finally {
 			casting = null;
 		}
@@ -88,8 +91,6 @@
 				</div>
 			</div>
 		</div>
-
-		<Problem message={store.problem} />
 
 		<div class="grid gap-8 lg:grid-cols-[1fr_320px]">
 			<section class="space-y-8">
@@ -180,6 +181,7 @@
 						>
 					{:else if p.me.mayVote}
 						<Panel padding="sm" class="space-y-3">
+							<Problem message={store.problem} />
 							<div class="grid grid-cols-2 gap-3">
 								<Button variant="accent" disabled={store.busy} onclick={() => vote('Yes')}>
 									{#if casting === 'Yes'}<Loader size={14} class="animate-spin" />{/if}Yes

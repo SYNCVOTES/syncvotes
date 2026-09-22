@@ -73,15 +73,24 @@ const preparing = () => working('Preparing the transaction');
 
 export type Choice = 'Yes' | 'No' | 'Abstain';
 
-/** A ballot is cast from the voter's own membership contract, which the proposal page names. */
-export async function vote(s: Signer, who: Identity, proposalId: string, choice: Choice) {
-	const { me, closesAt } = await remote.proposal(proposalId);
-	if (!me.membership) throw new Error('You are not a member of this DAO');
+/**
+ * A ballot is cast from the voter's own membership contract, which the proposal page names
+ * along with the deadline it shows — what the page knows already is not fetched again, since
+ * every round trip is felt.
+ */
+export async function vote(
+	s: Signer,
+	who: Identity,
+	proposalId: string,
+	choice: Choice,
+	membership: string,
+	closesAt: string
+) {
 	preparing();
 	const prepared = await remote.prepareVote({ proposal: proposalId, vote: choice });
 	const intent = {
 		choice: 'Member_Vote',
-		contractId: me.membership,
+		contractId: membership,
 		args: { proposalId, closesAt, vote: choice }
 	};
 	await sign(s, who, intent, prepared);
