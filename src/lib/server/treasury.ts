@@ -193,7 +193,12 @@ export async function transferAll(treasury: string, to: string, memo: string): P
 /** Coin sent to the treasury that waits for its acceptance: accepted, as the treasury. */
 export async function acceptIncoming(treasury: string): Promise<number> {
 	const token = (await sdk()).token;
-	const pending = await token.transfer.pending(treasury);
+	// What waits for the treasury's word: coin sent to it. A payout it sent, waiting for the
+	// receiver, is listed too and is not its to accept.
+	const pending = (await token.transfer.pending(treasury)).filter(
+		(p) =>
+			(p.interfaceViewValue.transfer as { receiver?: string } | undefined)?.receiver === treasury
+	);
 	let accepted = 0;
 	for (const p of pending) {
 		try {

@@ -600,11 +600,12 @@ export const commentForm = form(schemas.commentForm, async ({ proposal, body }) 
 	};
 });
 
-const myComment = (id: string): ledger.Comment => {
+/** The caller's own comment, by its contract; 403 for someone else's. */
+const myComment = (contractId: string): ledger.Comment => {
 	const me = session.required();
 	for (const thread of ledger.comments.values()) {
-		const c = thread.get(id);
-		if (c) {
+		for (const c of thread.values()) {
+			if (c.contractId !== contractId) continue;
 			if (c.author !== me) error(403, 'Not your comment');
 			return c;
 		}

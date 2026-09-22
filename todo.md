@@ -90,3 +90,12 @@
       after v1 and DAO DAO (`syncvotes-rules` 0.10.0)
 - [x] shares of the vote: a table at the founding, moved only by a share proposal; ballots weigh
       shares; a share changed mid-vote casts no ballot (`syncvotes-shares` 0.11.0)
+- [x] the treasury back, as a party of the DAO's own that the app acts for: anyone pays in to its
+      address, traffic is collected from it, payouts and the remainder on dissolution leave it
+      by vote; shares in whole units, DAOs by membership or by shares, share changes carried out
+      in batches (up to 2000 per proposal); votes that may change until the deadline (never with
+      early settlement); Markdown with pictures by link; comments; profiles
+      (`syncvotes-treasury` 0.12.0)
+- [ ] a treasury the provider cannot touch (m-of-n signers by vote, live signing sessions) as an
+      option per DAO, if wanted: `bb62260` has the working pieces
+- [ ] dividends: a payout split among members by share (one transfer per member, ~7.5 KB each)

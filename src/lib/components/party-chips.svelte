@@ -31,8 +31,11 @@
 	} = $props();
 
 	type Status = 'checking' | remote.PartyCheck;
-	let tokens = $state<string[]>([]);
-	let status = $state<Record<string, Status>>({});
+	// Parties handed in at the start (a field filled with what is there today) are chips already.
+	let tokens = $state<string[]>([...parties]);
+	let status = $state<Record<string, Status>>(
+		Object.fromEntries(parties.map((p) => [p, 'addable' as Status]))
+	);
 	let text = $state('');
 	let expanded = $state(false);
 
