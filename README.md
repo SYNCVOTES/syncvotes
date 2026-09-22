@@ -193,32 +193,32 @@ submissions. `verify.ts` takes the package name from the same place.
 
 ## Layout
 
-| Path                             | What it is                                                                               |
-| -------------------------------- | ---------------------------------------------------------------------------------------- |
-| `daml/src/Main.daml`             | `Account`, `DAO`, `Member`, `Proposal`, `Ballot` — the whole model                       |
-| `daml.js/`                       | Generated bindings — never edit, regenerate with `pnpm daml:codegen`                     |
-| `src/lib/wallet.ts`              | Phrase → signer closure; any number of keys encrypted at rest per device                 |
-| `src/lib/auto-lock.ts`           | Says when the key has been idle for 15 minutes, or the page is being left                |
-| `src/lib/wallet-store.svelte.ts` | The wallet as one rune store: onboarding screens, signer, identity                       |
-| `src/lib/verify.ts`              | Recomputes hashes and inspects transactions before anything is signed                    |
-| `src/lib/schemas.ts`             | One valibot schema per field and the batch size; browser and server check the same       |
-| `src/lib/forms.ts`               | signedForm(): submit, verify the prepared transaction against the fields, sign, go on    |
-| `src/lib/actions.ts`             | What the browser does: call the API, verify, sign, call again; member batches            |
-| `src/lib/api.remote.ts`          | The server API as remote functions: reads, forms, prepares, execute                      |
-| `src/lib/server/participant.ts`  | The participant: topology, allocation (single or multi-key), prepare and execute         |
-| `src/lib/server/ledger.ts`       | The provider's copy of the ledger in memory, fed by the update stream, with wake-ups     |
-| `src/lib/server/tally.ts`        | The provider's jobs: Proposal_Tally in batches, DAO_Execute for what passed              |
-| `src/lib/server/splice.ts`       | Canton Coin: the rules, the open round and prices, from public Scan                      |
-| `src/lib/server/treasury.ts`     | A DAO's treasury party: allocation, pre-approval, holdings, transfers, accepting coin    |
-| `src/lib/server/billing.ts`      | Traffic charged to the DAO that caused it; collected from its treasury; the funds gate   |
-| `src/lib/server/session.ts`      | Read sessions: a signed challenge behind an HttpOnly cookie                              |
-| `src/routes/(app)/`              | My DAOs, DAO, Create DAO, Proposal, Create proposal, Wallet                              |
-| `src/routes/+page.svelte`        | The landing (v1's Consensus Engine), Tailwind on the markup, `field.ts`                  |
-| `src/lib/components/ui/`         | shadcn-svelte primitives only (button, badge, input, textarea, label)                    |
-| `src/lib/components/`            | Everything built on them: page column, panels, lists, forms, header, footer, `landing-*` |
-| `src/lib/components/profile-form.svelte` | The party's name, picture and words, on the wallet page                         |
-| `src/lib/markdown.ts`            | Markdown as the app renders it: marked, then DOMPurify in the browser                    |
-| `compose.yaml`                   | The compose project for the servers, Caddy config inline                                 |
+| Path                                     | What it is                                                                               |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `daml/src/Main.daml`                     | `Account`, `DAO`, `Member`, `Proposal`, `Ballot` — the whole model                       |
+| `daml.js/`                               | Generated bindings — never edit, regenerate with `pnpm daml:codegen`                     |
+| `src/lib/wallet.ts`                      | Phrase → signer closure; any number of keys encrypted at rest per device                 |
+| `src/lib/auto-lock.ts`                   | Says when the key has been idle for 15 minutes, or the page is being left                |
+| `src/lib/wallet-store.svelte.ts`         | The wallet as one rune store: onboarding screens, signer, identity                       |
+| `src/lib/verify.ts`                      | Recomputes hashes and inspects transactions before anything is signed                    |
+| `src/lib/schemas.ts`                     | One valibot schema per field and the batch size; browser and server check the same       |
+| `src/lib/forms.ts`                       | signedForm(): submit, verify the prepared transaction against the fields, sign, go on    |
+| `src/lib/actions.ts`                     | What the browser does: call the API, verify, sign, call again; member batches            |
+| `src/lib/api.remote.ts`                  | The server API as remote functions: reads, forms, prepares, execute                      |
+| `src/lib/server/participant.ts`          | The participant: topology, allocation (single or multi-key), prepare and execute         |
+| `src/lib/server/ledger.ts`               | The provider's copy of the ledger in memory, fed by the update stream, with wake-ups     |
+| `src/lib/server/tally.ts`                | The provider's jobs: Proposal_Tally in batches, DAO_Execute for what passed              |
+| `src/lib/server/splice.ts`               | Canton Coin: the rules, the open round and prices, from public Scan                      |
+| `src/lib/server/treasury.ts`             | A DAO's treasury party: allocation, pre-approval, holdings, transfers, accepting coin    |
+| `src/lib/server/billing.ts`              | Traffic charged to the DAO that caused it; collected from its treasury; the funds gate   |
+| `src/lib/server/session.ts`              | Read sessions: a signed challenge behind an HttpOnly cookie                              |
+| `src/routes/(app)/`                      | My DAOs, DAO, Create DAO, Proposal, Create proposal, Wallet                              |
+| `src/routes/+page.svelte`                | The landing (v1's Consensus Engine), Tailwind on the markup, `field.ts`                  |
+| `src/lib/components/ui/`                 | shadcn-svelte primitives only (button, badge, input, textarea, label)                    |
+| `src/lib/components/`                    | Everything built on them: page column, panels, lists, forms, header, footer, `landing-*` |
+| `src/lib/components/profile-form.svelte` | The party's name, picture and words, on the wallet page                                  |
+| `src/lib/markdown.ts`                    | Markdown as the app renders it: marked, then DOMPurify in the browser                    |
+| `compose.yaml`                           | The compose project for the servers, Caddy config inline                                 |
 
 The private key exists only inside a closure (`Signer`): the page can ask it to sign, to encrypt
 itself for storage, or to dispose — never to reveal itself. Every write is a transaction the

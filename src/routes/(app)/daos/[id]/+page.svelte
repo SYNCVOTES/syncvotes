@@ -41,6 +41,9 @@
 	const preview = $derived(me ? remote.daoMembers({ id, offset: 0, limit: 8, q: '' }) : null);
 
 	const pct = (units: number, of: number) => (of > 0 ? Math.round((units / of) * 1000) / 10 : 0);
+	// The facts of a proposal as small tags, so a list scans instead of reads.
+	const tag =
+		'inline-flex items-center rounded-full border border-border bg-surface-hover px-2 py-0.5 font-mono text-[0.6875rem] text-ink-mid';
 </script>
 
 <svelte:head><title>{dao?.current?.name ?? 'DAO'} — SyncVotes</title></svelte:head>
@@ -137,12 +140,19 @@
 							<ListItem href="/proposals/{p.id}" padding="md">
 								<div class="min-w-0 flex-1">
 									<div class="truncate font-display text-[15px] font-bold">{p.title}</div>
-									<div class="mt-1 font-mono text-xs text-ink-dim">
-										by <PartyId party={p.proposer} class="align-middle" /> · {dateOf(p.createdAt)}
-										· <EffectLabel effect={p.effect} equal={d.equal} /> · {short(p.rule)} · {pct(
-											p.yes + p.no + p.abstain,
-											p.eligible
-										)}% counted · {p.outcome ? 'closed' : `closes ${relative(p.closesAt)}`}
+									<div
+										class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-xs text-ink-dim"
+									>
+										<PartyId party={p.proposer} />
+										<span>{dateOf(p.createdAt)}</span>
+									</div>
+									<div class="mt-2 flex flex-wrap items-center gap-1.5">
+										<span class={tag}><EffectLabel effect={p.effect} equal={d.equal} /></span>
+										<span class={tag}>{short(p.rule)}</span>
+										<span class={tag}>{pct(p.yes + p.no + p.abstain, p.eligible)}% counted</span>
+										<span class={tag}
+											>{p.outcome ? 'closed' : `closes ${relative(p.closesAt)}`}</span
+										>
 									</div>
 								</div>
 								<StatusBadge outcome={p.outcome} closesAt={p.closesAt} executedAt={p.executedAt} />
