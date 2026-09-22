@@ -97,8 +97,31 @@ export const createDaoForm = v.pipe(
 		description: daoDescription,
 		image: imageUrl,
 		equal: yesNo,
-		shares: shareChanges
+		shares: shareChanges,
+		basis: v.picklist(['all', 'cast']),
+		threshold: v.picklist(['majority', 'percent']),
+		percent: v.pipe(
+			v.optional(v.number('A percentage'), 67),
+			v.integer('Whole percent'),
+			v.minValue(1, 'At least 1%'),
+			v.maxValue(100, 'At most 100%')
+		),
+		quorum: v.pipe(
+			v.optional(v.number('A percentage'), 0),
+			v.integer('Whole percent'),
+			v.minValue(0, 'At least 0%'),
+			v.maxValue(100, 'At most 100%')
+		),
+		early: yesNo,
+		changeable: yesNo
 	}),
+	v.forward(
+		v.check(
+			(f) => !(f.early === 'yes' && f.changeable === 'yes'),
+			'Votes that may change cannot settle early'
+		),
+		['changeable']
+	),
 	v.forward(
 		v.check((f) => f.shares.every((r) => r.share > 0), 'Every founding member holds a share'),
 		['shares']
@@ -112,26 +135,7 @@ export const createDaoForm = v.pipe(
 	)
 );
 
-export const effectKind = v.picklist(['signal', 'shares', 'info', 'payout', 'dissolve']);
-
-const ruleFields = {
-	basis: v.picklist(['all', 'cast']),
-	threshold: v.picklist(['majority', 'percent']),
-	percent: v.pipe(
-		v.optional(v.number('A percentage'), 67),
-		v.integer('Whole percent'),
-		v.minValue(1, 'At least 1%'),
-		v.maxValue(100, 'At most 100%')
-	),
-	quorum: v.pipe(
-		v.optional(v.number('A percentage'), 0),
-		v.integer('Whole percent'),
-		v.minValue(0, 'At least 0%'),
-		v.maxValue(100, 'At most 100%')
-	),
-	early: yesNo,
-	changeable: yesNo
-};
+export const effectKind = v.picklist(['signal', 'shares', 'info', 'payout', 'dissolve', 'rule']);
 
 export const coinAmount = v.pipe(
 	v.number('An amount of coin'),
@@ -155,8 +159,47 @@ export const createProposalForm = v.pipe(
 		payoutAmount: v.optional(v.number('An amount of coin'), 0),
 		payoutReason: v.optional(v.pipe(v.string(), v.maxLength(500, 'At most 500 characters')), ''),
 		remainderTo: v.optional(v.string(), ''),
-		...ruleFields
+		basis: v.picklist(['all', 'cast']),
+		threshold: v.picklist(['majority', 'percent']),
+		percent: v.pipe(
+			v.optional(v.number('A percentage'), 67),
+			v.integer('Whole percent'),
+			v.minValue(1, 'At least 1%'),
+			v.maxValue(100, 'At most 100%')
+		),
+		quorum: v.pipe(
+			v.optional(v.number('A percentage'), 0),
+			v.integer('Whole percent'),
+			v.minValue(0, 'At least 0%'),
+			v.maxValue(100, 'At most 100%')
+		),
+		early: yesNo,
+		changeable: yesNo,
+		// The DAO's new rule, for a proposal that changes it.
+		newBasis: v.optional(v.picklist(['all', 'cast']), 'all'),
+		newThreshold: v.optional(v.picklist(['majority', 'percent']), 'majority'),
+		newPercent: v.pipe(
+			v.optional(v.number('A percentage'), 67),
+			v.integer('Whole percent'),
+			v.minValue(1, 'At least 1%'),
+			v.maxValue(100, 'At most 100%')
+		),
+		newQuorum: v.pipe(
+			v.optional(v.number('A percentage'), 0),
+			v.integer('Whole percent'),
+			v.minValue(0, 'At least 0%'),
+			v.maxValue(100, 'At most 100%')
+		),
+		newEarly: v.optional(yesNo, 'yes'),
+		newChangeable: v.optional(yesNo, 'no')
 	}),
+	v.forward(
+		v.check(
+			(f) => f.kind !== 'rule' || !(f.newEarly === 'yes' && f.newChangeable === 'yes'),
+			'Votes that may change cannot settle early'
+		),
+		['newChangeable']
+	),
 	v.forward(
 		v.check(
 			(f) => f.kind !== 'shares' || v.safeParse(shareChanges, f.shares).success,

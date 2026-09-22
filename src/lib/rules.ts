@@ -126,6 +126,21 @@ export function standing(
 	return { needed, denominator, quorumMet, note };
 }
 
+/**
+ * Whether `r` asks at least as much as `charter`, as the ledger checks it: never measured
+ * against less, never a lower threshold (a majority is just over half), never a smaller
+ * quorum, never settled early where the charter waits. Letting votes change asks nothing less.
+ */
+export function atLeast(charter: Rule, r: Rule): boolean {
+	if (charter.basis === 'all' && r.basis !== 'all') return false;
+	if (r.quorum < charter.quorum) return false;
+	if (!charter.early && r.early) return false;
+	const c = charter.threshold;
+	const t = r.threshold;
+	if (c.kind === 'majority') return t.kind === 'majority' || t.percent > 50;
+	return t.kind === 'percent' ? t.percent >= c.percent : c.percent <= 50;
+}
+
 /** The rule as the ledger's JSON writes it: enums as text, ints as text, the variant tagged. */
 export const toLedger = (r: Rule) => ({
 	basis: r.basis === 'all' ? 'OfAll' : 'OfCast',

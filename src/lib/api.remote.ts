@@ -13,7 +13,7 @@ import * as tally from './server/tally';
 import { fingerprintOf } from './verify';
 import { normaliseHint, hintProblem } from './hint';
 import * as schemas from './schemas';
-import { toLedger, type Rule } from './rules';
+import { atLeast, toLedger, type Rule } from './rules';
 
 /**
  * The server's API as remote functions: pages call these like local functions and SvelteKit
@@ -456,39 +456,53 @@ const nullable = (s: string) => (s === '' ? null : s);
  * submitting, so issues show under the field, and here again — then the transaction is
  * prepared. The browser verifies it says what the form said, signs it and executes it.
  */
-export const createDaoForm = form(
-	schemas.createDaoForm,
-	async ({ daoName, description, image, equal, shares }) => {
-		const party = session.required();
-		const account = accountOf(party).contractId;
-		if (!shares.some((r) => r.party === party)) error(400, 'You have to hold a share yourself');
-		for (const r of shares) {
-			if (!ledger.accounts.has(r.party)) error(404, `${r.party} is not registered with the app`);
-		}
-		const id = crypto.randomUUID();
-		// The creator's own share is in the first batch, so the DAO is theirs from the start.
-		const ordered = [
-			...shares.filter((r) => r.party === party),
-			...shares.filter((r) => r.party !== party)
-		];
-		const treasuryParty = await treasury.allocate(id);
-		const args = {
-			id,
-			daoName,
-			description,
-			image: nullable(image),
-			equal: equal === 'yes',
-			treasury: treasuryParty,
-			shares: shareRows(ordered.slice(0, schemas.BATCH)),
-			more: shareRows(ordered.slice(schemas.BATCH))
-		};
-		return {
-			id,
-			args,
-			prepared: await prepare(party, Main.Account, account, 'Account_CreateDAO', args, null)
-		};
+export const createDaoForm = form(schemas.createDaoForm, async (f) => {
+	const { daoName, description, image, equal, shares } = f;
+	const party = session.required();
+	const account = accountOf(party).contractId;
+	if (!shares.some((r) => r.party === party)) error(400, 'You have to hold a share yourself');
+	for (const r of shares) {
+		if (!ledger.accounts.has(r.party)) error(404, `${r.party} is not registered with the app`);
 	}
-);
+	const id = crypto.randomUUID();
+	// The creator's own share is in the first batch, so the DAO is theirs from the start.
+	const ordered = [
+		...shares.filter((r) => r.party === party),
+		...shares.filter((r) => r.party !== party)
+	];
+	const treasuryParty = await treasury.allocate(id);
+	const args = {
+		id,
+		daoName,
+		description,
+		image: nullable(image),
+		equal: equal === 'yes',
+		treasury: treasuryParty,
+		rule: toLedger(ruleOf(f, '')),
+		shares: shareRows(ordered.slice(0, schemas.BATCH)),
+		more: shareRows(ordered.slice(schemas.BATCH))
+	};
+	return {
+		id,
+		args,
+		prepared: await prepare(party, Main.Account, account, 'Account_CreateDAO', args, null)
+	};
+});
+
+/** A rule from a form's fields, plain or prefixed (`newBasis`…). */
+const ruleOf = (f: Record<string, unknown>, prefix: 'new' | ''): Rule => {
+	const field = (name: string) => f[prefix ? prefix + name[0].toUpperCase() + name.slice(1) : name];
+	return {
+		basis: field('basis') as Rule['basis'],
+		threshold:
+			field('threshold') === 'percent'
+				? { kind: 'percent', percent: Number(field('percent')) }
+				: { kind: 'majority' },
+		quorum: Number(field('quorum')),
+		early: field('early') === 'yes',
+		changeable: field('changeable') === 'yes'
+	};
+};
 
 export const createProposalForm = form(schemas.createProposalForm, async (f) => {
 	const party = session.required();
@@ -510,6 +524,9 @@ export const createProposalForm = form(schemas.createProposalForm, async (f) => 
 			break;
 		case 'dissolve':
 			action = { tag: 'Dissolve', value: { remainderTo: f.remainderTo.trim() } };
+			break;
+		case 'rule':
+			action = { tag: 'SetRule', value: { rule: toLedger(ruleOf(f, 'new')) } };
 			break;
 		case 'payout':
 			action = {
@@ -541,14 +558,8 @@ export const createProposalForm = form(schemas.createProposalForm, async (f) => 
 		default:
 			action = { tag: 'Signal', value: {} };
 	}
-	const rule: Rule = {
-		basis: f.basis,
-		threshold:
-			f.threshold === 'percent' ? { kind: 'percent', percent: f.percent } : { kind: 'majority' },
-		quorum: f.quorum,
-		early: f.early === 'yes',
-		changeable: f.changeable === 'yes'
-	};
+	const rule = ruleOf(f, '');
+	if (!atLeast(d.rule, rule)) error(400, "A proposal cannot ask less than the DAO's rule");
 	const args = {
 		dao: d.contractId,
 		pid,

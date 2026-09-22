@@ -4,6 +4,7 @@
 	import Markdown from './markdown.svelte';
 	import LoadMore from './load-more.svelte';
 	import { coin, fmt } from '$lib/format';
+	import { describe, type Rule } from '$lib/rules';
 
 	/**
 	 * What a proposal does when it passes, spelled out — for a share change, who joins, who
@@ -14,7 +15,8 @@
 		| { kind: 'shares'; changes: { party: string; share: number }[] }
 		| { kind: 'info'; name: string; description: string; image: string | null }
 		| { kind: 'payout'; to: string; amount: number; reason: string }
-		| { kind: 'dissolve'; remainderTo: string };
+		| { kind: 'dissolve'; remainderTo: string }
+		| { kind: 'rule'; rule: Rule };
 	let {
 		effect,
 		executed,
@@ -42,6 +44,8 @@
 				return 'Payout';
 			case 'dissolve':
 				return 'Dissolution';
+			case 'rule':
+				return 'The rule';
 			default:
 				return 'Decision';
 		}
@@ -128,6 +132,14 @@
 			Dissolves the DAO once every other vote has settled; whatever the treasury holds goes to
 			<PartyId party={effect.remainderTo} class="align-middle" />. Its settled proposals stay
 			readable; nothing new can be proposed.
+		</p>
+	{:else if effect.kind === 'rule'}
+		<p class="text-[13px] text-ink-mid">
+			From then on every proposal passes when {describe(effect.rule)}{effect.rule.early
+				? ', settling early once that is sure'
+				: effect.rule.changeable
+					? ', votes may change, decided at the deadline'
+					: ', decided at the deadline'}. A proposer may ask for more, never less.
 		</p>
 	{:else}
 		<p class="text-[13px] text-ink-mid">Decides, and does nothing else.</p>

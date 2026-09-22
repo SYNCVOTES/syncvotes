@@ -17,6 +17,8 @@
 	import ImageField from '$lib/components/image-field.svelte';
 	import Note from '$lib/components/note.svelte';
 	import Hint from '$lib/components/hint.svelte';
+	import RulePicker from '$lib/components/rule-picker.svelte';
+	import { PRESETS, toLedger, type Rule } from '$lib/rules';
 	import Users from '@lucide/svelte/icons/users';
 	import PieChart from '@lucide/svelte/icons/pie-chart';
 	import { fmt } from '$lib/format';
@@ -60,13 +62,26 @@
 	});
 	let description = $state('');
 	let image = $state('');
+	// What every proposal takes to pass, at the least; a majority of all to start with.
+	let rule = $state<Rule>({ ...PRESETS[0].rule!, threshold: { ...PRESETS[0].rule!.threshold } });
 
 	// The intent is the founding table as the ledger reads it: the first batch of rows, and the
 	// rest as a proposal already passed. The server orders the creator first; so does this.
 	const enhanced = signedForm(
 		f,
 		schema,
-		({ daoName, description, image, equal, shares }, { id, args }) => {
+		(fields, { id, args }) => {
+			const { daoName, description, image, equal, shares } = fields;
+			const charter: Rule = {
+				basis: fields.basis,
+				threshold:
+					fields.threshold === 'percent'
+						? { kind: 'percent', percent: fields.percent }
+						: { kind: 'majority' },
+				quorum: fields.quorum,
+				early: fields.early === 'yes',
+				changeable: fields.changeable === 'yes'
+			};
 			const me = store.who!.party;
 			const ordered = [
 				...shares.filter((r) => r.party === me),
@@ -83,6 +98,7 @@
 					image: image || null,
 					equal: equal === 'yes',
 					treasury: args.treasury,
+					rule: toLedger(charter),
 					shares: ordered.slice(0, BATCH).map(tuple),
 					more: ordered.slice(BATCH).map(tuple)
 				}
@@ -163,6 +179,15 @@
 					This cannot be changed later: a DAO by membership stays one, and so does one by shares.
 					Who is in it, and with how many units, changes by vote.
 				</Note>
+			</FormSection>
+
+			<FormSection title="What it takes to pass">
+				<p class="text-xs leading-relaxed text-ink-mid">
+					The least any proposal takes to pass. Whoever proposes may ask for more — a bigger
+					majority, a quorum, unanimity — never less. Changing this later is itself a proposal,
+					passed under this very rule.
+				</p>
+				<RulePicker bind:rule eligible={summary.units} equal={mode === 'equal'} />
 			</FormSection>
 
 			<FormSection title={mode === 'equal' ? 'Founding members' : 'Founding shares'}>

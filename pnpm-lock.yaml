@@ -12,8 +12,8 @@ importers:
         specifier: ^1.5.0
         version: 1.5.0
       '@daml.js/model':
-        specifier: workspace:@daml.js/syncvotes-treasury-0.12.0@*
-        version: link:daml.js/syncvotes-treasury-0.12.0
+        specifier: workspace:@daml.js/syncvotes-bylaws-0.13.0@*
+        version: link:daml.js/syncvotes-bylaws-0.13.0
       '@daml/types':
         specifier: 3.5.2
         version: 3.5.2
@@ -247,7 +247,7 @@ importers:
         specifier: ^3.1.0
         version: 3.1.0
 
-  daml.js/syncvotes-treasury-0.12.0:
+  daml.js/syncvotes-bylaws-0.13.0:
     dependencies:
       '@daml.js/daml-prim-DA-Types-1.0.0':
         specifier: file:../daml-prim-DA-Types-1.0.0

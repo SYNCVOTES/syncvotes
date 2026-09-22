@@ -23,7 +23,8 @@
 	import ShareBar from '$lib/components/share-bar.svelte';
 	import Markdown from '$lib/components/markdown.svelte';
 	import Note from '$lib/components/note.svelte';
-	import { short } from '$lib/rules';
+	import { short, describe } from '$lib/rules';
+	import Hint from '$lib/components/hint.svelte';
 	import Problem from '$lib/components/problem.svelte';
 	import TreasuryPanel from '$lib/components/treasury-panel.svelte';
 	import Plus from '@lucide/svelte/icons/plus';
@@ -74,6 +75,12 @@
 					<div class="mt-3 flex flex-wrap items-center gap-2">
 						<Badge variant="accent">Private</Badge>
 						<Badge>{d.equal ? 'By membership' : 'By shares'}</Badge>
+						<Badge>{short(d.rule)}</Badge>
+						<Hint
+							text="The DAO's rule: every proposal passes when {describe(
+								d.rule
+							)}, at the least. A proposer may ask for more, never less. The rule changes only by a proposal passed under it."
+						/>
 						{#if d.me.creator}<Badge variant="amber">You created it</Badge>{:else}<Badge
 								variant="green">Member</Badge
 							>{/if}

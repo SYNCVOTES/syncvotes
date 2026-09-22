@@ -16,7 +16,8 @@ export type Effect =
 	| { kind: 'shares'; changes: { party: string; share: number }[] }
 	| { kind: 'info'; name: string; description: string; image: string | null }
 	| { kind: 'payout'; to: string; amount: number; reason: string }
-	| { kind: 'dissolve'; remainderTo: string };
+	| { kind: 'dissolve'; remainderTo: string }
+	| { kind: 'rule'; rule: Rule };
 
 export type Account = { contractId: string; party: string };
 export type Dao = {
@@ -31,6 +32,8 @@ export type Dao = {
 	image: string | null;
 	/** One member, one unit of the vote. */
 	equal: boolean;
+	/** The least any proposal takes to pass; a proposer may ask for more. */
+	rule: Rule;
 	createdAt: string;
 	members: number;
 	/** The whole vote, in units. */
@@ -260,6 +263,8 @@ const effect = (v: unknown): Effect => {
 			};
 		case 'Dissolve':
 			return { kind: 'dissolve', remainderTo: text(t.value.remainderTo) };
+		case 'SetRule':
+			return { kind: 'rule', rule: rule(t.value.rule) };
 		default:
 			return { kind: 'signal' };
 	}
@@ -282,6 +287,7 @@ function created({ contractId, templateId, createArgument: a }: Created) {
 				description: text(a.description),
 				image: optional(a.image),
 				equal: a.equal === true,
+				rule: rule(a.rule),
 				createdAt: text(a.createdAt),
 				members: num(a.members),
 				units: num(a.units)

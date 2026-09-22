@@ -5,6 +5,8 @@
 	import Power from '@lucide/svelte/icons/power';
 	import Coins from '@lucide/svelte/icons/coins';
 	import MessageSquare from '@lucide/svelte/icons/message-square';
+	import Scale from '@lucide/svelte/icons/scale';
+	import { short } from '$lib/rules';
 	import { coin, fmt } from '$lib/format';
 	import type { Effect } from './effect-card.svelte';
 
@@ -26,6 +28,8 @@
 				return `pay ${coin(effect.amount)}`;
 			case 'dissolve':
 				return 'dissolve';
+			case 'rule':
+				return `rule: ${short(effect.rule)}`;
 			default:
 				return 'decision';
 		}
@@ -41,7 +45,9 @@
 					? Coins
 					: effect.kind === 'dissolve'
 						? Power
-						: MessageSquare
+						: effect.kind === 'rule'
+							? Scale
+							: MessageSquare
 	);
 </script>
 

@@ -15,6 +15,9 @@ import DA.Optional (isNone, isSome)
 -- proposal executed) are controlled by both, and neither has the other's key. The creator has
 -- no say of their own beyond that signature: everything a DAO does, it decides by vote.
 --
+-- A DAO has one rule of its own, set at the founding and changed only by vote: the least any
+-- proposal takes to pass. A proposer may ask for more than that, never less.
+--
 -- Members hold shares of the vote, counted in whole units — one each in a DAO that votes by
 -- membership, any number in one that votes by shares — and a ballot weighs the voter's units.
 -- Shares change only by vote, and a share moved while a proposal is open does not vote on it
@@ -54,6 +57,8 @@ data Effect
       reason : Text
   | Dissolve with
       remainderTo : Party
+  | SetRule with
+      rule : Rule
   deriving (Eq, Show)
 
 -- | What counts as passing, chosen per proposal. Yes is measured against all members, or
@@ -84,6 +89,21 @@ validRule r =
     && case r.threshold of
       Majority -> True
       Percent p -> p >= 1 && p <= 100
+
+-- | Whether a proposal's rule asks at least as much as the DAO's own: never measured against
+-- less (the votes cast where the DAO says the whole vote), never a lower threshold (a majority
+-- is just over half: more than any percentage up to fifty), never a smaller quorum, and never
+-- settled early where the DAO waits for the deadline. Letting votes change asks nothing less.
+atLeast : Rule -> Rule -> Bool
+atLeast charter r =
+  (charter.basis == OfCast || r.basis == OfAll)
+    && r.quorum >= charter.quorum
+    && (charter.early || not r.early)
+    && case (charter.threshold, r.threshold) of
+      (Majority, Majority) -> True
+      (Majority, Percent q) -> q > 50
+      (Percent p, Percent q) -> q >= p
+      (Percent p, Majority) -> p <= 50
 
 -- | Members created, reshared or removed per transaction; longer lists are carried out in
 -- several.
@@ -125,12 +145,14 @@ template Account
         image : Optional Text
         equal : Bool
         treasury : Party
+        rule : Rule
         shares : [(Party, Int)]
         more : [(Party, Int)]
       controller user
       do
         now <- getTime
         assertMsg "A DAO needs a name" (daoName /= "")
+        assertMsg "The rule's numbers are out of range" (validRule rule)
         assertMsg "The founding shares must be whole" (validChanges equal (shares ++ more))
         assertMsg "The first batch is one to a batch" (not (null shares) && length shares <= batch)
         assertMsg "The founding shares are all positive" (all (\(_, u) -> u > 0) (shares ++ more))
@@ -149,7 +171,7 @@ template Account
             yes = 0; no = 0; abstain = 0; outcome = Some Passed; executed = 0; executedAt = None
         create DAO with
           provider; operator; creator = user; treasury; id; name = daoName; description; image
-          equal; createdAt = now; members = length shares; units = sum (map snd shares)
+          equal; rule; createdAt = now; members = length shares; units = sum (map snd shares)
 
     -- How a party presents itself: a name, a picture, a few words. One per party; replacing
     -- it hands in the old one.
@@ -185,6 +207,8 @@ template DAO
     image : Optional Text
     -- One member, one unit: the vote is by membership rather than by shares.
     equal : Bool
+    -- What every proposal takes to pass, at the least; a proposer may ask for more, never less.
+    rule : Rule
     createdAt : Time
     members : Int
     -- The whole vote: what every member's units add up to.
@@ -225,6 +249,9 @@ template DAO
           Dissolve _ -> do
             exercise proposal Proposal_Advance with upTo = 1
             pure None
+          SetRule newRule -> do
+            exercise proposal Proposal_Advance with upTo = 1
+            Some <$> create this with rule = newRule
           SetShares changes -> do
             let from = p.executed
                 slice = take (upTo - from) (drop from changes)
@@ -312,9 +339,11 @@ template Member
         assertMsg "Not this member's DAO" (found.id == daoId)
         assertMsg "The deadline must be in the future" (closesAt > now)
         assertMsg "The rule's numbers are out of range" (validRule rule)
+        assertMsg "A proposal cannot ask less than the DAO's rule" (atLeast found.rule rule)
         case action of
           Signal -> pure ()
           Dissolve _ -> pure ()
+          SetRule newRule -> assertMsg "The new rule's numbers are out of range" (validRule newRule)
           SetInfo daoName _ _ -> assertMsg "A DAO needs a name" (daoName /= "")
           Payout _ amount _ -> assertMsg "A payout is a positive amount" (amount > 0.0)
           SetShares changes ->
