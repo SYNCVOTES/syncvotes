@@ -98,7 +98,7 @@
 				</Panel>
 
 				{#if p.effect.kind !== 'signal'}
-					<EffectCard effect={p.effect} executedAt={p.executedAt} />
+					<EffectCard effect={p.effect} executedAt={p.executedAt} members={p.members} />
 					{#if p.outcome === 'Passed' && !p.executedAt}
 						<Note mono={false}>Passed; being carried out.</Note>
 					{/if}

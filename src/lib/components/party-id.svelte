@@ -4,9 +4,10 @@
 	import { hintOf } from '$lib/format';
 
 	/**
-	 * A party, as it is named everywhere: the hint it chose, then enough of its fingerprint to
-	 * tell it from another party with the same hint, and the full id a click away. Copying is
-	 * how people add each other and check who signed what.
+	 * A party, as it is named everywhere: the hint it chose, the two colons, and enough of its
+	 * fingerprint to tell it from another party with the same hint — the id's own shape, cut
+	 * short — with the full id a click away. Copying is how people add each other and check who
+	 * signed what.
 	 */
 	let {
 		party,
@@ -35,7 +36,7 @@
 	title={party}
 >
 	<span class="truncate">
-		<span class="text-ink">{hintOf(party)}</span><span class="text-ink-dim"> · {short}</span>
+		<span class="text-ink">{hintOf(party)}</span><span class="text-ink-dim">::{short}…</span>
 	</span>
 	<button
 		type="button"

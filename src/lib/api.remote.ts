@@ -306,6 +306,7 @@ export const proposal = query.live(contractId, (id) =>
 		return {
 			...p,
 			daoName: dao?.name ?? null,
+			members: ledger.members.get(p.daoId)?.size ?? 0,
 			cast: ledger.ballots.get(id)?.size ?? 0,
 			me: {
 				membership: me?.contractId ?? null,
