@@ -12,8 +12,8 @@ importers:
         specifier: ^1.5.0
         version: 1.5.0
       '@daml.js/model':
-        specifier: workspace:@daml.js/syncvotes-charter-0.7.0@*
-        version: link:daml.js/syncvotes-charter-0.7.0
+        specifier: workspace:@daml.js/syncvotes-board-0.8.0@*
+        version: link:daml.js/syncvotes-board-0.8.0
       '@daml/types':
         specifier: 3.5.2
         version: 3.5.2
@@ -241,49 +241,7 @@ importers:
         specifier: ^3.1.0
         version: 3.1.0
 
-  daml.js/splice-api-token-holding-v1-1.0.0:
-    dependencies:
-      '@daml.js/daml-stdlib-DA-Time-Types-1.0.0':
-        specifier: file:../daml-stdlib-DA-Time-Types-1.0.0
-        version: link:../daml-stdlib-DA-Time-Types-1.0.0
-      '@daml.js/ghc-stdlib-DA-Internal-Template-1.0.0':
-        specifier: file:../ghc-stdlib-DA-Internal-Template-1.0.0
-        version: link:../ghc-stdlib-DA-Internal-Template-1.0.0
-      '@daml.js/splice-api-token-metadata-v1-1.0.0':
-        specifier: file:../splice-api-token-metadata-v1-1.0.0
-        version: link:../splice-api-token-metadata-v1-1.0.0
-      '@mojotech/json-type-validation':
-        specifier: ^3.1.0
-        version: 3.1.0
-
-  daml.js/splice-api-token-metadata-v1-1.0.0:
-    dependencies:
-      '@daml.js/daml-stdlib-DA-Time-Types-1.0.0':
-        specifier: file:../daml-stdlib-DA-Time-Types-1.0.0
-        version: link:../daml-stdlib-DA-Time-Types-1.0.0
-      '@daml.js/ghc-stdlib-DA-Internal-Template-1.0.0':
-        specifier: file:../ghc-stdlib-DA-Internal-Template-1.0.0
-        version: link:../ghc-stdlib-DA-Internal-Template-1.0.0
-      '@mojotech/json-type-validation':
-        specifier: ^3.1.0
-        version: 3.1.0
-
-  daml.js/splice-api-token-transfer-instruction-v1-1.0.0:
-    dependencies:
-      '@daml.js/ghc-stdlib-DA-Internal-Template-1.0.0':
-        specifier: file:../ghc-stdlib-DA-Internal-Template-1.0.0
-        version: link:../ghc-stdlib-DA-Internal-Template-1.0.0
-      '@daml.js/splice-api-token-holding-v1-1.0.0':
-        specifier: file:../splice-api-token-holding-v1-1.0.0
-        version: link:../splice-api-token-holding-v1-1.0.0
-      '@daml.js/splice-api-token-metadata-v1-1.0.0':
-        specifier: file:../splice-api-token-metadata-v1-1.0.0
-        version: link:../splice-api-token-metadata-v1-1.0.0
-      '@mojotech/json-type-validation':
-        specifier: ^3.1.0
-        version: 3.1.0
-
-  daml.js/syncvotes-charter-0.7.0:
+  daml.js/syncvotes-board-0.8.0:
     dependencies:
       '@daml.js/daml-prim-DA-Types-1.0.0':
         specifier: file:../daml-prim-DA-Types-1.0.0
@@ -291,12 +249,6 @@ importers:
       '@daml.js/ghc-stdlib-DA-Internal-Template-1.0.0':
         specifier: file:../ghc-stdlib-DA-Internal-Template-1.0.0
         version: link:../ghc-stdlib-DA-Internal-Template-1.0.0
-      '@daml.js/splice-api-token-holding-v1-1.0.0':
-        specifier: file:../splice-api-token-holding-v1-1.0.0
-        version: link:../splice-api-token-holding-v1-1.0.0
-      '@daml.js/splice-api-token-transfer-instruction-v1-1.0.0':
-        specifier: file:../splice-api-token-transfer-instruction-v1-1.0.0
-        version: link:../splice-api-token-transfer-instruction-v1-1.0.0
       '@mojotech/json-type-validation':
         specifier: ^3.1.0
         version: 3.1.0

@@ -80,7 +80,6 @@ async function execute(p: ledger.Proposal) {
 	if (p.outcome !== 'Passed' || p.executedAt || p.effect.kind === 'signal') return;
 	const dao = ledger.daos.get(p.daoId);
 	if (!dao || executing.has(p.id)) return;
-	if (p.effect.kind === 'payout' && !dao.treasury) return;
 	const removals =
 		p.effect.kind === 'members'
 			? p.effect.remove

@@ -8,7 +8,6 @@ import * as ledger from './server/ledger';
 import * as session from './server/session';
 import * as billing from './server/billing';
 import * as splice from './server/splice';
-import * as treasury from './server/treasury';
 import { fingerprintOf } from './verify';
 import { normaliseHint, hintProblem } from './hint';
 import * as schemas from './schemas';
@@ -62,11 +61,10 @@ const page = <T>(all: T[], offset: number, limit: number): Page<T> => ({
 const matches = (needle: string) => (party: string) =>
 	!needle || party.toLowerCase().includes(needle.trim().toLowerCase());
 
-/** The parties and prices the browser checks transactions against. Public, nothing secret. */
+/** The parties and prices the browser shows and checks against. Public, nothing secret. */
 export const config = query(async () => ({
 	provider: participant.providerParty(),
 	operator: participant.operatorParty(),
-	instrument: await splice.instrument(),
 	prices: await splice.prices()
 }));
 
@@ -132,8 +130,7 @@ export const enrol = command(
 							createArguments: {
 								provider: participant.providerParty(),
 								operator: participant.operatorParty(),
-								user: party,
-								publicKey
+								user: party
 							}
 						}
 					}
@@ -191,21 +188,12 @@ const proposalsOf = (daoId: string) =>
 		b.createdAt.localeCompare(a.createdAt)
 	);
 const openProposals = (daoId: string) => proposalsOf(daoId).filter((p) => !p.outcome).length;
-const isAdmin = (dao: ledger.Dao, party: string) => dao.admins.includes(party);
+const isAdmin = (dao: ledger.Dao, party: string) => dao.creator === party;
 
-/** The caller's standing in this DAO — a member, or an admin named by a vote — or 403. */
-const insiderOnly = (daoId: string) => {
-	const me = session.required();
-	const membership = ledger.members.get(daoId)?.get(me) ?? null;
-	const dao = ledger.daos.get(daoId);
-	if (!membership && !(dao && isAdmin(dao, me))) error(403, 'Only members can see this DAO');
-	return { me, membership };
-};
-
-/** The caller's membership of this DAO, or 403. */
+/** The caller's membership of this DAO, or 403. The admin is a member like any other. */
 const memberOnly = (daoId: string): ledger.Member => {
-	const { membership } = insiderOnly(daoId);
-	if (!membership) error(403, 'Only members can do this');
+	const membership = ledger.members.get(daoId)?.get(session.required());
+	if (!membership) error(403, 'Only members can see this DAO');
 	return membership;
 };
 
@@ -216,13 +204,11 @@ const summarise = (d: ledger.Dao) => ({
 	openProposals: openProposals(d.id)
 });
 
-/** The DAOs a party belongs to or runs, newest first. */
+/** The DAOs a party belongs to, newest first. */
 export const myDaos = query.live(partyId, (party) =>
 	live(ledger.keys.party(party), () => {
 		session.required(party);
-		const ids = new Set(ledger.memberships.get(party)?.keys() ?? []);
-		for (const d of ledger.daos.values()) if (isAdmin(d, party)) ids.add(d.id);
-		return [...ids]
+		return [...(ledger.memberships.get(party)?.keys() ?? [])]
 			.flatMap((id) => ledger.daos.get(id) ?? [])
 			.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
 			.map(summarise);
@@ -232,12 +218,12 @@ export const myDaos = query.live(partyId, (party) =>
 /** A DAO with its counts and the caller's standing in it. The lists are paged separately. */
 export const dao = query.live(contractId, (id) =>
 	live(ledger.keys.dao(id), () => {
-		const { me, membership } = insiderOnly(id);
+		const membership = memberOnly(id);
 		const d = daoOf(id);
 		return {
 			...summarise(d),
 			balance: billing.balance(id),
-			me: { admin: isAdmin(d, me), membership: membership?.contractId ?? null }
+			me: { admin: isAdmin(d, membership.party), membership: membership.contractId }
 		};
 	})
 );
@@ -247,7 +233,7 @@ export const daoMembers = query.live(
 	v.object({ id: contractId, ...paging, q: filter }),
 	({ id, offset, limit, q }) =>
 		live(ledger.keys.dao(id), () => {
-			insiderOnly(id);
+			memberOnly(id);
 			const all = membersOf(id)
 				.filter((m) => matches(q)(m.party))
 				.sort((a, b) => a.party.localeCompare(b.party));
@@ -259,7 +245,7 @@ export const daoProposals = query.live(
 	v.object({ id: contractId, ...paging, status: v.optional(v.picklist(['open', 'closed'])) }),
 	({ id, offset, limit, status }) =>
 		live(ledger.keys.dao(id), () => {
-			insiderOnly(id);
+			memberOnly(id);
 			const all = proposalsOf(id).filter((p) =>
 				status === 'open' ? !p.outcome : status === 'closed' ? !!p.outcome : true
 			);
@@ -279,7 +265,7 @@ export const checkParties = query(
 		parties: v.pipe(v.array(partyId), v.maxLength(100))
 	}),
 	({ dao, parties }): Record<string, PartyCheck> => {
-		if (dao) insiderOnly(dao);
+		if (dao) memberOnly(dao);
 		else session.required();
 		const check = (p: string): PartyCheck =>
 			dao && ledger.members.get(dao)?.has(p)
@@ -297,14 +283,11 @@ const proposalOf = (id: string): ledger.Proposal => {
 	return p;
 };
 
-/** The caller's membership of the proposal's DAO, or null for a proposer or admin; 403 otherwise. */
+/** The caller's membership of the proposal's DAO, or null for a proposer who left; 403 otherwise. */
 const proposalReader = (p: ledger.Proposal): ledger.Member | null => {
 	const me = session.required();
 	const membership = ledger.members.get(p.daoId)?.get(me);
-	const dao = ledger.daos.get(p.daoId);
-	if (!membership && p.proposer !== me && !(dao && isAdmin(dao, me))) {
-		error(403, 'Only members can see this proposal');
-	}
+	if (!membership && p.proposer !== me) error(403, 'Only members can see this proposal');
 	return membership ?? null;
 };
 
@@ -323,16 +306,13 @@ export const proposal = query.live(contractId, (id) =>
 		const who = session.required();
 		const dao = ledger.daos.get(p.daoId);
 		const mine = me && ledger.ballots.get(id)?.get(me.party);
-		const due = ledger.payouts.get(p.daoId)?.get(p.id) ?? null;
 		return {
 			...p,
 			daoName: dao?.name ?? null,
 			cast: ledger.ballots.get(id)?.size ?? 0,
-			payoutDue: due,
 			me: {
 				membership: me?.contractId ?? null,
 				vote: mine?.vote ?? null,
-				weight: mine?.weight ?? null,
 				mayVote: mayVote(p, me),
 				admin: !!dao && isAdmin(dao, who)
 			}
@@ -356,88 +336,8 @@ export const proposalBallots = query.live(
 /** The DAO's account: paid in, spent, what a byte costs it. */
 export const daoBilling = query.live(contractId, (id) =>
 	live(ledger.keys.dao(id), () => {
-		insiderOnly(id);
+		memberOnly(id);
 		return billing.statement(id);
-	})
-);
-
-/**
- * The caller's coin: free and locked, with what the network says a coin is worth; whether
- * coin sent to them just lands, and what waits to be accepted meanwhile.
- */
-export const myHoldings = query(async () => {
-	const party = session.required();
-	const [holdings, prices, setup, incoming] = await Promise.all([
-		splice.holdings(party),
-		splice.prices(),
-		splice.setupState(party),
-		splice.incoming(party)
-	]);
-	return { holdings, prices, approved: setup.approved, incoming };
-});
-
-/**
- * Opens the caller's party to deposits: the validator offers a pre-approval (it pays for it
- * and keeps it renewed), the party accepts it with one signature. Asked at sign-up, and
- * from the wallet page for a party that skipped it.
- */
-export const prepareAcceptDeposits = command(async () => {
-	const party = session.required();
-	let { proposal, approved } = await splice.setupState(party);
-	if (approved) error(409, 'Deposits already land');
-	if (!proposal) {
-		await splice.proposeSetup(party);
-		for (let i = 0; i < 30 && !proposal; i++) {
-			await new Promise((r) => setTimeout(r, 1000));
-			proposal = (await splice.setupState(party)).proposal;
-		}
-		if (!proposal) error(503, 'The validator has not offered the pre-approval yet — try again');
-	}
-	return {
-		proposal: proposal.contractId,
-		prepared: await participant.prepare(party, [
-			{
-				ExerciseCommand: {
-					templateId: splice.SETUP_PROPOSAL,
-					contractId: proposal.contractId,
-					choice: 'ExternalPartySetupProposal_Accept',
-					choiceArgument: {}
-				}
-			}
-		])
-	};
-});
-
-/** Accepts coin that was sent without a pre-approval in place. */
-export const prepareAcceptIncoming = command(contractId, async (cid) => {
-	const party = session.required();
-	if (!(await splice.incoming(party)).some((t) => t.contractId === cid))
-		error(404, 'No such transfer');
-	const [cmd, disclosed] = await splice.acceptCommand(cid);
-	return participant.prepare(party, [cmd], { disclosedContracts: disclosed });
-});
-
-/** The DAO's treasury: what it holds, what is due, a setup under way, sessions to sign. */
-export const daoTreasury = query.live(contractId, (id) =>
-	live(ledger.keys.dao(id), async () => {
-		insiderOnly(id);
-		const d = daoOf(id);
-		const setup = await treasury.setup(id);
-		if (setup && d.treasury?.party === setup.party) treasury.finish(id);
-		const party = d.treasury?.party ?? (setup?.allocated ? setup.party : null);
-		const holdings = party ? await splice.holdings(party) : [];
-		return {
-			treasury: d.treasury,
-			stale: !!d.treasury && [...d.treasury.signers].sort().join() !== [...d.admins].sort().join(),
-			setup: d.treasury && !setup ? null : setup,
-			plan: treasury.current(id),
-			balance: holdings.reduce((s, h) => s + (h.lock ? 0 : h.amount), 0),
-			approved: party ? (await splice.setupState(party)).approved : false,
-			due: [...(ledger.payouts.get(id)?.values() ?? [])].sort((a, b) =>
-				a.createdAt.localeCompare(b.createdAt)
-			),
-			sessions: treasury.sessionsOf(id)
-		};
 	})
 );
 
@@ -470,14 +370,6 @@ const adminOf = (daoId: string, party: string): ledger.Dao => {
 	return found;
 };
 
-const votingOf = async (kind: 'member' | 'stake', quorum: number) =>
-	kind === 'stake'
-		? {
-				tag: 'ByStake',
-				value: { instrument: await splice.instrument(), quorum: quorum.toFixed(10) }
-			}
-		: { tag: 'ByMember', value: {} };
-
 /**
  * The text forms: each field is checked against the shared schema — in the browser before
  * submitting, so issues show under the field, and here again — then the transaction is
@@ -485,26 +377,16 @@ const votingOf = async (kind: 'member' | 'stake', quorum: number) =>
  */
 export const createDaoForm = form(
 	schemas.createDaoForm,
-	async ({ daoName, description, members, admins, voting, quorum }) => {
+	async ({ daoName, description, members }) => {
 		const party = session.required();
 		const account = accountOf(party).contractId;
-		for (const p of [...members, ...admins]) {
+		for (const p of members) {
 			if (!ledger.accounts.has(p)) error(404, `${p} is not registered with the app`);
 		}
 		const id = crypto.randomUUID();
-		const leads = admins.length ? admins : [party];
-		const args = {
-			id,
-			daoName,
-			description,
-			members,
-			admins: leads,
-			voting: await votingOf(voting, quorum)
-		};
+		const args = { id, daoName, description, members };
 		return {
 			id,
-			admins: leads,
-			voting: args.voting,
 			prepared: await prepare(party, Main.Account, account, 'Account_CreateDAO', args, null)
 		};
 	}
@@ -517,42 +399,9 @@ export const updateDaoForm = form(schemas.updateDaoForm, async ({ dao, daoName, 
 	return { prepared: await prepare(party, Main.DAO, contractId, 'DAO_Update', args, dao) };
 });
 
-export const prepareSetAdmins = command(
-	v.object({ dao: contractId, admins: v.pipe(v.array(partyId), v.minLength(1), v.maxLength(50)) }),
-	({ dao, admins }) => {
-		const party = session.required();
-		const { contractId } = adminOf(dao, party);
-		for (const p of admins) {
-			if (!ledger.members.get(dao)?.has(p)) error(409, `${p} is not a member`);
-		}
-		const args = { admin: party, newAdmins: admins };
-		return prepare(party, Main.DAO, contractId, 'DAO_SetAdmins', args, dao);
-	}
-);
-
-export const prepareSetVoting = command(
-	v.object({ dao: contractId, voting: schemas.votingKind, quorum: schemas.quorum }),
-	async ({ dao, voting, quorum }) => {
-		const party = session.required();
-		const { contractId } = adminOf(dao, party);
-		const newVoting = await votingOf(voting, quorum);
-		return {
-			voting: newVoting,
-			prepared: await prepare(
-				party,
-				Main.DAO,
-				contractId,
-				'DAO_SetVoting',
-				{ admin: party, newVoting },
-				dao
-			)
-		};
-	}
-);
-
 export const createProposalForm = form(
 	schemas.createProposalForm,
-	async ({ dao, title, description, days, kind, payoutTo, payoutAmount, add, remove, admins }) => {
+	async ({ dao, title, description, days, kind, add, remove }) => {
 		const party = session.required();
 		const membership = memberOnly(dao).contractId;
 		const d = daoOf(dao);
@@ -560,10 +409,6 @@ export const createProposalForm = form(
 		const closesAt = new Date(Date.now() + days * 86_400_000).toISOString();
 		let action: { tag: string; value: unknown };
 		switch (kind) {
-			case 'payout':
-				if (!d.treasury) error(409, 'This DAO has no treasury to pay from');
-				action = { tag: 'Payout', value: { to: payoutTo, amount: payoutAmount.toFixed(10) } };
-				break;
 			case 'members':
 				for (const p of add) {
 					if (!ledger.accounts.has(p)) error(404, `${p} is not registered with the app`);
@@ -574,12 +419,6 @@ export const createProposalForm = form(
 					if (p === d.creator) error(409, 'The creator stays a member');
 				}
 				action = { tag: 'SetMembers', value: { add, remove } };
-				break;
-			case 'admins':
-				for (const p of admins) {
-					if (!ledger.members.get(dao)?.has(p)) error(409, `${p} is not a member`);
-				}
-				action = { tag: 'SetAdmins', value: { admins } };
 				break;
 			default:
 				action = { tag: 'Signal', value: {} };
@@ -654,7 +493,7 @@ export const prepareCancelProposal = command(contractId, async (proposalId) => {
 	const d = daoOf(daoId);
 	if (outcome) error(409, 'Already settled');
 	if (proposer !== party && !isAdmin(d, party))
-		error(403, 'Only the proposer or an admin can cancel');
+		error(403, 'Only the proposer or the admin can cancel');
 	const args = { canceller: party, dao: d.contractId };
 	return {
 		dao: d.contractId,
@@ -662,82 +501,17 @@ export const prepareCancelProposal = command(contractId, async (proposalId) => {
 	};
 });
 
-/**
- * A ballot, cast from the voter's own membership contract. In a stake DAO it names the voter's
- * locked holdings that outlast the deadline; the ledger reads their weight.
- */
+/** A ballot, cast from the voter's own membership contract. */
 export const prepareVote = command(
-	v.object({
-		proposal: contractId,
-		vote: v.picklist(['Yes', 'No', 'Abstain']),
-		holdings: v.optional(v.pipe(v.array(contractId), v.maxLength(20)), [])
-	}),
-	async ({ proposal, vote, holdings }) => {
+	v.object({ proposal: contractId, vote: v.picklist(['Yes', 'No', 'Abstain']) }),
+	({ proposal, vote }) => {
 		const p = proposalOf(proposal);
 		const me = proposalReader(p);
 		if (!me || !mayVote(p, me)) error(409, 'You have no vote on this proposal');
-		const stake =
-			p.voting.kind === 'stake'
-				? (() => {
-						if (holdings.length === 0) error(409, 'Lock some coin past the deadline to vote here');
-						// A Daml pair travels as `_1`/`_2`.
-						return { _1: p.voting.instrument, _2: holdings };
-					})()
-				: null;
-		const args = { proposalId: proposal, closesAt: p.closesAt, vote, stake };
+		const args = { proposalId: proposal, closesAt: p.closesAt, vote };
 		return prepare(me.party, Main.Member, me.contractId, 'Member_Vote', args, p.daoId);
 	}
 );
-
-// ---- Coin: stake locks and the DAO's balance ----------------------------------------------
-
-/** Locks coin in the caller's wallet for `days`; the DAO is not involved and nothing is charged. */
-export const prepareLock = command(schemas.lockForm, async ({ amount, days }) => {
-	const party = session.required();
-	const expiresAt = new Date(Date.now() + days * 86_400_000).toISOString();
-	const [cmd, disclosed] = await splice.lockCommand(
-		party,
-		amount.toFixed(10),
-		expiresAt,
-		'syncvotes stake'
-	);
-	return {
-		expiresAt,
-		amount: amount.toFixed(10),
-		prepared: await participant.prepare(party, [cmd], { disclosedContracts: disclosed })
-	};
-});
-
-/** Releases a lock whose time has come. */
-export const prepareRelease = command(contractId, async (cid) => {
-	const party = session.required();
-	const locked = (await splice.holdings(party)).find((h) => h.contractId === cid && h.lock);
-	if (!locked) error(404, 'No such lock');
-	if (new Date(locked.lock!.expiresAt).getTime() > Date.now()) error(409, 'Still locked');
-	return participant.prepare(party, [splice.releaseCommand(locked)]);
-});
-
-/** Hashes of top-ups under way, so the credit lands with the coin. */
-const topUps = new Map<string, { dao: string; amount: number }>();
-
-/** Coin from the caller to the provider, credited to the DAO's balance when it lands. */
-export const topUpForm = form(schemas.topUpForm, async ({ dao, amount }) => {
-	const party = session.required();
-	insiderOnly(dao);
-	const free = (await splice.holdings(party)).filter((h) => !h.lock);
-	const have = free.reduce((s, h) => s + h.amount, 0);
-	if (have === 0) error(400, 'Your wallet holds no coin yet — receive some Canton Coin first');
-	if (have < amount) error(400, `Your wallet holds ${have.toFixed(2)} CC, less than that`);
-	const [cmd, disclosed] = await splice.transferCommand(
-		party,
-		participant.providerParty(),
-		amount.toFixed(10),
-		`syncvotes:${dao}`
-	);
-	const prepared = await participant.prepare(party, [cmd], { disclosedContracts: disclosed });
-	topUps.set(prepared.preparedTransactionHash, { dao, amount });
-	return { amount: amount.toFixed(10), prepared };
-});
 
 /** The signed hash comes back; the participant submits, and the reply waits for the pages. */
 export const execute = command(
@@ -754,93 +528,6 @@ export const execute = command(
 			{ fingerprint: party.split('::')[1], signature }
 		]);
 		await ledger.applied(updateId);
-		const topUp = topUps.get(prepared.preparedTransactionHash);
-		if (topUp) {
-			topUps.delete(prepared.preparedTransactionHash);
-			await billing.credit(topUp.dao, topUp.amount);
-		}
 		if (known?.dao) void billing.settle(known.dao, updateId, party);
 	}
-);
-
-// ---- Treasury: built by every admin, run by a threshold of them ----------------------------
-
-/** Starts the ceremony: the treasury the current admins would own, for each of them to sign. */
-export const treasuryBegin = command(
-	v.object({ dao: contractId, threshold: v.pipe(v.number(), v.integer(), v.minValue(1)) }),
-	({ dao, threshold }) => {
-		const party = session.required();
-		adminOf(dao, party);
-		return treasury.begin(dao, threshold);
-	}
-);
-
-/** An admin's signature over the treasury's identity. */
-export const treasurySignSetup = command(
-	v.object({ dao: contractId, signature: base64 }),
-	({ dao, signature }) => treasury.signSetup(dao, session.required(), signature)
-);
-
-/** Records the built treasury on the DAO, signed by an admin who checked it is the one planned. */
-export const prepareRecordTreasury = command(contractId, async (dao) => {
-	const party = session.required();
-	const { contractId } = adminOf(dao, party);
-	const p = treasury.current(dao);
-	if (!p) error(409, 'No treasury has been built');
-	// An Int travels as text through the JSON API.
-	const newTreasury = {
-		party: p.party,
-		signers: p.owners.map((o) => o.party),
-		threshold: String(p.threshold)
-	};
-	return {
-		treasury: newTreasury,
-		prepared: await prepare(
-			party,
-			Main.DAO,
-			contractId,
-			'DAO_SetTreasury',
-			{ admin: party, newTreasury },
-			dao
-		)
-	};
-});
-
-/** Lets go of a treasury whose signers are no longer the admins; its coin is moved first. */
-export const prepareDropTreasury = command(contractId, (dao) => {
-	const party = session.required();
-	const { contractId } = adminOf(dao, party);
-	return prepare(
-		party,
-		Main.DAO,
-		contractId,
-		'DAO_SetTreasury',
-		{ admin: party, newTreasury: null },
-		dao
-	);
-});
-
-const intent = v.variant('kind', [
-	v.object({ kind: v.literal('approve'), proposal: v.optional(v.string(), '') }),
-	v.object({
-		kind: v.literal('payout'),
-		due: contractId,
-		to: v.optional(v.string(), ''),
-		amount: v.optional(v.number(), 0)
-	}),
-	v.object({ kind: v.literal('move'), to: partyId, amount: schemas.coin })
-]);
-
-/** Opens a signing session for the treasury: the prepared transaction, for signers to check. */
-export const treasuryOpen = command(v.object({ dao: contractId, intent }), ({ dao, intent }) => {
-	const party = session.required();
-	adminOf(dao, party);
-	billing.funded(dao);
-	return treasury.open(dao, intent as treasury.Intent);
-});
-
-/** A signer's signature over a session's hash. */
-export const treasurySign = command(
-	v.object({ session: v.string(), signature: base64 }),
-	({ session: id, signature }) => treasury.sign(id, session.required(), signature)
 );

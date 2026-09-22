@@ -7,16 +7,17 @@ import { operatorParty, paidTraffic, providerParty, submitAsProvider } from './p
 
 /**
  * Who pays for what. Every transaction a DAO causes costs this validator traffic — bytes the
- * network charges in coin, at a price it publishes. The DAO pays that back from a balance it
- * tops up with coin sent to the provider, at `factor` times the network's price: one to start
- * with, less once the rewards this traffic earns are known. The balance lives on the ledger as
- * the DAO's `Meter`, rewritten as the figures move; between writes the charges are kept here.
+ * network charges in coin, at a price it publishes. The DAO's admin pays that back into a
+ * balance: coin sent to the provider with the DAO's memo, found in the provider's own
+ * transactions and credited at `factor` times the network's price (one to start with, less
+ * once the rewards this traffic earns are known). The balance lives on the ledger as the
+ * DAO's `Meter`, rewritten as the figures move; between writes the charges are kept here.
  * Reads are free; a write is refused when the balance is gone.
  */
 
 /** Charges not yet written to the meter, in coin, by DAO id. */
 const pending = new Map<string, number>();
-/** DAOs whose meter needs writing, and when it was last written. */
+/** DAOs whose meter needs writing. */
 const dirty = new Set<string>();
 let writing = false;
 
@@ -28,11 +29,6 @@ async function coinPerByte(): Promise<number> {
 	return (usdPerMb / 1_000_000 / usdPerCoin) * factor();
 }
 
-/** What a transaction of `bytes` would cost the DAO, in coin. */
-export async function quote(bytes: number): Promise<number> {
-	return bytes * (await coinPerByte());
-}
-
 export type Statement = {
 	credited: number;
 	charged: number;
@@ -42,6 +38,9 @@ export type Statement = {
 	usdPerCoin: number;
 	factor: number;
 	updatedAt: string | null;
+	/** Where to send coin, and the memo that credits it to this DAO. */
+	payTo: string;
+	memo: string;
 };
 
 /** The DAO's account as it stands, meter plus what is not written yet. */
@@ -57,7 +56,9 @@ export async function statement(daoId: string): Promise<Statement> {
 		coinPerMb: (usdPerMb / usdPerCoin) * factor(),
 		usdPerCoin,
 		factor: factor(),
-		updatedAt: meter?.updatedAt ?? null
+		updatedAt: meter?.updatedAt ?? null,
+		payTo: providerParty(),
+		memo: splice.memoFor(daoId)
 	};
 }
 
@@ -69,19 +70,19 @@ export const balance = (daoId: string) =>
 /** Refuses a write for a DAO that has no coin left. */
 export function funded(daoId: string): void {
 	if (balance(daoId) <= 0) {
-		throw error(402, "This DAO's balance is empty — an admin has to top it up first");
+		throw error(402, "This DAO's balance is empty — its admin has to pay in first");
 	}
 }
 
 /** The traffic a transaction cost, charged to the DAO that caused it. */
 export async function charge(daoId: string, bytes: number): Promise<void> {
 	if (!bytes) return;
-	const coin = await quote(bytes);
+	const coin = bytes * (await coinPerByte());
 	pending.set(daoId, (pending.get(daoId) ?? 0) + coin);
 	dirty.add(daoId);
 	ledger.notify(ledger.keys.dao(daoId));
 	// Charges reach the ledger once they add up to something: a fraction of the balance, or
-	// the daily write, whichever comes first.
+	// the hourly write, whichever comes first.
 	if ((pending.get(daoId) ?? 0) > Math.max(0.05, balance(daoId) * 0.01)) void flush();
 }
 
@@ -90,16 +91,10 @@ export async function settle(daoId: string, updateId: string, party = providerPa
 	await charge(daoId, await paidTraffic(updateId, party));
 }
 
-/** Coin that arrived for a DAO: written to the meter at once, so a restart cannot lose it. */
-export async function credit(daoId: string, coin: number): Promise<void> {
-	const meter = ledger.meters.get(daoId);
-	await write(daoId, (meter?.credited ?? 0) + coin, meter?.charged ?? 0);
-}
-
 async function write(daoId: string, credited: number, charged: number) {
 	const dao = ledger.daos.get(daoId);
+	if (!dao) return;
 	const meter = ledger.meters.get(daoId);
-	const admins = dao?.admins ?? [];
 	const updateId = meter
 		? await submitAsProvider(
 				[
@@ -108,11 +103,7 @@ async function write(daoId: string, credited: number, charged: number) {
 							templateId: Main.Meter.templateId,
 							contractId: meter.contractId,
 							choice: 'Meter_Update',
-							choiceArgument: {
-								newAdmins: admins,
-								newCredited: credited.toFixed(10),
-								newCharged: charged.toFixed(10)
-							}
+							choiceArgument: { newCredited: credited.toFixed(10), newCharged: charged.toFixed(10) }
 						}
 					}
 				],
@@ -127,7 +118,7 @@ async function write(daoId: string, credited: number, charged: number) {
 								provider: providerParty(),
 								operator: operatorParty(),
 								daoId,
-								admins,
+								admin: dao.creator,
 								credited: credited.toFixed(10),
 								charged: charged.toFixed(10),
 								updatedAt: new Date().toISOString()
@@ -166,7 +157,51 @@ export async function flush(): Promise<void> {
 	}
 }
 
+// ---- Deposits: coin at the provider with a DAO's memo ---------------------------------------
+
+/** Coin credited so far, by DAO, as summed from the provider's transactions. */
+const deposited = new Map<string, number>();
+let seenOffset: number | undefined;
+let watching = false;
+
+/**
+ * Reads the provider's transactions since the last look and credits what carries a memo.
+ * The total is a sum over the ledger's history, so a restart recomputes rather than repeats;
+ * the meter is written only when its credited figure is behind that sum.
+ */
+export async function watchDeposits(): Promise<void> {
+	if (watching) return;
+	watching = true;
+	try {
+		const fresh = await splice.deposits(seenOffset);
+		for (const d of fresh) {
+			deposited.set(d.daoId, (deposited.get(d.daoId) ?? 0) + d.amount);
+			seenOffset = Math.max(seenOffset ?? 0, d.offset);
+		}
+		if (fresh.length === 0 && seenOffset === undefined) {
+			// Nothing marked in the whole history: remember where we looked up to.
+			seenOffset = await (await import('./participant')).sdk().then((s) => s.ledger.ledgerEnd());
+		}
+		for (const [daoId, total] of deposited) {
+			const meter = ledger.meters.get(daoId);
+			if (!ledger.daos.has(daoId) || (meter?.credited ?? 0) >= total) continue;
+			try {
+				await write(daoId, total, meter?.charged ?? 0);
+				ledger.notify(ledger.keys.dao(daoId));
+			} catch (e) {
+				console.warn(`Deposit to ${daoId} not credited yet:`, e instanceof Error ? e.message : e);
+			}
+		}
+	} catch (e) {
+		console.warn('Deposits not read:', e instanceof Error ? e.message : e);
+	} finally {
+		watching = false;
+	}
+}
+
 export function start(): void {
+	void watchDeposits();
+	setInterval(() => void watchDeposits(), 20_000);
 	setInterval(() => void flush(), 60 * 60 * 1000);
 	for (const signal of ['SIGTERM', 'SIGINT'] as const) {
 		process.once(signal, () => {

@@ -1,33 +1,26 @@
 <script lang="ts">
 	import * as remote from '$lib/api.remote';
-	import * as actions from '$lib/actions';
 	import { store } from '$lib/wallet-store.svelte';
-	import { signedForm } from '$lib/forms';
-	import { topUpForm as schema } from '$lib/schemas';
-	import { Input } from '$lib/components/ui/input';
-	import { Button } from '$lib/components/ui/button';
 	import Panel from './panel.svelte';
 	import Skeleton from './skeleton.svelte';
+	import PartyId from './party-id.svelte';
+	import Copy from '@lucide/svelte/icons/copy';
+	import Check from '@lucide/svelte/icons/check';
 	import { coin } from '$lib/format';
 
 	/**
-	 * The DAO's account: what it holds, what its transactions have cost, and a way to pay in.
-	 * Coin goes to the app's provider and is credited to the DAO the moment it lands.
+	 * The DAO's balance: what its admin has paid in, what its transactions have cost, and how to
+	 * pay in — coin sent to the app's provider from any Canton wallet, with the DAO's memo, is
+	 * credited within a minute of landing.
 	 */
 	let { dao, admin }: { dao: string; admin: boolean } = $props();
 	const billing = $derived(store.who ? remote.daoBilling(dao) : null);
-
-	const f = remote.topUpForm;
-	let provider = $state('');
-	$effect(() => {
-		actions.configuration().then((c) => (provider = c.provider));
-	});
-	const enhanced = signedForm(
-		f,
-		schema,
-		({ amount }) => actions.transferIntent(store.who!.party, provider, amount.toFixed(10)),
-		() => f.fields.amount.set(undefined as unknown as number)
-	);
+	let copied = $state(false);
+	async function copy(text: string) {
+		await navigator.clipboard.writeText(text);
+		copied = true;
+		setTimeout(() => (copied = false), 1500);
+	}
 </script>
 
 <Panel padding="sm" class="space-y-3">
@@ -44,28 +37,34 @@
 		</p>
 		{#if b.balance <= 0}
 			<p class="text-[13px] text-red">
-				Empty: nothing can be signed for this DAO until an admin pays in.
+				Empty: nothing can be signed for this DAO until {admin ? 'you pay' : 'the admin pays'} in.
 			</p>
 		{/if}
 		{#if admin}
-			<form {...enhanced} class="flex items-start gap-2">
-				<input {...f.fields.dao.as('hidden', dao)} />
-				<div class="flex-1">
-					<Input
-						{...f.fields.amount.as('number')}
-						step="any"
-						min={0}
-						placeholder="CC to pay in"
-						aria-label="Coin to pay in"
-					/>
-					{#each f.fields.amount.issues() as issue (issue.message)}
-						<p class="mt-1 text-xs text-red">{issue.message}</p>
-					{/each}
+			<div class="space-y-2 border-t border-border pt-3 text-[13px] text-ink-mid">
+				<p>
+					To pay in, send Canton Coin from any wallet to the app's provider with this memo. It is
+					credited within a minute of landing.
+				</p>
+				<div class="font-mono text-xs">
+					<div class="text-ink-dim">To</div>
+					<PartyId party={b.payTo} size="md" />
 				</div>
-				<Button type="submit" size="sm" disabled={store.busy || f.pending > 0 || !provider}
-					>Pay in</Button
-				>
-			</form>
+				<div class="font-mono text-xs">
+					<div class="text-ink-dim">Memo</div>
+					<button
+						type="button"
+						class="inline-flex items-center gap-1.5 text-ink hover:text-orange"
+						onclick={() => copy(b.memo)}
+						title="Copy the memo"
+					>
+						<span class="break-all">{b.memo}</span>
+						{#if copied}<Check size={12} />{:else}<Copy size={12} />{/if}
+					</button>
+				</div>
+			</div>
+		{:else}
+			<p class="text-[13px] text-ink-dim">The admin keeps this balance funded.</p>
 		{/if}
 	{:else}
 		<Skeleton height="h-16" />

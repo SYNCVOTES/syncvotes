@@ -22,7 +22,7 @@
 	import LoadMore from '$lib/components/load-more.svelte';
 	import SearchInput from '$lib/components/search-input.svelte';
 	import DangerZone from '$lib/components/danger-zone.svelte';
-	import { relative, dateOf, coin } from '$lib/format';
+	import { relative, dateOf } from '$lib/format';
 
 	const id = $derived(page.params.id!);
 	const me = $derived(store.who?.party ?? null);
@@ -57,9 +57,9 @@
 		<Skeleton />
 	{:else}
 		{@const p = proposal.current}
+		{@const needed = Math.floor(p.eligible / 2) + 1}
 		{@const ended = new Date(p.closesAt).getTime() < Date.now()}
 		{@const mine = me === p.proposer}
-		{@const stake = p.voting.kind === 'stake'}
 
 		<div class="mb-8">
 			<div class="mb-3 flex items-center gap-3">
@@ -94,13 +94,8 @@
 
 				{#if p.effect.kind !== 'signal'}
 					<EffectCard effect={p.effect} executedAt={p.executedAt} />
-					{#if p.outcome === 'Passed' && !p.executedAt && p.effect.kind !== 'payout'}
+					{#if p.outcome === 'Passed' && !p.executedAt}
 						<Note mono={false}>Passed; being carried out.</Note>
-					{:else if p.payoutDue}
-						<Note mono={false}
-							>Passed. The payout of {coin(p.payoutDue.amount)} waits for the treasury signers — see the
-							DAO's treasury page.</Note
-						>
 					{/if}
 				{/if}
 
@@ -127,7 +122,6 @@
 											? '[&>span>span:first-child]:text-orange'
 											: ''}"
 									/>
-									{#if stake}<span class="text-ink-mid">{coin(b.weight)}</span>{/if}
 									<span class="text-ink-dim">{relative(b.castAt)}</span>
 									{#if !b.counted}<span
 											class="text-ink-dim"
@@ -152,9 +146,9 @@
 					yes={p.yes}
 					no={p.no}
 					abstain={p.abstain}
-					eligible={p.eligible}
+					total={p.eligible}
+					{needed}
 					cast={p.cast}
-					voting={p.voting}
 				/>
 
 				{#if p.outcome}
@@ -188,15 +182,10 @@
 						<Note
 							>You voted <span class={tone(p.me.vote)}
 								>{p.me.vote === 'Abstain' ? 'to abstain' : p.me.vote}</span
-							>{stake && p.me.weight !== null ? ` with ${coin(p.me.weight)}` : ''}.</Note
+							>.</Note
 						>
 					{:else if p.me.mayVote}
 						<Panel padding="sm" class="space-y-3">
-							{#if stake}
-								<p class="text-[13px] text-ink-dim">
-									Your vote weighs the coin you have locked past {dateOf(p.closesAt)}.
-								</p>
-							{/if}
 							<div class="grid grid-cols-2 gap-3">
 								<Button variant="accent" disabled={store.busy} onclick={() => vote('Yes')}
 									>Yes</Button

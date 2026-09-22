@@ -20,8 +20,6 @@
 	import RoleTag from '$lib/components/role-tag.svelte';
 	import Problem from '$lib/components/problem.svelte';
 	import BillingPanel from '$lib/components/billing-panel.svelte';
-	import TreasuryPanel from '$lib/components/treasury-panel.svelte';
-	import StakePanel from '$lib/components/stake-panel.svelte';
 	import Plus from '@lucide/svelte/icons/plus';
 	import ArrowRight from '@lucide/svelte/icons/arrow-right';
 	import { relative, dateOf, fmt, coin } from '$lib/format';
@@ -58,8 +56,7 @@
 					<h1 class="display text-3xl md:text-4xl">{d.name}</h1>
 					<div class="mt-3 flex flex-wrap items-center gap-2">
 						<Badge variant="accent">Private</Badge>
-						<Badge>{d.voting.kind === 'stake' ? 'By stake' : 'By member'}</Badge>
-						{#if d.treasury}<Badge>Treasury</Badge>{/if}
+						<Badge>Majority</Badge>
 						{#if d.me.admin}<Badge variant="amber">You are admin</Badge>{:else}<Badge
 								variant="green">Member</Badge
 							>{/if}
@@ -73,13 +70,10 @@
 			</div>
 			<div class="flex shrink-0 items-center gap-2">
 				{#if d.me.admin}
-					<Button href="/daos/{d.id}/edit" variant="outline">Settings</Button>
+					<Button href="/daos/{d.id}/edit" variant="outline">Edit</Button>
 				{/if}
-				{#if d.me.membership}
-					<Button href="/daos/{d.id}/proposals/create"
-						><Plus strokeWidth={2.5} /> New proposal</Button
-					>
-				{/if}
+				<Button href="/daos/{d.id}/proposals/create"><Plus strokeWidth={2.5} /> New proposal</Button
+				>
 			</div>
 		</div>
 
@@ -128,9 +122,7 @@
 									<div class="truncate font-display text-[15px] font-bold">{p.title}</div>
 									<div class="mt-1 font-mono text-xs text-ink-dim">
 										by <PartyId party={p.proposer} class="align-middle" /> · {dateOf(p.createdAt)}
-										· {p.voting.kind === 'member'
-											? `${fmt(counted(p))} counted of ${fmt(p.eligible)}`
-											: `${coin(counted(p))} counted`}
+										· {fmt(counted(p))} counted of {fmt(p.eligible)}
 										· {p.effect.kind !== 'signal' ? `${p.effect.kind} · ` : ''}{p.outcome
 											? 'closed'
 											: `closes ${relative(p.closesAt)}`}
@@ -156,8 +148,6 @@
 
 			<aside class="space-y-6">
 				<BillingPanel dao={d.id} admin={d.me.admin} />
-				<TreasuryPanel dao={d.id} admin={d.me.admin} treasury={d.treasury} />
-				{#if d.voting.kind === 'stake'}<StakePanel />{/if}
 
 				<div>
 					<SectionTitle title="Members" count={fmt(d.members)} />
@@ -169,7 +159,7 @@
 										party={m.party}
 										class={m.party === me ? '[&>span>span:first-child]:text-orange' : ''}
 									/>
-									{#if d.admins.includes(m.party)}<RoleTag role="admin" />{/if}
+									{#if m.party === d.creator}<RoleTag role="admin" />{/if}
 								</ListItem>
 							{/each}
 						</List>

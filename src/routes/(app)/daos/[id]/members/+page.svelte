@@ -47,11 +47,6 @@
 		if (ok) selected.clear();
 	}
 
-	// Admins are a list on the DAO; one signed transaction makes it the new list.
-	const setAdmins = (admins: string[]) => flow.act((s, w) => actions.setAdmins(s, w, id, admins));
-	const promote = (party: string) => setAdmins([...dao!.current!.admins, party]);
-	const demote = (party: string) => setAdmins(dao!.current!.admins.filter((a) => a !== party));
-
 	const toggle = (cid: string) => (selected.has(cid) ? selected.delete(cid) : selected.add(cid));
 </script>
 
@@ -69,10 +64,9 @@
 		<PageHeader
 			eyebrow="Membership"
 			title="Members"
-			description="{fmt(d.members)} {d.members === 1 ? 'party' : 'parties'} hold this DAO; {d.admins
-				.length === 1
-				? 'one of them runs it'
-				: `${d.admins.length} of them run it`}. Each is named by the hint it chose and the fingerprint of its key."
+			description="{fmt(d.members)} {d.members === 1
+				? 'party'
+				: 'parties'} hold this DAO. Each is named by the hint it chose and the fingerprint of its key."
 		/>
 
 		<Problem message={store.problem} />
@@ -109,7 +103,6 @@
 		{:else}
 			<List>
 				{#each members.current.items as m (m.party)}
-					{@const admin = d.admins.includes(m.party)}
 					<ListItem class="flex items-center gap-3 font-mono text-xs">
 						{#if d.me.admin && m.party !== d.creator}
 							<input
@@ -126,24 +119,7 @@
 							class="min-w-0 flex-1 {m.party === me ? '[&>span>span:first-child]:text-orange' : ''}"
 						/>
 						<span class="hidden text-ink-dim sm:inline">since {dateOf(m.since)}</span>
-						{#if admin}<RoleTag role="admin" />{/if}
-						{#if d.me.admin}
-							{#if admin && d.admins.length > 1}
-								<Button
-									variant="ghost"
-									size="sm"
-									disabled={store.busy}
-									onclick={() => demote(m.party)}>Remove admin</Button
-								>
-							{:else if !admin}
-								<Button
-									variant="ghost"
-									size="sm"
-									disabled={store.busy}
-									onclick={() => promote(m.party)}>Make admin</Button
-								>
-							{/if}
-						{/if}
+						{#if m.party === d.creator}<RoleTag role="admin" />{/if}
 					</ListItem>
 				{/each}
 			</List>

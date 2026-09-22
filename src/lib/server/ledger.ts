@@ -10,27 +10,18 @@ import { providerParty, sdk, streamActiveContracts, type Created } from './parti
 
 export type Vote = 'Yes' | 'No' | 'Abstain';
 export type Outcome = 'Passed' | 'Failed';
-export type Instrument = { admin: string; id: string };
-export type Voting = { kind: 'member' } | { kind: 'stake'; instrument: Instrument; quorum: number };
-export type Treasury = { party: string; signers: string[]; threshold: number };
-export type Effect =
-	| { kind: 'signal' }
-	| { kind: 'payout'; to: string; amount: number }
-	| { kind: 'members'; add: string[]; remove: string[] }
-	| { kind: 'admins'; admins: string[] };
+export type Effect = { kind: 'signal' } | { kind: 'members'; add: string[]; remove: string[] };
 
-export type Account = { contractId: string; party: string; publicKey: string };
+export type Account = { contractId: string; party: string };
 export type Dao = {
 	contractId: string;
 	id: string;
+	/** The creator: the DAO's one admin. */
 	creator: string;
-	admins: string[];
 	name: string;
 	description: string;
 	createdAt: string;
 	members: number;
-	voting: Voting;
-	treasury: Treasury | null;
 };
 export type Member = {
 	contractId: string;
@@ -48,7 +39,6 @@ export type Proposal = {
 	title: string;
 	description: string;
 	effect: Effect;
-	voting: Voting;
 	createdAt: string;
 	closesAt: string;
 	eligible: number;
@@ -65,20 +55,9 @@ export type Ballot = {
 	voter: string;
 	since: string;
 	vote: Vote;
-	weight: number;
-	instrument: Instrument | null;
 	closesAt: string;
 	castAt: string;
 	counted: boolean;
-};
-export type PayoutDue = {
-	contractId: string;
-	daoId: string;
-	proposalId: string;
-	treasury: string;
-	to: string;
-	amount: number;
-	createdAt: string;
 };
 export type Meter = {
 	contractId: string;
@@ -109,8 +88,6 @@ export const proposals = new Map<string, Proposal>();
 export const proposalsOf = new Map<string, Map<string, Proposal>>();
 /** by proposal id, then voter */
 export const ballots = new Map<string, Map<string, Ballot>>();
-/** by DAO id, then proposal id */
-export const payouts = new Map<string, Map<string, PayoutDue>>();
 /** by DAO id */
 export const meters = new Map<string, Meter>();
 
@@ -184,39 +161,17 @@ const list = (value: unknown) => (Array.isArray(value) ? value.map(text) : []);
 
 type Tagged = { tag: string; value: Record<string, unknown> };
 
-const voting = (v: unknown): Voting => {
-	const t = v as Tagged;
-	if (t.tag === 'ByStake') {
-		const i = t.value.instrument as Instrument;
-		return { kind: 'stake', instrument: { admin: i.admin, id: i.id }, quorum: num(t.value.quorum) };
-	}
-	return { kind: 'member' };
-};
-
 const effect = (v: unknown): Effect => {
 	const t = v as Tagged;
-	switch (t.tag) {
-		case 'Payout':
-			return { kind: 'payout', to: text(t.value.to), amount: num(t.value.amount) };
-		case 'SetMembers':
-			return { kind: 'members', add: list(t.value.add), remove: list(t.value.remove) };
-		case 'SetAdmins':
-			return { kind: 'admins', admins: list(t.value.admins) };
-		default:
-			return { kind: 'signal' };
-	}
-};
-
-const treasury = (v: unknown): Treasury | null => {
-	if (v == null) return null;
-	const t = v as Record<string, unknown>;
-	return { party: text(t.party), signers: list(t.signers), threshold: num(t.threshold) };
+	return t.tag === 'SetMembers'
+		? { kind: 'members', add: list(t.value.add), remove: list(t.value.remove) }
+		: { kind: 'signal' };
 };
 
 function created({ contractId, templateId, createArgument: a }: Created) {
 	switch (templateName(templateId)) {
 		case 'Account': {
-			const row: Account = { contractId, party: text(a.user), publicKey: text(a.publicKey) };
+			const row: Account = { contractId, party: text(a.user) };
 			track(contractId, [keys.all], put(accounts, row.party, row));
 			break;
 		}
@@ -225,15 +180,12 @@ function created({ contractId, templateId, createArgument: a }: Created) {
 				contractId,
 				id: text(a.id),
 				creator: text(a.creator),
-				admins: list(a.admins),
 				name: text(a.name),
 				description: text(a.description),
 				createdAt: text(a.createdAt),
-				members: num(a.members),
-				voting: voting(a.voting),
-				treasury: treasury(a.treasury)
+				members: num(a.members)
 			};
-			track(contractId, [keys.dao(row.id), ...row.admins.map(keys.party)], put(daos, row.id, row));
+			track(contractId, [keys.dao(row.id), keys.party(row.creator)], put(daos, row.id, row));
 			break;
 		}
 		case 'Member': {
@@ -262,7 +214,6 @@ function created({ contractId, templateId, createArgument: a }: Created) {
 				title: text(a.title),
 				description: text(a.description),
 				effect: effect(a.action),
-				voting: voting(a.voting),
 				createdAt: text(a.createdAt),
 				closesAt: text(a.closesAt),
 				eligible: num(a.eligible),
@@ -281,7 +232,6 @@ function created({ contractId, templateId, createArgument: a }: Created) {
 			break;
 		}
 		case 'Ballot': {
-			const i = a.instrument as Instrument | null | undefined;
 			const row: Ballot = {
 				contractId,
 				proposalId: text(a.proposalId),
@@ -289,8 +239,6 @@ function created({ contractId, templateId, createArgument: a }: Created) {
 				voter: text(a.voter),
 				since: text(a.since),
 				vote: a.vote as Vote,
-				weight: num(a.weight),
-				instrument: i ? { admin: i.admin, id: i.id } : null,
 				closesAt: text(a.closesAt),
 				castAt: text(a.castAt),
 				counted: a.counted === true
@@ -299,23 +247,6 @@ function created({ contractId, templateId, createArgument: a }: Created) {
 				contractId,
 				[keys.proposal(row.proposalId), keys.party(row.voter)],
 				put(inner(ballots, row.proposalId), row.voter, row)
-			);
-			break;
-		}
-		case 'PayoutDue': {
-			const row: PayoutDue = {
-				contractId,
-				daoId: text(a.daoId),
-				proposalId: text(a.proposalId),
-				treasury: text(a.treasury),
-				to: text(a.to),
-				amount: num(a.amount),
-				createdAt: text(a.createdAt)
-			};
-			track(
-				contractId,
-				[keys.dao(row.daoId), keys.proposal(row.proposalId)],
-				put(inner(payouts, row.daoId), row.proposalId, row)
 			);
 			break;
 		}
@@ -340,15 +271,9 @@ function archived(contractId: string) {
 
 // ---- following the ledger ------------------------------------------------------------------
 
-const TEMPLATES = [
-	Main.Account,
-	Main.DAO,
-	Main.Member,
-	Main.Proposal,
-	Main.Ballot,
-	Main.PayoutDue,
-	Main.Meter
-].map((t) => t.templateId);
+const TEMPLATES = [Main.Account, Main.DAO, Main.Member, Main.Proposal, Main.Ballot, Main.Meter].map(
+	(t) => t.templateId
+);
 
 type Event =
 	{ CreatedEvent: Created } | { ArchivedEvent: { contractId: string } } | Record<string, never>;

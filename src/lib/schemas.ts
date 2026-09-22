@@ -44,32 +44,14 @@ export const partyList = (max = BATCH) =>
 		v.maxLength(max, `At most ${max} parties at once`)
 	);
 
-/** A coin amount as typed: a positive number with at most ten decimals. */
-export const coin = v.pipe(
-	v.number('An amount of coin'),
-	v.minValue(0.0000000001, 'More than nothing'),
-	v.maxValue(1_000_000_000, 'That is more coin than there is')
-);
-
-/** How a DAO decides, as the create and settings forms name it. */
-export const votingKind = v.picklist(['member', 'stake'], 'Choose how the DAO votes');
-export const quorum = v.pipe(
-	v.optional(v.number('The quorum is an amount of coin'), 0),
-	v.minValue(0, 'The quorum cannot be negative')
-);
-
-// Admins must be members; the creator is one without being listed, so the ledger checks it.
 export const createDaoForm = v.object({
 	daoName,
 	description: daoDescription,
-	members: partyList(BATCH - 1),
-	admins: partyList(50),
-	voting: votingKind,
-	quorum
+	members: partyList(BATCH - 1)
 });
 export const updateDaoForm = v.object({ dao: id, daoName, description: daoDescription });
 
-export const effectKind = v.picklist(['signal', 'payout', 'members', 'admins']);
+export const effectKind = v.picklist(['signal', 'members']);
 
 export const createProposalForm = v.pipe(
 	v.object({
@@ -78,44 +60,14 @@ export const createProposalForm = v.pipe(
 		description: proposalDescription,
 		days: votingDays,
 		kind: effectKind,
-		payoutTo: v.optional(v.string(), ''),
-		payoutAmount: v.optional(v.number(), 0),
 		add: partyList(),
-		remove: partyList(),
-		admins: partyList(50)
+		remove: partyList()
 	}),
-	v.forward(
-		v.check(
-			(f) => f.kind !== 'payout' || f.payoutTo.includes('::'),
-			'A payout needs a party id to pay'
-		),
-		['payoutTo']
-	),
-	v.forward(
-		v.check((f) => f.kind !== 'payout' || f.payoutAmount > 0, 'A payout is a positive amount'),
-		['payoutAmount']
-	),
 	v.forward(
 		v.check(
 			(f) => f.kind !== 'members' || f.add.length + f.remove.length > 0,
 			'Name someone to add or remove'
 		),
 		['add']
-	),
-	v.forward(
-		v.check((f) => f.kind !== 'admins' || f.admins.length > 0, 'A DAO needs at least one admin'),
-		['admins']
 	)
 );
-
-export const lockForm = v.object({
-	amount: coin,
-	days: v.pipe(
-		v.number('A number of days'),
-		v.integer('Whole days only'),
-		v.minValue(1, 'At least a day'),
-		v.maxValue(365, 'At most a year')
-	)
-});
-
-export const topUpForm = v.object({ dao: id, amount: coin });
