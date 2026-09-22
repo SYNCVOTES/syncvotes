@@ -44,13 +44,43 @@ export const partyList = (max = BATCH) =>
 		v.maxLength(max, `At most ${max} parties at once`)
 	);
 
+/**
+ * A share table as the table submits it: one `party=percent` per line. Percents have at most
+ * two decimals and add up to exactly 100; the ledger checks the same.
+ */
+export const shareTable = v.pipe(
+	v.string('Shares are required'),
+	v.transform((raw) =>
+		raw
+			.split(/\n+/)
+			.map((l) => l.trim())
+			.filter(Boolean)
+			.map((l) => {
+				const [party, pct] = l.split('=');
+				return { party: party.trim(), share: Math.round(Number(pct) * 100) / 100 };
+			})
+	),
+	v.minLength(1, 'At least one holder'),
+	v.maxLength(BATCH, `At most ${BATCH} holders at once`),
+	v.check((rows) => rows.every((r) => r.party.includes('::')), 'A row has no party id'),
+	v.check((rows) => rows.every((r) => r.share > 0), 'Every share must be more than zero'),
+	v.check(
+		(rows) => new Set(rows.map((r) => r.party)).size === rows.length,
+		'A party is listed twice'
+	),
+	v.check(
+		(rows) => Math.round(rows.reduce((s, r) => s + r.share, 0) * 100) === 10000,
+		'The shares must add up to exactly 100%'
+	)
+);
+
 export const createDaoForm = v.object({
 	daoName,
 	description: daoDescription,
-	members: partyList(BATCH - 1)
+	shares: shareTable
 });
 
-export const effectKind = v.picklist(['signal', 'members', 'info', 'dissolve']);
+export const effectKind = v.picklist(['signal', 'shares', 'info', 'dissolve']);
 
 export const createProposalForm = v.pipe(
 	v.object({
@@ -59,8 +89,7 @@ export const createProposalForm = v.pipe(
 		description: proposalDescription,
 		days: votingDays,
 		kind: effectKind,
-		add: partyList(),
-		remove: partyList(),
+		shares: v.optional(v.string(), ''),
 		newName: v.optional(v.string(), ''),
 		newDescription: v.optional(v.string(), ''),
 		basis: v.picklist(['all', 'cast']),
@@ -81,10 +110,10 @@ export const createProposalForm = v.pipe(
 	}),
 	v.forward(
 		v.check(
-			(f) => f.kind !== 'members' || f.add.length + f.remove.length > 0,
-			'Name someone to add or remove'
+			(f) => f.kind !== 'shares' || v.safeParse(shareTable, f.shares).success,
+			'The share table is not whole'
 		),
-		['add']
+		['shares']
 	),
 	v.forward(
 		v.check(

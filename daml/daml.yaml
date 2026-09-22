@@ -1,7 +1,7 @@
 sdk-version: 3.5.7
-name: syncvotes-rules
+name: syncvotes-shares
 source: src
-version: 0.10.0
+version: 0.11.0
 dependencies:
   - daml-prim
   - daml-stdlib

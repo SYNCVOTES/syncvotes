@@ -82,14 +82,15 @@ export function standing(
 ): { needed: number; denominator: number; quorumMet: boolean; note: string } {
 	const cast = yes + no + abstain;
 	const denominator = r.basis === 'all' ? eligible : yes + no;
+	// Shares are percents with two decimals; "needed" is the smallest weight that passes.
 	const needed =
 		r.threshold.kind === 'majority'
-			? Math.floor(denominator / 2) + 1
-			: Math.ceil((denominator * r.threshold.percent) / 100);
+			? Math.floor(denominator * 50) / 100 + 0.01
+			: (denominator * r.threshold.percent) / 100;
 	const quorumMet = r.quorum === 0 || cast * 100 >= eligible * r.quorum;
 	const note = quorumMet
 		? ''
-		: `quorum not met: ${cast} of ${eligible} took part, ${Math.ceil((eligible * r.quorum) / 100)} needed`;
+		: `quorum not met: ${cast.toFixed(2)}% took part, ${r.quorum}% needed`;
 	return { needed, denominator, quorumMet, note };
 }
 

@@ -16,16 +16,19 @@
 	import Field from '$lib/components/field.svelte';
 	import FormActions from '$lib/components/form-actions.svelte';
 	import QueryError from '$lib/components/query-error.svelte';
-	import PartyChips from '$lib/components/party-chips.svelte';
-	import MemberPicker from '$lib/components/remove-picker.svelte';
+	import ShareTable, { type Row } from '$lib/components/share-table.svelte';
 	import Note from '$lib/components/note.svelte';
 	import RulePicker from '$lib/components/rule-picker.svelte';
 	import { PRESETS, toLedger, type Rule } from '$lib/rules';
-	import Users from '@lucide/svelte/icons/users';
+	import PieChart from '@lucide/svelte/icons/pie-chart';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import Power from '@lucide/svelte/icons/power';
 	import MessageSquare from '@lucide/svelte/icons/message-square';
 	import { fmt } from '$lib/format';
+	import { shareTable } from '$lib/schemas';
+	import * as v from 'valibot';
+
+	const parsed = (raw: string) => v.parse(shareTable, raw);
 
 	const id = $derived(page.params.id!);
 	const dao = $derived(store.who ? remote.dao(id) : null);
@@ -35,11 +38,8 @@
 	 * up top, its own fields follow, and before signing the page says in one sentence what the
 	 * ledger will do — the same sentence the voters will read.
 	 */
-	type Kind = 'signal' | 'members' | 'info' | 'dissolve';
+	type Kind = 'signal' | 'shares' | 'info' | 'dissolve';
 	let kind = $state<Kind>('signal');
-	let checking = $state(false);
-	let add = $state<string[]>([]);
-	let remove = $state<string[]>([]);
 	let newName = $state('');
 	let newDescription = $state('');
 	let rule = $state<Rule>({ ...PRESETS[0].rule! });
@@ -60,26 +60,61 @@
 			text: 'The DAO takes a position. Nothing else changes.',
 			icon: MessageSquare
 		},
-		{ value: 'members', title: 'Membership', text: 'Parties join or leave the DAO.', icon: Users },
+		{
+			value: 'shares',
+			title: 'Shares',
+			text: 'Who holds what share of the vote: parties join, leave, gain or lose.',
+			icon: PieChart
+		},
 		{ value: 'info', title: 'Name', text: 'A new name and description.', icon: Pencil },
 		{ value: 'dissolve', title: 'Dissolve', text: 'The DAO is wound up for good.', icon: Power }
 	] as const;
 
 	const members = $derived(dao?.current?.members ?? 0);
+	// The share table starts as today's table, read once; the rest is the proposer's.
+	const today = $derived(store.who ? remote.daoMembers({ id, offset: 0, limit: 200 }) : null);
+	let rows = $state<Row[]>([]);
+	let seeded = $state(false);
+	$effect(() => {
+		const t = today?.current;
+		if (!t || seeded) return;
+		rows = t.items.map((m) => ({ party: m.party, share: m.share }));
+		seeded = true;
+	});
+	const whole = $derived(
+		rows.length > 0 &&
+			rows.every((r) => r.share > 0) &&
+			Math.round(rows.reduce((s, r) => s + r.share, 0) * 100) === 10000
+	);
+	const changes = $derived.by(() => {
+		const now = new Map((today?.current?.items ?? []).map((m) => [m.party, m.share]));
+		const joins = rows.filter((r) => !now.has(r.party)).length;
+		const leaves = [...now.keys()].filter((p) => !rows.some((r) => r.party === p)).length;
+		const moved = rows.filter((r) => now.has(r.party) && now.get(r.party) !== r.share).length;
+		return { joins, leaves, moved };
+	});
 	/** What the ledger will do, in the voters' words. */
 	const outcome = $derived.by(() => {
 		switch (kind) {
-			case 'members': {
-				if (add.length + remove.length === 0)
-					return 'Nobody joins or leaves yet — name someone below.';
+			case 'shares': {
+				if (!whole)
+					return 'The table has to add up to exactly 100% before it can be put to the vote.';
 				const parts = [];
-				if (add.length)
-					parts.push(`${fmt(add.length)} ${add.length === 1 ? 'party joins' : 'parties join'}`);
-				if (remove.length)
+				if (changes.joins)
 					parts.push(
-						`${fmt(remove.length)} ${remove.length === 1 ? 'member leaves' : 'members leave'}`
+						`${fmt(changes.joins)} ${changes.joins === 1 ? 'party joins' : 'parties join'}`
 					);
-				return `${parts.join(' and ')}: ${fmt(members)} members now, ${fmt(members + add.length - remove.length)} after.`;
+				if (changes.leaves)
+					parts.push(
+						`${fmt(changes.leaves)} ${changes.leaves === 1 ? 'member leaves' : 'members leave'}`
+					);
+				if (changes.moved)
+					parts.push(
+						`${fmt(changes.moved)} ${changes.moved === 1 ? 'share changes' : 'shares change'}`
+					);
+				return parts.length
+					? `${parts.join(', ')}; ${fmt(rows.length)} holders after.`
+					: 'Nothing changes yet — edit the table below.';
 			}
 			case 'info':
 				return newName.trim()
@@ -94,12 +129,8 @@
 	/** A title the proposal can carry if none is typed. */
 	const suggested = $derived.by(() => {
 		switch (kind) {
-			case 'members': {
-				const parts = [];
-				if (add.length) parts.push(`Admit ${fmt(add.length)}`);
-				if (remove.length) parts.push(`remove ${fmt(remove.length)}`);
-				return parts.join(', ') || 'Membership change';
-			}
+			case 'shares':
+				return 'Change the shares';
 			case 'info':
 				return newName.trim() ? `Rename to ${newName.trim()}` : 'Rename the DAO';
 			case 'dissolve':
@@ -117,8 +148,13 @@
 		schema,
 		(fields, { pid, membership, dao: daoCid, closesAt }) => {
 			const action: Plain =
-				fields.kind === 'members'
-					? { tag: 'SetMembers', value: { add: fields.add, remove: fields.remove } }
+				fields.kind === 'shares'
+					? {
+							tag: 'SetShares',
+							value: {
+								shares: parsed(fields.shares).map((r) => ({ _1: r.party, _2: r.share.toFixed(10) }))
+							}
+						}
 					: fields.kind === 'info'
 						? {
 								tag: 'SetInfo',
@@ -194,12 +230,18 @@
 					{/each}
 				</div>
 
-				{#if kind === 'members'}
-					<Field label="Who joins" id="add" issues={f.fields.add.issues()}>
-						<PartyChips dao={id} name="add" busy={store.busy} bind:parties={add} bind:checking />
-					</Field>
-					<Field label="Who leaves" id="remove" issues={f.fields.remove.issues()}>
-						<MemberPicker dao={id} name="remove" busy={store.busy} bind:parties={remove} />
+				{#if kind === 'shares'}
+					<Field
+						label="The table after"
+						id="shares"
+						hint="Today's holders and shares to start from. Add, remove, move; it must add up to 100."
+						issues={f.fields.shares.issues()}
+					>
+						{#if seeded}
+							<ShareTable name="shares" dao={id} busy={store.busy} bind:rows />
+						{:else}
+							<Skeleton height="h-24" />
+						{/if}
 					</Field>
 				{:else if kind === 'info'}
 					<Field label="New name" id="newName" issues={f.fields.newName.issues()}>
@@ -284,8 +326,7 @@
 				label="Create proposal"
 				busy={store.busy || f.pending > 0}
 				disabled={!dao?.ready ||
-					checking ||
-					(kind === 'members' && add.length + remove.length === 0) ||
+					(kind === 'shares' && (!whole || changes.joins + changes.leaves + changes.moved === 0)) ||
 					(kind === 'info' && newName.trim().length < 2)}
 				cancelHref="/daos/{id}"
 				problem={store.problem}

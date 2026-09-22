@@ -13,7 +13,7 @@ export type Vote = 'Yes' | 'No' | 'Abstain';
 export type Outcome = 'Passed' | 'Failed';
 export type Effect =
 	| { kind: 'signal' }
-	| { kind: 'members'; add: string[]; remove: string[] }
+	| { kind: 'shares'; shares: { party: string; share: number }[] }
 	| { kind: 'info'; name: string; description: string }
 	| { kind: 'dissolve' };
 
@@ -34,6 +34,9 @@ export type Member = {
 	party: string;
 	sponsor: string;
 	since: string;
+	/** Percent of the vote. */
+	share: number;
+	shareSince: string;
 };
 export type Proposal = {
 	contractId: string;
@@ -47,7 +50,6 @@ export type Proposal = {
 	rule: Rule;
 	createdAt: string;
 	closesAt: string;
-	eligible: number;
 	yes: number;
 	no: number;
 	abstain: number;
@@ -61,6 +63,8 @@ export type Ballot = {
 	voter: string;
 	since: string;
 	vote: Vote;
+	weight: number;
+	shareSince: string;
 	closesAt: string;
 	castAt: string;
 	counted: boolean;
@@ -76,9 +80,14 @@ export type Meter = {
 /** Timestamps arrive as ISO text of varying precision; compare them as numbers. */
 export const time = (iso: string) => new Date(iso).getTime();
 
-/** Whether a ballot counts for a proposal: a member when it was made, cast before the deadline. */
-export const eligible = (p: Proposal, b: { since: string; castAt: string }) =>
-	time(b.since) <= time(p.createdAt) && time(b.castAt) < time(p.closesAt);
+/**
+ * Whether a ballot counts for a proposal: a member, with that share, when it was made, cast
+ * before the deadline.
+ */
+export const eligible = (p: Proposal, b: { since: string; shareSince: string; castAt: string }) =>
+	time(b.since) <= time(p.createdAt) &&
+	time(b.shareSince) <= time(p.createdAt) &&
+	time(b.castAt) < time(p.closesAt);
 
 /** by party */
 export const accounts = new Map<string, Account>();
@@ -183,8 +192,14 @@ const rule = (v: unknown): Rule => {
 const effect = (v: unknown): Effect => {
 	const t = v as Tagged;
 	switch (t.tag) {
-		case 'SetMembers':
-			return { kind: 'members', add: list(t.value.add), remove: list(t.value.remove) };
+		case 'SetShares':
+			return {
+				kind: 'shares',
+				shares: (t.value.shares as { _1: string; _2: unknown }[]).map((e) => ({
+					party: text(e._1),
+					share: num(e._2)
+				}))
+			};
 		case 'SetInfo':
 			return { kind: 'info', name: text(t.value.daoName), description: text(t.value.description) };
 		case 'Dissolve':
@@ -220,7 +235,9 @@ function created({ contractId, templateId, createArgument: a }: Created) {
 				daoId: text(a.daoId),
 				party: text(a.party),
 				sponsor: text(a.sponsor),
-				since: text(a.since)
+				since: text(a.since),
+				share: num(a.share),
+				shareSince: text(a.shareSince)
 			};
 			track(
 				contractId,
@@ -243,7 +260,6 @@ function created({ contractId, templateId, createArgument: a }: Created) {
 				rule: rule(a.rule),
 				createdAt: text(a.createdAt),
 				closesAt: text(a.closesAt),
-				eligible: num(a.eligible),
 				yes: num(a.yes),
 				no: num(a.no),
 				abstain: num(a.abstain),
@@ -266,6 +282,8 @@ function created({ contractId, templateId, createArgument: a }: Created) {
 				voter: text(a.voter),
 				since: text(a.since),
 				vote: a.vote as Vote,
+				weight: num(a.weight),
+				shareSince: text(a.shareSince),
 				closesAt: text(a.closesAt),
 				castAt: text(a.castAt),
 				counted: a.counted === true

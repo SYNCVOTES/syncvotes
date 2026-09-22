@@ -13,19 +13,33 @@
 	import FormSection from '$lib/components/form-section.svelte';
 	import Field from '$lib/components/field.svelte';
 	import FormActions from '$lib/components/form-actions.svelte';
-	import PartyChips from '$lib/components/party-chips.svelte';
+	import ShareTable, { type Row } from '$lib/components/share-table.svelte';
 
 	const f = remote.createDaoForm;
-	let members = $state<string[]>([]);
-	let checking = $state(false);
+	// The creator holds it all until others are added; the table must add up to a hundred.
+	let rows = $state<Row[]>([]);
+	$effect(() => {
+		if (store.who && rows.length === 0) rows = [{ party: store.who.party, share: 100 }];
+	});
+	const whole = $derived(
+		rows.length > 0 &&
+			rows.every((r) => r.share > 0) &&
+			Math.round(rows.reduce((s, r) => s + r.share, 0) * 100) === 10000
+	);
 
+	// A share is a Daml Decimal: ten places on the ledger, two in the table.
 	const enhanced = signedForm(
 		f,
 		schema,
-		({ daoName, description, members }, { id }) => ({
+		({ daoName, description, shares }, { id }) => ({
 			choice: 'Account_CreateDAO',
 			contractId: store.who!.account,
-			args: { id, daoName, description, members }
+			args: {
+				id,
+				daoName,
+				description,
+				shares: shares.map((r) => ({ _1: r.party, _2: r.share.toFixed(10) }))
+			}
 		}),
 		({ id }) => goto(`/daos/${id}`)
 	);
@@ -37,7 +51,7 @@
 	<PageHeader
 		eyebrow="New organisation"
 		title="Create DAO"
-		description="A DAO is private to its members: only they, and the app as provider, ever see it. You are its admin and first member. Every transaction it makes is paid from a balance you keep funded."
+		description="A DAO is private to its members: only they, and the app as provider, ever see it. Its members hold shares of the vote that add up to a hundred; from here on, shares change only by vote. Every transaction it makes is paid from a balance anyone can fill."
 	/>
 
 	{#if store.screen.at === 'loading'}
@@ -66,21 +80,26 @@
 				</Field>
 			</FormSection>
 
-			<FormSection title="Members">
+			<FormSection title="Who holds the vote">
 				<Field
-					label="Founding members"
-					id="members"
-					hint="Party ids, besides you. More can join later."
-					issues={f.fields.members.issues()}
+					label="Shares"
+					id="shares"
+					hint="You, and whoever else holds a share of the vote. Percents, to two decimals, adding up to 100."
+					issues={f.fields.shares.issues()}
 				>
-					<PartyChips name="members" busy={store.busy} bind:parties={members} bind:checking />
+					<ShareTable
+						name="shares"
+						busy={store.busy}
+						bind:rows
+						fixed={store.who ? [store.who.party] : []}
+					/>
 				</Field>
 			</FormSection>
 
 			<FormActions
 				label="Create DAO"
 				busy={store.busy || f.pending > 0}
-				disabled={checking}
+				disabled={!whole}
 				cancelHref="/my-daos"
 				problem={store.problem}
 			/>

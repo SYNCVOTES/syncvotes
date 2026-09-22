@@ -44,7 +44,7 @@
 			title="Members"
 			description="{fmt(d.members)} {d.members === 1
 				? 'party'
-				: 'parties'} hold this DAO; they join and leave by vote. Each is named by the hint it chose and the fingerprint of its key."
+				: 'parties'} hold this DAO's vote, in shares that add up to 100; the shares change by vote. Each is named by the hint it chose and the fingerprint of its key."
 		/>
 
 		<div class="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -69,6 +69,7 @@
 							class="min-w-0 flex-1 {m.party === me ? '[&>span>span:first-child]:text-orange' : ''}"
 						/>
 						<span class="hidden text-ink-dim sm:inline">since {dateOf(m.since)}</span>
+						<span class="w-16 text-right text-ink">{m.share}%</span>
 						{#if m.party === d.creator}<RoleTag role="creator" />{/if}
 					</ListItem>
 				{/each}

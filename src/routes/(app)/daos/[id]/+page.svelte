@@ -19,6 +19,7 @@
 	import LoadMore from '$lib/components/load-more.svelte';
 	import RoleTag from '$lib/components/role-tag.svelte';
 	import EffectLabel from '$lib/components/effect-label.svelte';
+	import ShareBar from '$lib/components/share-bar.svelte';
 	import { short } from '$lib/rules';
 	import Problem from '$lib/components/problem.svelte';
 	import BillingPanel from '$lib/components/billing-panel.svelte';
@@ -34,7 +35,7 @@
 	let status = $state<'open' | 'closed' | undefined>(undefined);
 	let limit = $state(20);
 	const proposals = $derived(me ? remote.daoProposals({ id, offset: 0, limit, status }) : null);
-	const preview = $derived(me ? remote.daoMembers({ id, offset: 0, limit: 6 }) : null);
+	const preview = $derived(me ? remote.daoMembers({ id, offset: 0, limit: 200 }) : null);
 
 	const counted = (p: { yes: number; no: number; abstain: number }) => p.yes + p.no + p.abstain;
 </script>
@@ -123,9 +124,8 @@
 									<div class="truncate font-display text-[15px] font-bold">{p.title}</div>
 									<div class="mt-1 font-mono text-xs text-ink-dim">
 										by <PartyId party={p.proposer} class="align-middle" /> · {dateOf(p.createdAt)}
-										· <EffectLabel effect={p.effect} /> · {short(p.rule)} · {fmt(counted(p))} of {fmt(
-											p.eligible
-										)} · {p.outcome ? 'closed' : `closes ${relative(p.closesAt)}`}
+										· <EffectLabel effect={p.effect} /> · {short(p.rule)} · {counted(p).toFixed(0)}%
+										cast · {p.outcome ? 'closed' : `closes ${relative(p.closesAt)}`}
 									</div>
 								</div>
 								<StatusBadge outcome={p.outcome} closesAt={p.closesAt} executedAt={p.executedAt} />
@@ -150,16 +150,20 @@
 				<BillingPanel dao={d.id} />
 
 				<div>
-					<SectionTitle title="Members" count={fmt(d.members)} />
+					<SectionTitle title="Shares of the vote" count={fmt(d.members)} />
 					{#if preview?.ready}
+						<div class="mb-3"><ShareBar members={preview.current.items} {me} /></div>
 						<List>
-							{#each preview.current.items as m (m.party)}
+							{#each preview.current.items.slice(0, 6) as m (m.party)}
 								<ListItem class="flex items-center justify-between gap-3 font-mono text-xs">
 									<PartyId
 										party={m.party}
 										class={m.party === me ? '[&>span>span:first-child]:text-orange' : ''}
 									/>
-									{#if m.party === d.creator}<RoleTag role="creator" />{/if}
+									<span class="flex items-center gap-2">
+										<span class="text-ink">{m.share}%</span>
+										{#if m.party === d.creator}<RoleTag role="creator" />{/if}
+									</span>
 								</ListItem>
 							{/each}
 						</List>

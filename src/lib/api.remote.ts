@@ -222,7 +222,11 @@ export const dao = query.live(contractId, (id) =>
 		return {
 			...summarise(d),
 			balance: billing.balance(id),
-			me: { creator: d.creator === membership.party, membership: membership.contractId }
+			me: {
+				creator: d.creator === membership.party,
+				membership: membership.contractId,
+				share: membership.share
+			}
 		};
 	})
 );
@@ -294,7 +298,11 @@ const proposalReader = (p: ledger.Proposal): ledger.Member | null => {
 const mayVote = (p: ledger.Proposal, m: ledger.Member | null) =>
 	!!m &&
 	!p.outcome &&
-	ledger.eligible(p, { since: m.since, castAt: new Date().toISOString() }) &&
+	ledger.eligible(p, {
+		since: m.since,
+		shareSince: m.shareSince,
+		castAt: new Date().toISOString()
+	}) &&
 	!ledger.ballots.get(p.id)?.has(m.party);
 
 /** A proposal with its tally and the caller's standing: a ballot cast, a vote to cast, or neither. */
@@ -312,7 +320,9 @@ export const proposal = query.live(contractId, (id) =>
 			me: {
 				membership: me?.contractId ?? null,
 				vote: mine?.vote ?? null,
-				mayVote: mayVote(p, me)
+				weight: mine?.weight ?? me?.share ?? null,
+				mayVote: mayVote(p, me),
+				reshared: !!me && ledger.time(me.shareSince) > ledger.time(p.createdAt)
 			}
 		};
 	})
@@ -367,16 +377,22 @@ const prepare = (
  * submitting, so issues show under the field, and here again — then the transaction is
  * prepared. The browser verifies it says what the form said, signs it and executes it.
  */
+/** A share as the ledger writes a Decimal: ten places. */
+const decimal = (n: number) => n.toFixed(10);
+const shareRows = (rows: { party: string; share: number }[]) =>
+	rows.map((r) => ({ _1: r.party, _2: decimal(r.share) }));
+
 export const createDaoForm = form(
 	schemas.createDaoForm,
-	async ({ daoName, description, members }) => {
+	async ({ daoName, description, shares }) => {
 		const party = session.required();
 		const account = accountOf(party).contractId;
-		for (const p of members) {
-			if (!ledger.accounts.has(p)) error(404, `${p} is not registered with the app`);
+		if (!shares.some((r) => r.party === party)) error(400, 'You have to hold a share yourself');
+		for (const r of shares) {
+			if (!ledger.accounts.has(r.party)) error(404, `${r.party} is not registered with the app`);
 		}
 		const id = crypto.randomUUID();
-		const args = { id, daoName, description, members };
+		const args = { id, daoName, description, shares: shareRows(shares) };
 		return {
 			id,
 			prepared: await prepare(party, Main.Account, account, 'Account_CreateDAO', args, null)
@@ -392,8 +408,7 @@ export const createProposalForm = form(
 		description,
 		days,
 		kind,
-		add,
-		remove,
+		shares,
 		newName,
 		newDescription,
 		basis,
@@ -418,16 +433,15 @@ export const createProposalForm = form(
 			case 'dissolve':
 				action = { tag: 'Dissolve', value: {} };
 				break;
-			case 'members':
-				for (const p of add) {
-					if (!ledger.accounts.has(p)) error(404, `${p} is not registered with the app`);
-					if (ledger.members.get(dao)?.has(p)) error(409, `${p} is already a member`);
+			case 'shares': {
+				const rows = v.parse(schemas.shareTable, shares);
+				for (const r of rows) {
+					if (!ledger.accounts.has(r.party))
+						error(404, `${r.party} is not registered with the app`);
 				}
-				for (const p of remove) {
-					if (!ledger.members.get(dao)?.has(p)) error(409, `${p} is not a member`);
-				}
-				action = { tag: 'SetMembers', value: { add, remove } };
+				action = { tag: 'SetShares', value: { shares: shareRows(rows) } };
 				break;
+			}
 			default:
 				action = { tag: 'Signal', value: {} };
 		}

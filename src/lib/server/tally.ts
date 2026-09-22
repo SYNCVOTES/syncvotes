@@ -87,12 +87,10 @@ async function execute(p: ledger.Proposal) {
 		const others = [...(ledger.proposalsOf.get(p.daoId)?.values() ?? [])];
 		if (others.some((o) => o.id !== p.id && !o.outcome)) return;
 	}
-	const removals =
-		p.effect.kind === 'members'
-			? p.effect.remove
-					.map((party) => ledger.members.get(p.daoId)?.get(party))
-					.filter((m): m is ledger.Member => !!m)
-					.map((m) => m.contractId)
+	// A new share table takes every current member's contract; the ledger checks the count.
+	const current =
+		p.effect.kind === 'shares'
+			? [...(ledger.members.get(p.daoId)?.values() ?? [])].map((m) => m.contractId)
 			: [];
 	executing.add(p.id);
 	try {
@@ -103,7 +101,7 @@ async function execute(p: ledger.Proposal) {
 						templateId: Main.DAO.templateId,
 						contractId: dao.contractId,
 						choice: 'DAO_Execute',
-						choiceArgument: { proposal: p.contractId, removals }
+						choiceArgument: { proposal: p.contractId, current }
 					}
 				}
 			],

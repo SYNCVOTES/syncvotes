@@ -30,6 +30,11 @@
 	let q = $state('');
 	let limit = $state(20);
 	const ballots = $derived(me ? remote.proposalBallots({ id, offset: 0, limit, q }) : null);
+	const holders = $derived(
+		proposal?.current
+			? remote.daoMembers({ id: proposal.current.daoId, offset: 0, limit: 200 })
+			: null
+	);
 
 	// Every write lands on this page through the live query; nothing to refresh by hand. The
 	// button pressed says so until the ledger answers; the activity pill says what is happening.
@@ -98,7 +103,11 @@
 				</Panel>
 
 				{#if p.effect.kind !== 'signal'}
-					<EffectCard effect={p.effect} executedAt={p.executedAt} members={p.members} />
+					<EffectCard
+						effect={p.effect}
+						executedAt={p.executedAt}
+						current={holders?.current?.items ?? []}
+					/>
 					{#if p.outcome === 'Passed' && !p.executedAt}
 						<Note mono={false}>Passed; being carried out.</Note>
 					{/if}
@@ -127,6 +136,7 @@
 											? '[&>span>span:first-child]:text-orange'
 											: ''}"
 									/>
+									<span class="text-ink-mid">{b.weight}%</span>
 									<span class="text-ink-dim">{relative(b.castAt)}</span>
 									{#if !b.counted}<span
 											class="text-ink-dim"
@@ -151,7 +161,7 @@
 					yes={p.yes}
 					no={p.no}
 					abstain={p.abstain}
-					eligible={p.eligible}
+					eligible={100}
 					cast={p.cast}
 					rule={p.rule}
 				/>
@@ -176,11 +186,12 @@
 						<Note
 							>You voted <span class={tone(p.me.vote)}
 								>{p.me.vote === 'Abstain' ? 'to abstain' : p.me.vote}</span
-							>.</Note
+							>{p.me.weight !== null ? ` with ${p.me.weight}%` : ''}.</Note
 						>
 					{:else if p.me.mayVote}
 						<Panel padding="sm" class="space-y-3">
 							<Problem message={store.problem} />
+							<p class="text-[13px] text-ink-dim">Your vote weighs {p.me.weight}%.</p>
 							<div class="grid grid-cols-2 gap-3">
 								<Button variant="accent" disabled={store.busy} onclick={() => vote('Yes')}>
 									{#if casting === 'Yes'}<Loader size={14} class="animate-spin" />{/if}Yes
@@ -200,7 +211,10 @@
 							</Button>
 						</Panel>
 					{:else if p.me.membership}
-						<Note mono={false}>You joined after this vote opened, so it has no ballot for you.</Note
+						<Note mono={false}
+							>{p.me.reshared
+								? 'Your share changed after this vote opened, so it has no ballot for you.'
+								: 'You joined after this vote opened, so it has no ballot for you.'}</Note
 						>
 					{/if}
 				{/if}

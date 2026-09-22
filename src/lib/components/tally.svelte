@@ -19,6 +19,7 @@
 	const counted = $derived(yes + no + abstain);
 	const s = $derived(standing(rule, yes, no, abstain, eligible));
 	const pct = (n: number) => (eligible > 0 ? (n / eligible) * 100 : 0);
+	const w = (n: number) => `${Math.round(n * 100) / 100}%`;
 </script>
 
 <Panel padding="sm">
