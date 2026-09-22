@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { goto } from '$app/navigation';
 	import * as remote from '$lib/api.remote';
 	import * as actions from '$lib/actions';
 	import { store, flow } from '$lib/wallet-store.svelte';
@@ -21,7 +20,6 @@
 	import Skeleton from '$lib/components/skeleton.svelte';
 	import LoadMore from '$lib/components/load-more.svelte';
 	import SearchInput from '$lib/components/search-input.svelte';
-	import DangerZone from '$lib/components/danger-zone.svelte';
 	import Loader from '@lucide/svelte/icons/loader';
 	import { relative, dateOf } from '$lib/format';
 
@@ -46,10 +44,6 @@
 	}
 	const tone = (v: string) =>
 		v === 'Yes' ? 'text-green' : v === 'No' ? 'text-red' : 'text-ink-dim';
-	async function cancel(daoId: string) {
-		const ok = await flow.act((s, w) => actions.cancelProposal(s, w, id));
-		if (ok) await goto(`/daos/${daoId}`);
-	}
 </script>
 
 <svelte:head><title>{proposal?.current?.title ?? 'Proposal'} — SyncVotes</title></svelte:head>
@@ -71,7 +65,6 @@
 		{@const p = proposal.current}
 		{@const needed = Math.floor(p.eligible / 2) + 1}
 		{@const ended = new Date(p.closesAt).getTime() < Date.now()}
-		{@const mine = me === p.proposer}
 
 		<div class="mb-8">
 			<div class="mb-3 flex items-center gap-3">
@@ -171,17 +164,6 @@
 					</Note>
 				{:else if ended}
 					<Note>The deadline has passed; the last ballots are being counted.</Note>
-				{/if}
-
-				{#if !p.outcome && (mine || p.me.admin)}
-					<DangerZone
-						compact
-						text={mine ? 'Withdraw your proposal.' : 'As admin you can withdraw this proposal.'}
-						action="Cancel proposal"
-						confirm="Yes, withdraw"
-						busy={store.busy}
-						onconfirm={() => cancel(p.daoId)}
-					/>
 				{/if}
 
 				{#if !p.outcome && !ended}

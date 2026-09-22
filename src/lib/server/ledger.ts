@@ -10,13 +10,17 @@ import { providerParty, sdk, streamActiveContracts, type Created } from './parti
 
 export type Vote = 'Yes' | 'No' | 'Abstain';
 export type Outcome = 'Passed' | 'Failed';
-export type Effect = { kind: 'signal' } | { kind: 'members'; add: string[]; remove: string[] };
+export type Effect =
+	| { kind: 'signal' }
+	| { kind: 'members'; add: string[]; remove: string[] }
+	| { kind: 'info'; name: string; description: string }
+	| { kind: 'dissolve' };
 
 export type Account = { contractId: string; party: string };
 export type Dao = {
 	contractId: string;
 	id: string;
-	/** The creator: the DAO's one admin. */
+	/** Who created it; no powers come with that. */
 	creator: string;
 	name: string;
 	description: string;
@@ -163,9 +167,16 @@ type Tagged = { tag: string; value: Record<string, unknown> };
 
 const effect = (v: unknown): Effect => {
 	const t = v as Tagged;
-	return t.tag === 'SetMembers'
-		? { kind: 'members', add: list(t.value.add), remove: list(t.value.remove) }
-		: { kind: 'signal' };
+	switch (t.tag) {
+		case 'SetMembers':
+			return { kind: 'members', add: list(t.value.add), remove: list(t.value.remove) };
+		case 'SetInfo':
+			return { kind: 'info', name: text(t.value.daoName), description: text(t.value.description) };
+		case 'Dissolve':
+			return { kind: 'dissolve' };
+		default:
+			return { kind: 'signal' };
+	}
 };
 
 function created({ contractId, templateId, createArgument: a }: Created) {

@@ -10,10 +10,10 @@ import DA.Optional (isNone)
 -- one that ever signs a submission. The provider's authority enters once, with the Account, and
 -- every later contract inherits it through the choice that creates it.
 --
--- A DAO is signed by the party that created it as well — its one admin, who runs it and keeps
--- its balance funded — and that pair, creator and provider, is the DAO's own authority: choices
--- that only the DAO may exercise (removing a member, marking a proposal executed) are controlled
--- by both, and neither has the other's key.
+-- A DAO is signed by the party that created it as well, and that pair, creator and provider, is
+-- the DAO's own authority: choices that only the DAO may exercise (removing a member, marking a
+-- proposal executed) are controlled by both, and neither has the other's key. The creator has
+-- no say of their own beyond that signature: everything a DAO does, it decides by vote.
 --
 -- Built for large DAOs: a member's vote touches only that member's own contract, so thousands
 -- can vote at once, and a proposal holds counters rather than lists. The provider counts the
@@ -27,20 +27,21 @@ data Outcome = Passed | Failed
   deriving (Eq, Show)
 
 -- | What a proposal does when it passes (`Effect`: `Action` is the Prelude's). `Signal`
--- decides and does nothing else.
+-- decides and does nothing else; the rest is everything a DAO can change about itself.
 data Effect
   = Signal
   | SetMembers with
       add : [Party]
       remove : [Party]
+  | SetInfo with
+      daoName : Text
+      description : Text
+  | Dissolve
   deriving (Eq, Show)
 
 -- | Members added or removed per transaction; longer lists are split.
 batch : Int
 batch = 200
-
-adminOnly : Party -> Party -> Update ()
-adminOnly creator party = assertMsg "Only the admin can do this" (party == creator)
 
 -- | A party's standing with the app: created by the provider once per party, and the door
 -- through which the party creates DAOs.
@@ -72,10 +73,10 @@ template Account
           provider; operator; creator = user; id; name = daoName; description; createdAt = now
           members = length everyone
 
--- | A DAO: who runs it, what it is called, and how many members it has. The members
+-- | A DAO: who created it, what it is called, and how many members it has. The members
 -- themselves are `Member` contracts, so a DAO of ten thousand is as small as one of three.
--- The creator is its admin, and the creator's signature is what keeps the provider from
--- archiving it alone.
+-- Nobody changes it by hand: its one choice carries out what a vote decided. The creator's
+-- signature is what keeps the provider from archiving it alone.
 template DAO
   with
     provider : Party
@@ -92,55 +93,11 @@ template DAO
 
     ensure name /= ""
 
-    choice DAO_Update : ContractId DAO
-      with
-        admin : Party
-        daoName : Text
-        description : Text
-      controller admin
-      do
-        adminOnly creator admin
-        create this with name = daoName; description
-
-    choice DAO_Archive : ()
-      with
-        admin : Party
-      controller admin
-      do adminOnly creator admin
-
-    choice DAO_AddMembers : ContractId DAO
-      with
-        admin : Party
-        parties : [Party]
-      controller admin
-      do
-        adminOnly creator admin
-        now <- getTime
-        let new = dedup parties
-        assertMsg "Too many at once" (length new <= batch)
-        forA_ new \party ->
-          create Member with
-            provider; operator; creator; sponsor = admin; daoId = id; party; since = now; voted = []
-        create this with members = members + length new
-
-    choice DAO_RemoveMembers : ContractId DAO
-      with
-        admin : Party
-        memberCids : [ContractId Member]
-      controller admin
-      do
-        adminOnly creator admin
-        forA_ memberCids \cid -> do
-          member <- fetch cid
-          assertMsg "Not a member of this DAO" (member.daoId == id)
-          assertMsg "The admin stays a member" (member.party /= creator)
-          exercise cid Member_Remove
-        create this with members = members - length memberCids
-
     -- A passed proposal is carried out by the provider, with the DAO's authority and the
     -- ledger's check that it did pass. Removals are named by contract, since a proposal can
-    -- only name parties; the ledger checks each one is who the proposal said.
-    choice DAO_Execute : ContractId DAO
+    -- only name parties; the ledger checks each one is who the proposal said. Dissolving
+    -- archives the DAO and returns nothing.
+    choice DAO_Execute : Optional (ContractId DAO)
       with
         proposal : ContractId Proposal
         removals : [ContractId Member]
@@ -151,20 +108,21 @@ template DAO
         exercise proposal Proposal_MarkExecuted
         now <- getTime
         case p.action of
-          Signal -> create this
+          Signal -> Some <$> create this
+          SetInfo daoName description -> Some <$> create this with name = daoName; description
+          Dissolve -> pure None
           SetMembers add remove -> do
             forA_ removals \cid -> do
               member <- fetch cid
               assertMsg "Not a member of this DAO" (member.daoId == id)
               assertMsg "Not named by the proposal" (member.party `elem` remove)
-              assertMsg "The admin stays a member" (member.party /= creator)
               exercise cid Member_Remove
             let new = dedup add
             forA_ new \party ->
               create Member with
                 provider; operator; creator; sponsor = creator; daoId = id; party; since = now
                 voted = []
-            create this with members = members + length new - length removals
+            Some <$> create this with members = members + length new - length removals
 
 -- | One party's membership of one DAO: the door through which the member proposes, and their
 -- ballot box — voting replaces it with a copy that remembers the proposal, which is what makes
@@ -210,6 +168,8 @@ template Member
         assertMsg "The deadline must be in the future" (closesAt > now)
         case action of
           Signal -> pure ()
+          Dissolve -> pure ()
+          SetInfo daoName _ -> assertMsg "A DAO needs a name" (daoName /= "")
           SetMembers add remove -> do
             assertMsg "Nothing to change" (not (null add && null remove))
             assertMsg "Too many at once" (length add <= batch && length remove <= batch)
@@ -239,8 +199,8 @@ template Member
 
 -- | A proposal counts; it does not list. Its electorate was fixed when it was made: the members
 -- of that moment. It passes once yes reaches a majority of them, fails once no makes that
--- impossible, and is decided by the ballots cast when the deadline has passed. An action is
--- carried out by the DAO once it has passed.
+-- impossible, and is decided by the ballots cast when the deadline has passed. Nobody withdraws
+-- it: once made, it is decided. An action is carried out by the DAO once it has passed.
 template Proposal
   with
     provider : Party
@@ -265,18 +225,6 @@ template Proposal
     observer operator
 
     ensure title /= ""
-
-    choice Proposal_Cancel : ()
-      with
-        canceller : Party
-        dao : ContractId DAO
-      controller canceller
-      do
-        assertMsg "Already settled" (isNone outcome)
-        found <- fetch dao
-        assertMsg "Not this proposal's DAO" (found.id == daoId)
-        assertMsg "Only the proposer or the admin can cancel"
-          (canceller == proposer || canceller == found.creator)
 
     -- `final` says the deadline has passed and these are the last ballots there are: the one
     -- thing the ledger takes on the provider's word, since it cannot see what was not handed in.
@@ -345,7 +293,7 @@ template Ballot
         create this with counted = True
         pure vote
 
--- | The provider's statement of a DAO's account: what its admin paid in, and what its
+-- | The provider's statement of a DAO's account: what was paid in, and what its
 -- transactions have cost so far. Rewritten as the numbers move; one contract per DAO,
 -- whatever its history.
 template Meter
@@ -353,13 +301,13 @@ template Meter
     provider : Party
     operator : Party
     daoId : Text
-    admin : Party
+    creator : Party
     credited : Decimal
     charged : Decimal
     updatedAt : Time
   where
     signatory provider
-    observer operator, admin
+    observer operator, creator
 
     choice Meter_Update : ContractId Meter
       with

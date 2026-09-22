@@ -49,9 +49,8 @@ export const createDaoForm = v.object({
 	description: daoDescription,
 	members: partyList(BATCH - 1)
 });
-export const updateDaoForm = v.object({ dao: id, daoName, description: daoDescription });
 
-export const effectKind = v.picklist(['signal', 'members']);
+export const effectKind = v.picklist(['signal', 'members', 'info', 'dissolve']);
 
 export const createProposalForm = v.pipe(
 	v.object({
@@ -61,7 +60,9 @@ export const createProposalForm = v.pipe(
 		days: votingDays,
 		kind: effectKind,
 		add: partyList(),
-		remove: partyList()
+		remove: partyList(),
+		newName: v.optional(v.string(), ''),
+		newDescription: v.optional(v.string(), '')
 	}),
 	v.forward(
 		v.check(
@@ -69,5 +70,23 @@ export const createProposalForm = v.pipe(
 			'Name someone to add or remove'
 		),
 		['add']
+	),
+	v.forward(
+		v.check(
+			(f) => f.kind !== 'info' || f.newName.trim().length >= 2,
+			'The name needs at least 2 characters'
+		),
+		['newName']
+	),
+	v.forward(
+		v.check(
+			(f) => f.kind !== 'info' || f.newName.trim().length <= 60,
+			'The name is at most 60 characters'
+		),
+		['newName']
+	),
+	v.forward(
+		v.check((f) => f.newDescription.length <= 2000, 'The description is at most 2000 characters'),
+		['newDescription']
 	)
 );

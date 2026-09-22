@@ -1,7 +1,6 @@
 import * as remote from './api.remote';
 import { toBase64, type Signer } from './wallet';
 import { verifyPrepared, verifyTopology, type Expected, type Plain } from './verify';
-import { BATCH } from './schemas';
 import { working } from './wallet-store.svelte';
 
 /**
@@ -70,83 +69,7 @@ export async function sign(s: Signer, who: Identity, intent: Intent, prepared: P
 /** Said before every prepare: the server is building the transaction. */
 const preparing = () => working('Preparing the transaction');
 
-/**
- * Members join and leave a batch at a time, each batch its own signed transaction on the DAO
- * contract of the moment. A batch replaces that contract, so the next one waits for the live
- * query to show the replacement before it is prepared.
- */
-async function inBatches<T extends Plain>(
-	items: T[],
-	daoId: string,
-	progress: Progress | undefined,
-	each: (batch: T[], daoContractId: string) => Promise<void>
-) {
-	const all = Array.from({ length: Math.ceil(items.length / BATCH) }, (_, i) =>
-		items.slice(i * BATCH, (i + 1) * BATCH)
-	);
-	let consumed: string | undefined;
-	for (const [i, batch] of all.entries()) {
-		progress?.(i, all.length);
-		for await (const dao of remote.dao(daoId)) {
-			if (dao.contractId === consumed) continue;
-			await each(batch, dao.contractId);
-			consumed = dao.contractId;
-			break;
-		}
-	}
-	progress?.(all.length, all.length);
-}
-
-// ---- DAOs ---------------------------------------------------------------------------------
-
-export async function archiveDao(
-	s: Signer,
-	who: Identity,
-	dao: { id: string; contractId: string }
-) {
-	preparing();
-	const prepared = await remote.prepareArchiveDao(dao.id);
-	const intent = { choice: 'DAO_Archive', contractId: dao.contractId, args: { admin: who.party } };
-	await sign(s, who, intent, prepared);
-}
-
-export const addMembers = (
-	s: Signer,
-	who: Identity,
-	daoId: string,
-	parties: string[],
-	progress?: Progress
-) =>
-	inBatches(parties, daoId, progress, async (batch, contractId) => {
-		preparing();
-		const prepared = await remote.prepareAddMembers({ dao: daoId, parties: batch });
-		const args = { admin: who.party, parties: batch };
-		await sign(s, who, { choice: 'DAO_AddMembers', contractId, args }, prepared);
-	});
-
-export const removeMembers = (
-	s: Signer,
-	who: Identity,
-	daoId: string,
-	memberCids: string[],
-	progress?: Progress
-) =>
-	inBatches(memberCids, daoId, progress, async (batch, contractId) => {
-		preparing();
-		const prepared = await remote.prepareRemoveMembers({ dao: daoId, memberCids: batch });
-		const args = { admin: who.party, memberCids: batch };
-		await sign(s, who, { choice: 'DAO_RemoveMembers', contractId, args }, prepared);
-	});
-
 // ---- Proposals ----------------------------------------------------------------------------
-
-export async function cancelProposal(s: Signer, who: Identity, proposalId: string) {
-	const { contractId } = await remote.proposal(proposalId);
-	preparing();
-	const { dao, prepared } = await remote.prepareCancelProposal(proposalId);
-	const args = { canceller: who.party, dao };
-	await sign(s, who, { choice: 'Proposal_Cancel', contractId, args }, prepared);
-}
 
 export type Choice = 'Yes' | 'No' | 'Abstain';
 

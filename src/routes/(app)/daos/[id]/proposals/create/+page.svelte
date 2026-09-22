@@ -24,12 +24,18 @@
 	const id = $derived(page.params.id!);
 	const dao = $derived(store.who ? remote.dao(id) : null);
 
-	type Kind = 'signal' | 'members';
+	type Kind = 'signal' | 'members' | 'info' | 'dissolve';
 	let kind = $state<Kind>('signal');
 	let checking = $state(false);
 	const kinds: { value: Kind; title: string; text: string }[] = [
-		{ value: 'signal', title: 'Signal', text: 'A decision, and nothing else happens.' },
-		{ value: 'members', title: 'Membership', text: 'Parties join or leave when it passes.' }
+		{ value: 'signal', title: 'Decision', text: 'A decision, and nothing else happens.' },
+		{ value: 'members', title: 'Membership', text: 'Parties join or leave when it passes.' },
+		{ value: 'info', title: 'Name', text: 'A new name and description when it passes.' },
+		{
+			value: 'dissolve',
+			title: 'Dissolve',
+			text: 'The DAO is wound up once every other vote has settled.'
+		}
 	];
 
 	// One signature, from the member's own contract; the vote opens as it lands.
@@ -41,7 +47,14 @@
 			const action: Plain =
 				fields.kind === 'members'
 					? { tag: 'SetMembers', value: { add: fields.add, remove: fields.remove } }
-					: { tag: 'Signal', value: {} };
+					: fields.kind === 'info'
+						? {
+								tag: 'SetInfo',
+								value: { daoName: fields.newName.trim(), description: fields.newDescription }
+							}
+						: fields.kind === 'dissolve'
+							? { tag: 'Dissolve', value: {} }
+							: { tag: 'Signal', value: {} };
 			return {
 				choice: 'Member_Propose',
 				contractId: membership,
@@ -134,6 +147,22 @@
 					</Field>
 					<Field label="Remove" id="remove" issues={f.fields.remove.issues()}>
 						<MemberPicker dao={id} name="remove" busy={store.busy} />
+					</Field>
+				{:else if kind === 'info'}
+					<Field label="New name" id="newName" issues={f.fields.newName.issues()}>
+						<Input {...f.fields.newName.as('text')} id="newName" maxlength={60} />
+					</Field>
+					<Field
+						label="New description"
+						id="newDescription"
+						issues={f.fields.newDescription.issues()}
+					>
+						<Textarea
+							{...f.fields.newDescription.as('text')}
+							id="newDescription"
+							rows={4}
+							maxlength={2000}
+						/>
 					</Field>
 				{/if}
 			</FormSection>

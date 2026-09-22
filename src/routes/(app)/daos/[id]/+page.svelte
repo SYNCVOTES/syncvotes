@@ -59,7 +59,7 @@
 					<div class="mt-3 flex flex-wrap items-center gap-2">
 						<Badge variant="accent">Private</Badge>
 						<Badge>Majority</Badge>
-						{#if d.me.admin}<Badge variant="amber">You are admin</Badge>{:else}<Badge
+						{#if d.me.creator}<Badge variant="amber">You created it</Badge>{:else}<Badge
 								variant="green">Member</Badge
 							>{/if}
 					</div>
@@ -71,9 +71,6 @@
 				</div>
 			</div>
 			<div class="flex shrink-0 items-center gap-2">
-				{#if d.me.admin}
-					<Button href="/daos/{d.id}/edit" variant="outline">Edit</Button>
-				{/if}
 				<Button href="/daos/{d.id}/proposals/create"><Plus strokeWidth={2.5} /> New proposal</Button
 				>
 			</div>
@@ -149,7 +146,7 @@
 			</section>
 
 			<aside class="space-y-6">
-				<BillingPanel dao={d.id} admin={d.me.admin} />
+				<BillingPanel dao={d.id} />
 
 				<div>
 					<SectionTitle title="Members" count={fmt(d.members)} />
@@ -161,7 +158,7 @@
 										party={m.party}
 										class={m.party === me ? '[&>span>span:first-child]:text-orange' : ''}
 									/>
-									{#if m.party === d.creator}<RoleTag role="admin" />{/if}
+									{#if m.party === d.creator}<RoleTag role="creator" />{/if}
 								</ListItem>
 							{/each}
 						</List>
@@ -169,7 +166,7 @@
 						<Skeleton height="h-24" />
 					{/if}
 					<Button href="/daos/{d.id}/members" variant="outline" size="sm" class="mt-3 w-full">
-						{d.me.admin ? 'Manage members' : 'All members'}
+						All members
 						<ArrowRight size={14} />
 					</Button>
 				</div>

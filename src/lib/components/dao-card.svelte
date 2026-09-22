@@ -13,7 +13,7 @@
 		description: string;
 		members: number;
 		openProposals: number;
-		role: 'admin' | 'member';
+		role: 'creator' | 'member';
 	} = $props();
 
 	const monogram = $derived(name.slice(0, 3).toUpperCase());
@@ -30,7 +30,7 @@
 			{monogram}
 		</div>
 		<span
-			class="pt-1 font-mono text-xs font-bold tracking-[0.18em] uppercase {role === 'admin'
+			class="pt-1 font-mono text-xs font-bold tracking-[0.18em] uppercase {role === 'creator'
 				? 'text-amber'
 				: 'text-orange'}">{role}</span
 		>

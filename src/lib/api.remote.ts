@@ -188,8 +188,6 @@ const proposalsOf = (daoId: string) =>
 		b.createdAt.localeCompare(a.createdAt)
 	);
 const openProposals = (daoId: string) => proposalsOf(daoId).filter((p) => !p.outcome).length;
-const isAdmin = (dao: ledger.Dao, party: string) => dao.creator === party;
-
 /** The caller's membership of this DAO, or 403. The admin is a member like any other. */
 const memberOnly = (daoId: string): ledger.Member => {
 	const membership = ledger.members.get(daoId)?.get(session.required());
@@ -223,7 +221,7 @@ export const dao = query.live(contractId, (id) =>
 		return {
 			...summarise(d),
 			balance: billing.balance(id),
-			me: { admin: isAdmin(d, membership.party), membership: membership.contractId }
+			me: { creator: d.creator === membership.party, membership: membership.contractId }
 		};
 	})
 );
@@ -303,7 +301,6 @@ export const proposal = query.live(contractId, (id) =>
 	live(ledger.keys.proposal(id), () => {
 		const p = proposalOf(id);
 		const me = proposalReader(p);
-		const who = session.required();
 		const dao = ledger.daos.get(p.daoId);
 		const mine = me && ledger.ballots.get(id)?.get(me.party);
 		return {
@@ -313,8 +310,7 @@ export const proposal = query.live(contractId, (id) =>
 			me: {
 				membership: me?.contractId ?? null,
 				vote: mine?.vote ?? null,
-				mayVote: mayVote(p, me),
-				admin: !!dao && isAdmin(dao, who)
+				mayVote: mayVote(p, me)
 			}
 		};
 	})
@@ -364,12 +360,6 @@ const prepare = (
 	);
 };
 
-const adminOf = (daoId: string, party: string): ledger.Dao => {
-	const found = daoOf(daoId);
-	if (!isAdmin(found, party)) error(403, 'Only an admin can do this');
-	return found;
-};
-
 /**
  * The text forms: each field is checked against the shared schema — in the browser before
  * submitting, so issues show under the field, and here again — then the transaction is
@@ -392,16 +382,9 @@ export const createDaoForm = form(
 	}
 );
 
-export const updateDaoForm = form(schemas.updateDaoForm, async ({ dao, daoName, description }) => {
-	const party = session.required();
-	const { contractId } = adminOf(dao, party);
-	const args = { admin: party, daoName, description };
-	return { prepared: await prepare(party, Main.DAO, contractId, 'DAO_Update', args, dao) };
-});
-
 export const createProposalForm = form(
 	schemas.createProposalForm,
-	async ({ dao, title, description, days, kind, add, remove }) => {
+	async ({ dao, title, description, days, kind, add, remove, newName, newDescription }) => {
 		const party = session.required();
 		const membership = memberOnly(dao).contractId;
 		const d = daoOf(dao);
@@ -409,6 +392,15 @@ export const createProposalForm = form(
 		const closesAt = new Date(Date.now() + days * 86_400_000).toISOString();
 		let action: { tag: string; value: unknown };
 		switch (kind) {
+			case 'info':
+				action = {
+					tag: 'SetInfo',
+					value: { daoName: newName.trim(), description: newDescription }
+				};
+				break;
+			case 'dissolve':
+				action = { tag: 'Dissolve', value: {} };
+				break;
 			case 'members':
 				for (const p of add) {
 					if (!ledger.accounts.has(p)) error(404, `${p} is not registered with the app`);
@@ -416,7 +408,6 @@ export const createProposalForm = form(
 				}
 				for (const p of remove) {
 					if (!ledger.members.get(dao)?.has(p)) error(409, `${p} is not a member`);
-					if (p === d.creator) error(409, 'The creator stays a member');
 				}
 				action = { tag: 'SetMembers', value: { add, remove } };
 				break;
@@ -434,72 +425,6 @@ export const createProposalForm = form(
 		};
 	}
 );
-
-/** Deleting archives the DAO. Its settled proposals stay readable; open ones block it. */
-export const prepareArchiveDao = command(contractId, (daoId) => {
-	const party = session.required();
-	const { contractId } = adminOf(daoId, party);
-	if (openProposals(daoId) > 0) error(409, 'Close or cancel the open proposals first');
-	// The one write an empty balance does not refuse: a DAO can always be wound up.
-	return participant.prepare(
-		party,
-		[
-			{
-				ExerciseCommand: {
-					templateId: Main.DAO.templateId,
-					contractId,
-					choice: 'DAO_Archive',
-					choiceArgument: { admin: party }
-				}
-			}
-		],
-		{ dao: daoId }
-	);
-});
-
-/** A batch of new members: registered parties that are not members yet. */
-export const prepareAddMembers = command(
-	v.object({
-		dao: contractId,
-		parties: v.pipe(v.array(partyId), v.minLength(1), v.maxLength(schemas.BATCH))
-	}),
-	({ dao, parties }) => {
-		const party = session.required();
-		const { contractId } = adminOf(dao, party);
-		for (const p of parties) {
-			if (!ledger.accounts.has(p)) error(404, `${p} is not registered with the app`);
-			if (ledger.members.get(dao)?.has(p)) error(409, `${p} is already a member`);
-		}
-		return prepare(party, Main.DAO, contractId, 'DAO_AddMembers', { admin: party, parties }, dao);
-	}
-);
-
-export const prepareRemoveMembers = command(
-	v.object({
-		dao: contractId,
-		memberCids: v.pipe(v.array(contractId), v.minLength(1), v.maxLength(schemas.BATCH))
-	}),
-	({ dao, memberCids }) => {
-		const party = session.required();
-		const { contractId } = adminOf(dao, party);
-		const args = { admin: party, memberCids };
-		return prepare(party, Main.DAO, contractId, 'DAO_RemoveMembers', args, dao);
-	}
-);
-
-export const prepareCancelProposal = command(contractId, async (proposalId) => {
-	const party = session.required();
-	const { contractId, outcome, proposer, daoId } = proposalOf(proposalId);
-	const d = daoOf(daoId);
-	if (outcome) error(409, 'Already settled');
-	if (proposer !== party && !isAdmin(d, party))
-		error(403, 'Only the proposer or the admin can cancel');
-	const args = { canceller: party, dao: d.contractId };
-	return {
-		dao: d.contractId,
-		prepared: await prepare(party, Main.Proposal, contractId, 'Proposal_Cancel', args, daoId)
-	};
-});
 
 /** A ballot, cast from the voter's own membership contract. */
 export const prepareVote = command(

@@ -75,16 +75,23 @@ async function count(id: string) {
 	if (again.delete(id)) setTimeout(() => void count(id), 1500);
 }
 
-/** A passed proposal with an effect is carried out once, with the DAO's authority. */
+/**
+ * A passed proposal with an effect is carried out once, with the DAO's authority. Dissolving
+ * waits until nothing else is open, so no vote is cut short by the DAO vanishing under it.
+ */
 async function execute(p: ledger.Proposal) {
 	if (p.outcome !== 'Passed' || p.executedAt || p.effect.kind === 'signal') return;
 	const dao = ledger.daos.get(p.daoId);
 	if (!dao || executing.has(p.id)) return;
+	if (p.effect.kind === 'dissolve') {
+		const others = [...(ledger.proposalsOf.get(p.daoId)?.values() ?? [])];
+		if (others.some((o) => o.id !== p.id && !o.outcome)) return;
+	}
 	const removals =
 		p.effect.kind === 'members'
 			? p.effect.remove
 					.map((party) => ledger.members.get(p.daoId)?.get(party))
-					.filter((m): m is ledger.Member => !!m && m.party !== dao.creator)
+					.filter((m): m is ledger.Member => !!m)
 					.map((m) => m.contractId)
 			: [];
 	executing.add(p.id);

@@ -15,7 +15,7 @@
 
 	const who = $derived(store.who);
 	const daos = $derived(who ? remote.myDaos(who.party) : null);
-	const admin = $derived(daos?.current?.filter((d) => d.creator === who?.party).length ?? 0);
+	const created = $derived(daos?.current?.filter((d) => d.creator === who?.party).length ?? 0);
 </script>
 
 <svelte:head><title>My DAOs — SyncVotes</title></svelte:head>
@@ -24,7 +24,7 @@
 	<PageHeader
 		eyebrow="Personal workspace"
 		title="My DAOs"
-		description="DAOs where your key is admin or member. On-chain membership only — derived from the DAO contracts on Canton Network."
+		description="DAOs your key is a member of. On-chain membership only — derived from the DAO contracts on Canton Network."
 	>
 		{#snippet action()}
 			<Button href="/daos/create" size="lg"><Plus strokeWidth={2.5} /> Create DAO</Button>
@@ -46,8 +46,8 @@
 	{:else}
 		<div class="mb-8 grid grid-cols-2 gap-3 md:grid-cols-3">
 			<Stat value={daos.current.length} label="Total" sub="DAOs joined" />
-			<Stat value={admin} label="Admin" sub="you control" />
-			<Stat value={daos.current.length - admin} label="Member" sub="you participate in" />
+			<Stat value={created} label="Created" sub="by you" />
+			<Stat value={daos.current.length - created} label="Joined" sub="by vote" />
 		</div>
 
 		{#if daos.current.length === 0}
@@ -64,7 +64,7 @@
 						description={dao.description}
 						members={dao.members}
 						openProposals={dao.openProposals}
-						role={dao.creator === who.party ? 'admin' : 'member'}
+						role={dao.creator === who.party ? 'creator' : 'member'}
 					/>
 				{/each}
 			</div>

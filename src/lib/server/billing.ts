@@ -7,8 +7,8 @@ import { operatorParty, paidTraffic, providerParty, sdk, submitAsProvider } from
 
 /**
  * Who pays for what. Every transaction a DAO causes costs this validator traffic — bytes the
- * network charges in coin, at a price it publishes. The DAO's admin pays that back into a
- * balance: coin sent to the provider with the DAO's memo, found in the provider's own
+ * network charges in coin, at a price it publishes. The DAO pays that back from a balance
+ * anyone may fill: coin sent to the provider with the DAO's memo, found in the provider's own
  * transactions and credited at `factor` times the network's price (one to start with, less
  * once the rewards this traffic earns are known). The balance lives on the ledger as the
  * DAO's `Meter`, rewritten as the figures move; between writes the charges are kept here.
@@ -70,7 +70,7 @@ export const balance = (daoId: string) =>
 /** Refuses a write for a DAO that has no coin left. */
 export function funded(daoId: string): void {
 	if (balance(daoId) <= 0) {
-		throw error(402, "This DAO's balance is empty — its admin has to pay in first");
+		throw error(402, "This DAO's balance is empty — someone has to pay in first");
 	}
 }
 
@@ -118,7 +118,7 @@ async function write(daoId: string, credited: number, charged: number) {
 								provider: providerParty(),
 								operator: operatorParty(),
 								daoId,
-								admin: dao.creator,
+								creator: dao.creator,
 								credited: credited.toFixed(10),
 								charged: charged.toFixed(10),
 								updatedAt: new Date().toISOString()
