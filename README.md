@@ -305,7 +305,9 @@ ships CommonJS that breaks when bundled into an ES module); adapter-node bundles
 into `build/`.
 
 Caddy's config is inline in `compose.yaml` (a compose `configs` entry with `content:`) rather than
-bind-mounted — a host path would be resolved on the server, where this tree does not exist.
+bind-mounted — a host path would be resolved on the server, where this tree does not exist. A change
+to that content does not make `compose up` recreate the container: after one, run
+`docker --context syncvotes-testnet compose --env-file testnet.env up -d --force-recreate caddy`.
 The site sits behind Cloudflare, and Caddy is what works the visitor's address out: Cloudflare's
 published ranges are its trusted proxies, so a request that came through Cloudflare is known by
 the address in Cloudflare's header and one that reached the origin directly by the connection
