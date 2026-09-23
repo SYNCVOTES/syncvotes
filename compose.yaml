@@ -90,6 +90,8 @@ services:
   keycloak-db:
     image: postgres:16-alpine
     restart: unless-stopped
+    labels:
+      traefik.enable: 'false'
     environment:
       POSTGRES_DB: keycloak
       POSTGRES_USER: keycloak
