@@ -131,24 +131,16 @@
 						executedAt={p.executedAt}
 						equal={p.daoEqual}
 						current={holders?.current ?? []}
-						paid={p.paidBy}
-						payout={p.payout}
 					/>
 					{#if p.stuck}
 						<Note mono={false}>
 							<span class="text-red">Could not be carried out yet:</span>
-							{p.stuck}. The provider keeps trying{p.effect.kind === 'payout'
-								? '; if the DAO dissolves first, the payout is written off'
-								: ''}.
+							{p.stuck}. The provider keeps trying.
 						</Note>
 					{:else if p.waiting && !p.executedAt}
 						<Note mono={false}>Passed; waiting for {p.waiting}.</Note>
 					{:else if p.outcome === 'Passed' && !p.executedAt}
-						<Note mono={false}>
-							{#if p.effect.kind === 'payout'}Passed; paid the moment the treasury can cover it.{:else if p.effect.kind === 'dissolve'}Passed;
-								nothing new is proposed; carried out once every other proposal is done.{:else}Passed;
-								being carried out.{/if}
-						</Note>
+						<Note mono={false}>Passed; being carried out.</Note>
 					{/if}
 				{/if}
 

@@ -201,14 +201,7 @@ export const createDaoForm = v.pipe(
 	)
 );
 
-export const effectKind = v.picklist([
-	'signal',
-	'shares',
-	'info',
-	'payout',
-	'dissolve',
-	'settings'
-]);
+export const effectKind = v.picklist(['signal', 'shares', 'info', 'dissolve', 'settings']);
 
 export const coinAmount = v.pipe(
 	v.number('An amount of coin'),
@@ -227,10 +220,6 @@ export const createProposalForm = v.pipe(
 		newName: v.optional(v.string(), ''),
 		newDescription: v.optional(v.string(), ''),
 		newImage: imageUrl,
-		payoutTo: v.optional(v.string(), ''),
-		payoutAmount: v.optional(v.number('An amount of coin'), 0),
-		payoutReason: v.optional(v.pipe(v.string(), v.maxLength(500, 'At most 500 characters')), ''),
-		remainderTo: v.optional(v.string(), ''),
 		// The DAO's next settings, for a proposal that changes them.
 		...newRoutineFields,
 		...newSensitiveFields
@@ -262,30 +251,6 @@ export const createProposalForm = v.pipe(
 			'The description is at most 10 000 characters'
 		),
 		['newDescription']
-	),
-	v.forward(
-		v.check(
-			(f) =>
-				f.kind !== 'payout' || /^[A-Za-z0-9_-]{1,255}::1220[0-9a-f]{64}$/.test(f.payoutTo.trim()),
-			'A full party id: hint::1220 and 64 hex characters'
-		),
-		['payoutTo']
-	),
-	v.forward(
-		v.check(
-			(f) => f.kind !== 'payout' || v.safeParse(coinAmount, f.payoutAmount).success,
-			'An amount of coin, more than zero, at most four decimals'
-		),
-		['payoutAmount']
-	),
-	v.forward(
-		v.check(
-			(f) =>
-				f.kind !== 'dissolve' ||
-				/^[A-Za-z0-9_-]{1,255}::1220[0-9a-f]{64}$/.test(f.remainderTo.trim()),
-			'A full party id to receive what is left'
-		),
-		['remainderTo']
 	),
 	v.forward(
 		v.check((f) => !(f.newRoutineEarly === 'yes' && f.newRoutineChangeable === 'yes'), EXCLUSIVE),

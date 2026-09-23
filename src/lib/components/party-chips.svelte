@@ -20,8 +20,7 @@
 		busy = false,
 		placeholder = 'Party ids — type one, or paste a whole list',
 		parties = $bindable([]),
-		checking = $bindable(false),
-		external = false
+		checking = $bindable(false)
 	}: {
 		dao?: string;
 		name?: string;
@@ -29,13 +28,9 @@
 		placeholder?: string;
 		parties?: string[];
 		checking?: boolean;
-		/** Wanted: addresses outside the app (a payout's receiver), so a registered party is refused. */
-		external?: boolean;
 	} = $props();
-	const WELL_FORMED = /^[A-Za-z0-9_-]{1,255}::1220[0-9a-f]{64}$/;
-	/** What passes here: registered and not a member, or — outside — a well-formed unknown id. */
-	const passes = (t: string) =>
-		external ? status[t] === 'unknown' && WELL_FORMED.test(t) : status[t] === 'addable';
+	/** What passes here: registered, and not a member already. */
+	const passes = (t: string) => status[t] === 'addable';
 
 	type Status = 'checking' | remote.PartyCheck;
 	// Parties handed in at the start (a field filled with what is there today) are chips already.
@@ -106,13 +101,9 @@
 	const note = (t: string): string =>
 		status[t] === 'checking' || passes(t)
 			? ''
-			: external
-				? status[t] === 'unknown'
-					? 'not a full party id'
-					: 'a SyncVotes party; payouts go outside the app'
-				: status[t] === 'already'
-					? 'already a member'
-					: 'not registered';
+			: status[t] === 'already'
+				? 'already a member'
+				: 'not registered';
 </script>
 
 <div class="space-y-3">
@@ -185,7 +176,7 @@
 			{#if tokens.filter((t) => status[t] !== 'checking' && !passes(t)).length}
 				<span class="text-red"
 					>{fmt(tokens.filter((t) => status[t] !== 'checking' && !passes(t)).length)}
-					{external ? 'refused' : 'not addable'}</span
+					not addable</span
 				>
 				<button
 					type="button"

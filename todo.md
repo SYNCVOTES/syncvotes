@@ -96,9 +96,13 @@
       in batches (up to 2000 per proposal); votes that may change until the deadline (never with
       early settlement); Markdown with pictures by link; comments; profiles
       (`syncvotes-treasury` 0.12.0)
+- [x] the treasury gone again, payouts with it: a DAO holds no coin; its balance is paid in
+      by memo to the provider from any wallet, read off the provider's transactions, credited to
+      the meter; dissolution archives the DAO at once; no `paid.json`, no state off the ledger
+      (`syncvotes-books` 0.17.0). The treasury party, payouts and the remainder are in git
+      history at `9d8a00b`, audited four rounds, if a DAO ever needs to hold coin
 - [ ] a treasury the provider cannot touch (m-of-n signers by vote, live signing sessions) as an
       option per DAO, if wanted: `bb62260` has the working pieces
-- [ ] dividends: a payout split among members by share (one transfer per member, ~7.5 KB each)
 - [x] the DAO's settings, set at the founding and changed only by vote: for routine and for
       sensitive proposals, the rule and the voting period; a proposer chooses what, never what it
       takes (`syncvotes-rulebook` 0.14.0, after a one-rule step `syncvotes-bylaws` 0.13.x with
@@ -121,14 +125,10 @@
       stands. The logic audit stops here; what it left is below
 - [ ] `cf-connecting-ip` is trusted as it comes: reach the origin directly and the pacing is
       yours to name (bind the origin to the proxy, or check the proxy's address)
-- [ ] a withdrawal that fails and a lock that expires leave an instruction nobody can close
-      (the 1 CC test payout the audit named was in fact whole, and was taken back by hand)
-- [ ] a remainder's lowered attempts (`-0..-3`) and a receiver swapped for the same address:
-      dust guard (below 0.01 CC, write off), and `known` keyed on the instruction, not the receiver
 - [ ] Daml Script tests for the model's claims (decoy ballot, duplicate member, dissolve order)
 - [ ] a DAO-authority `Comment_Remove`; pace proposals as comments are paced
-- [ ] a treasury pre-approval is created once for a year and never renewed (`TransferPreapproval`
-      renewal ~20 days before expiry, per the docs)
+- [ ] the provider's pre-approval is created for a year and renewed only once it is gone
+      (`TransferPreapproval` renewal ~20 days before expiry, per the docs)
 - [ ] `ParticipantAdmin` on the web process: move DAR upload and party allocation to a setup job
 - [ ] every user party has one confirming participant (this validator); a second validator, or
       say so on the wallet page

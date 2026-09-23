@@ -3,29 +3,26 @@
 	import PartyId from './party-id.svelte';
 	import Markdown from './markdown.svelte';
 	import LoadMore from './load-more.svelte';
-	import { coin, fmt } from '$lib/format';
+	import { fmt } from '$lib/format';
 	import type { Settings } from '$lib/rules';
 	import SettingsSummary from './settings-summary.svelte';
 
 	/**
 	 * What a proposal does when it passes, spelled out — for a share change, who joins, who
-	 * leaves, who gains and who loses, against the table of today; for a payout, who gets what.
+	 * leaves, who gains and who loses, against the table of today.
 	 */
 	export type Effect =
 		| { kind: 'signal' }
 		| { kind: 'shares'; changes: { party: string; share: number }[] }
 		| { kind: 'info'; name: string; description: string; image: string | null }
-		| { kind: 'payout'; to: string; amount: number; reason: string }
-		| { kind: 'dissolve'; remainderTo: string }
+		| { kind: 'dissolve' }
 		| { kind: 'settings'; routine: Settings; sensitive: Settings };
 	let {
 		effect,
 		executed,
 		executedAt,
 		equal = false,
-		current,
-		paid = null,
-		payout = null
+		current
 	}: {
 		effect: Effect;
 		executed: number;
@@ -33,10 +30,6 @@
 		/** The DAO votes by membership: units are people. */
 		equal?: boolean;
 		current: { party: string; share: number }[];
-		/** The transaction that paid a payout or the remainder, once it went out. */
-		paid?: string | null;
-		/** Where a payout stands, from the server. */
-		payout?: { state: string; note: string | null } | null;
 	} = $props();
 	const title = $derived.by(() => {
 		switch (effect.kind) {
@@ -44,8 +37,6 @@
 				return equal ? 'Membership' : 'Shares of the vote';
 			case 'info':
 				return 'Name and description';
-			case 'payout':
-				return 'Payout';
 			case 'dissolve':
 				return 'Dissolution';
 			case 'settings':
@@ -70,13 +61,11 @@
 
 <Panel padding="sm" class="space-y-3">
 	<h2 class="eyebrow">
-		{title}{payout?.state === 'unpaid'
-			? ' · written off'
-			: executedAt
-				? ' · carried out'
-				: executed > 0
-					? ` · ${fmt(executed)} of ${fmt(rows.length)} carried out`
-					: ''}
+		{title}{executedAt
+			? ' · carried out'
+			: executed > 0
+				? ` · ${fmt(executed)} of ${fmt(rows.length)} carried out`
+				: ''}
 	</h2>
 	{#if effect.kind === 'shares'}
 		<ul class="divide-y divide-border">
@@ -122,35 +111,10 @@
 				/>{/if}
 			{#if effect.description}<Markdown text={effect.description} />{/if}
 		</div>
-	{:else if effect.kind === 'payout'}
-		<div class="space-y-2 text-[13px] text-ink-mid">
-			<p class="flex flex-wrap items-center gap-x-2">
-				Pays <span class="font-mono font-bold text-ink">{coin(effect.amount)}</span> from the
-				treasury to <PartyId party={effect.to} class="align-middle" />
-			</p>
-			{#if effect.reason}<Markdown text={effect.reason} />{/if}
-			{#if payout?.state === 'awaiting'}
-				<p class="font-mono text-xs text-amber">
-					Sent; waiting to be accepted at the receiving address. Not accepted within a day, the coin
-					stays locked until the app releases it back to the treasury.
-				</p>
-			{:else if payout?.state === 'returned'}
-				<p class="font-mono text-xs text-red">
-					Not accepted in time; the coin came back to the treasury. Propose again if it is still
-					owed.
-				</p>
-			{:else if payout?.state === 'unpaid'}
-				<p class="font-mono text-xs text-red">Not paid: {payout.note}.</p>
-			{:else if payout?.state === 'sending'}
-				<p class="font-mono text-xs text-amber">{payout.note}</p>
-			{:else if paid || executedAt}<p class="font-mono text-xs text-green">Paid.</p>{/if}
-		</div>
 	{:else if effect.kind === 'dissolve'}
-		<p class="flex flex-wrap items-center gap-x-2 text-[13px] text-ink-mid">
-			Once this passes nothing new is proposed; when every other proposal has settled and been
-			carried out, what is owed for traffic is collected and whatever the treasury holds goes to
-			<PartyId party={effect.remainderTo} class="align-middle" />. Its settled proposals stay
-			readable; nothing new can be proposed.
+		<p class="text-[13px] text-ink-mid">
+			The DAO is archived the moment this passes: nothing more can be proposed or voted on, what was
+			paid in for it is spent, and its record stays readable.
 		</p>
 	{:else if effect.kind === 'settings'}
 		<p class="text-[13px] text-ink-mid">From then on:</p>

@@ -8,7 +8,6 @@ import * as ledger from './server/ledger';
 import * as session from './server/session';
 import * as billing from './server/billing';
 import * as splice from './server/splice';
-import * as treasury from './server/treasury';
 import * as tally from './server/tally';
 import { fingerprintOf } from './verify';
 import { normaliseHint, hintProblem } from './hint';
@@ -21,7 +20,7 @@ import { settingsToLedger, type Rule, type Settings } from './rules';
  * value, then sends it again whenever what it shows changed — and need a read session (a
  * challenge signed by the party's key, `server/session.ts`) plus membership. Writes are
  * prepared here, signed in the browser and executed here; the ledger accepts them only with the
- * acting party's own signature. A DAO's writes are refused once its treasury is spent.
+ * acting party's own signature. A DAO's writes are refused once its balance is spent.
  */
 
 /** Runs `load` now and whenever `key` changes, yielding only when the result changed. */
@@ -380,9 +379,6 @@ export const proposal = query.live(contractId, (id) =>
 			cast: ledger.ballots.get(id)?.size ?? 0,
 			comments: ledger.comments.get(id)?.size ?? 0,
 			proposedBy: who(p.proposer),
-			paidBy: tally.paid.get(id) ?? null,
-			/** For a payout that went out: whether the receiver still has to accept it. */
-			payout: p.effect.kind === 'payout' ? tally.payoutState(p) : null,
 			waiting: tally.waiting.get(id) ?? null,
 			/** Why the provider could not carry it out, after repeated attempts. */
 			stuck: tally.stuck.get(id) ?? null,
@@ -426,7 +422,7 @@ export const proposalComments = query.live(contractId, (id) =>
 	})
 );
 
-/** The DAO's account: what its treasury holds, what it owes, what a byte costs it. */
+/** The DAO's account: paid in, charged, what a byte costs it, and where to pay in. */
 export const daoBilling = query.live(contractId, (id) =>
 	live(ledger.keys.dao(id), () => {
 		memberOnly(id);
@@ -466,8 +462,6 @@ const prepare = async (
 	);
 };
 
-/** A coin amount as the ledger writes a Decimal: ten places. */
-const decimal = (n: number) => n.toFixed(10);
 /** A share table as the ledger reads it: tuples of party and units, the Int as text. */
 const shareRows = (rows: { party: string; share: number }[]) =>
 	rows.map((r) => ({ _1: r.party, _2: String(r.share) }));
@@ -492,14 +486,12 @@ export const createDaoForm = form(schemas.createDaoForm, async (f) => {
 		...shares.filter((r) => r.party === party),
 		...shares.filter((r) => r.party !== party)
 	];
-	const treasuryParty = await treasury.allocate(id);
 	const args = {
 		id,
 		daoName,
 		description,
 		image: nullable(image),
 		equal: equal === 'yes',
-		treasury: treasuryParty,
 		routine: settingsToLedger(settingsOf(f, 'routine')),
 		sensitive: settingsToLedger(settingsOf(f, 'sensitive')),
 		shares: shareRows(ordered.slice(0, schemas.BATCH)),
@@ -511,25 +503,6 @@ export const createDaoForm = form(schemas.createDaoForm, async (f) => {
 		prepared: await prepare(party, Main.Account, account, 'Account_CreateDAO', args, null)
 	};
 });
-
-/**
- * Coin leaves the app: a receiver is an address outside it — never a party registered here,
- * a DAO's treasury or the provider — and one the network knows.
- */
-const outside = async (party: string) => {
-	if (ledger.accounts.has(party)) {
-		error(400, 'Payouts go to addresses outside SyncVotes, not to a party registered here');
-	}
-	if (party === participant.providerParty() || party === participant.operatorParty()) {
-		error(400, "That is the app's own party");
-	}
-	for (const d of ledger.daos.values()) {
-		if (d.treasury === party) error(400, "That is a DAO's treasury, not an outside address");
-	}
-	if (!(await participant.partyExists(party))) {
-		error(400, 'The network knows no such party; check the id');
-	}
-};
 
 /** A category's settings from a form's fields under a prefix (`routineBasis`, `newSensitiveDays`…). */
 const settingsOf = (f: Record<string, unknown>, prefix: string): Settings => {
@@ -567,8 +540,7 @@ export const createProposalForm = form(schemas.createProposalForm, async (f) => 
 			};
 			break;
 		case 'dissolve':
-			await outside(f.remainderTo.trim());
-			action = { tag: 'Dissolve', value: { remainderTo: f.remainderTo.trim() } };
+			action = { tag: 'Dissolve', value: {} };
 			break;
 		case 'settings':
 			action = {
@@ -577,13 +549,6 @@ export const createProposalForm = form(schemas.createProposalForm, async (f) => 
 					routine: settingsToLedger(settingsOf(f, 'newRoutine')),
 					sensitive: settingsToLedger(settingsOf(f, 'newSensitive'))
 				}
-			};
-			break;
-		case 'payout':
-			await outside(f.payoutTo.trim());
-			action = {
-				tag: 'Payout',
-				value: { to: f.payoutTo.trim(), amount: decimal(f.payoutAmount), reason: f.payoutReason }
 			};
 			break;
 		case 'shares': {

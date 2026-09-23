@@ -285,13 +285,6 @@ export async function allocateMultiKeyParty(
 	});
 }
 
-/** Whether the network knows this party at all — hosted here or anywhere the participant has heard of. */
-export const partyExists = (party: string): Promise<boolean> =>
-	api<{ partyDetails?: unknown[] }>(`/v2/parties/${encodeURIComponent(party)}`).then(
-		(r) => (r.partyDetails?.length ?? 0) > 0,
-		() => false
-	);
-
 /** Whether the synchronizer knows this party yet. */
 export const partyKnown = (party: string): Promise<boolean> =>
 	api<{ connectedSynchronizers?: unknown[] }>(

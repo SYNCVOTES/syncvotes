@@ -245,7 +245,7 @@ function covers(expected: Plain, actual: Plain): boolean {
 const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
 
 export type Expected = {
-	/** The party the transaction acts as: the signer's own, or a treasury the signer co-owns. */
+	/** The party the transaction acts as: the signer's own. */
 	party: string;
 	choice: string;
 	/** The contract the choice is on, when the page knows it; a transfer's factory it does not. */

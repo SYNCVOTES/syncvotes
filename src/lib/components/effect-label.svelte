@@ -3,10 +3,9 @@
 	import Users from '@lucide/svelte/icons/users';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import Power from '@lucide/svelte/icons/power';
-	import Coins from '@lucide/svelte/icons/coins';
 	import MessageSquare from '@lucide/svelte/icons/message-square';
 	import Scale from '@lucide/svelte/icons/scale';
-	import { coin, fmt } from '$lib/format';
+	import { fmt } from '$lib/format';
 	import type { Effect } from './effect-card.svelte';
 
 	/** What a proposal does, in a glance: an icon and a few words, for lists. */
@@ -23,8 +22,6 @@
 			}
 			case 'info':
 				return `rename to ${effect.name}`;
-			case 'payout':
-				return `pay ${coin(effect.amount)}`;
 			case 'dissolve':
 				return 'dissolve';
 			case 'settings':
@@ -40,13 +37,11 @@
 				: PieChart
 			: effect.kind === 'info'
 				? Pencil
-				: effect.kind === 'payout'
-					? Coins
-					: effect.kind === 'dissolve'
-						? Power
-						: effect.kind === 'settings'
-							? Scale
-							: MessageSquare
+				: effect.kind === 'dissolve'
+					? Power
+					: effect.kind === 'settings'
+						? Scale
+						: MessageSquare
 	);
 </script>
 

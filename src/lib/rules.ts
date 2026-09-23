@@ -189,9 +189,8 @@ export const CATEGORIES: { value: Category; title: string; text: string; covers:
 	{
 		value: 'sensitive',
 		title: 'Sensitive',
-		text: 'Members and shares, payouts, these settings, dissolution.',
-		covers:
-			'Who is in the DAO and with what share, coin leaving the treasury, these very settings, and winding the DAO up.'
+		text: 'Members and shares, these settings, dissolution.',
+		covers: 'Who is in the DAO and with what share, these very settings, and winding the DAO up.'
 	}
 ];
 

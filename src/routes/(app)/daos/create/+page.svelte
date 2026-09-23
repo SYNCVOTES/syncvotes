@@ -43,7 +43,7 @@
 			value: 'shares',
 			title: 'By shares',
 			text: 'Members hold units of the vote — 40 of 100, say. A company, a fund, a partnership.',
-			more: "Members hold units of the vote, whole numbers you set, like shares of a company: 60, 30 and 10 units give 60%, 30% and 10% of the vote. A ballot weighs the voter's units. Units move only by vote; pay-ins to the treasury do not change them.",
+			more: "Members hold units of the vote, whole numbers you set, like shares of a company: 60, 30 and 10 units give 60%, 30% and 10% of the vote. A ballot weighs the voter's units. Units move only by vote; paying the DAO's balance in does not change them.",
 			icon: PieChart
 		}
 	] as const;
@@ -76,7 +76,7 @@
 	const enhanced = signedForm(
 		f,
 		schema,
-		(fields, { id, args }) => {
+		(fields, { id }) => {
 			const { daoName, description, image, equal, shares } = fields;
 			const settingsOf = (prefix: 'routine' | 'sensitive'): Settings => {
 				const x = fields as unknown as Record<string, unknown>;
@@ -112,7 +112,6 @@
 					description,
 					image: image || null,
 					equal: equal === 'yes',
-					treasury: args.treasury,
 					routine: settingsToLedger(settingsOf('routine')),
 					sensitive: settingsToLedger(settingsOf('sensitive')),
 					shares: ordered.slice(0, BATCH).map(tuple),
@@ -130,7 +129,7 @@
 	<PageHeader
 		eyebrow="New organisation"
 		title="Create DAO"
-		description="A DAO is private to its members: only they, and the app as provider, ever see it. It gets a treasury of its own — an address anyone can send Canton Coin to — which pays for everything it does, and which it spends by vote: a payout, or what is left when it dissolves. The app collects what the DAO owes for traffic from it, and the app is what moves the coin. From here on, everything about it changes by vote."
+		description="A DAO is private to its members: only they, and the app as provider, ever see it. Everything it does costs network traffic, paid from a balance anyone can top up by sending Canton Coin to the app with the DAO's memo. From here on, everything about it changes by vote."
 	/>
 
 	{#if store.screen.at === 'loading'}

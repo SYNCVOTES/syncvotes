@@ -27,7 +27,7 @@
 	import Hint from '$lib/components/hint.svelte';
 	import SettingsSummary from '$lib/components/settings-summary.svelte';
 	import Problem from '$lib/components/problem.svelte';
-	import TreasuryPanel from '$lib/components/treasury-panel.svelte';
+	import BalancePanel from '$lib/components/balance-panel.svelte';
 	import Plus from '@lucide/svelte/icons/plus';
 	import ArrowRight from '@lucide/svelte/icons/arrow-right';
 	import { relative, dateOf, fmt, coin } from '$lib/format';
@@ -81,12 +81,11 @@
 							/>
 						</Badge>
 						<Badge>{d.equal ? 'By membership' : 'By shares'}</Badge>
-						{#if d.dissolving}<Badge variant="red">Dissolving</Badge>{/if}
 						{#if d.me.creator}<Badge variant="amber">You created it</Badge>{:else}<Badge
 								variant="green">Member</Badge
 							>{/if}
 					</div>
-					{#if !d.dissolving && d.balance <= 0}
+					{#if d.balance <= 0}
 						<p class="mt-3 font-mono text-xs text-red">
 							Nothing can be signed for this DAO until someone pays in.
 						</p>
@@ -94,11 +93,7 @@
 				</div>
 			</div>
 			<div class="flex shrink-0 items-center gap-2">
-				{#if d.dissolving}
-					<span class="font-mono text-xs text-ink-dim"
-						>Being dissolved; nothing new is proposed.</span
-					>
-				{:else if d.balance <= 0}
+				{#if d.balance <= 0}
 					<!-- Nothing to press: the line under the badges says why. -->
 				{:else}
 					<Button href="/daos/{d.id}/proposals/create"
@@ -131,7 +126,7 @@
 			items={[
 				{ label: 'Members', value: fmt(d.members) },
 				{ label: 'Open proposals', value: fmt(d.openProposals), accent: d.openProposals > 0 },
-				{ label: 'Treasury to spend', value: coin(d.balance), accent: d.balance <= 0 },
+				{ label: 'Balance', value: coin(d.balance), accent: d.balance <= 0 },
 				{
 					label: 'Your vote',
 					value: d.equal ? '1 of ' + fmt(d.units) : `${pct(d.me.share, d.units)}%`
@@ -207,7 +202,7 @@
 			</section>
 
 			<aside class="min-w-0 space-y-6">
-				<TreasuryPanel dao={d.id} />
+				<BalancePanel dao={d.id} />
 
 				<div>
 					<SectionTitle title="How proposals pass" />

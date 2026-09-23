@@ -26,10 +26,9 @@ import DA.Time (addRelTime, days)
 -- Shares change only by vote, and a share moved while a proposal is open does not vote on it
 -- twice: a ballot is refused if its share changed after the proposal was made.
 --
--- A DAO's money is a party of its own, the treasury, hosted by the app: anyone pays in by
--- sending coin to it, its transactions are paid from it, and coin leaves it only as a proposal
--- decided. The ledger records the decision and the execution; the coin itself moves by the
--- network's own rules, outside this module.
+-- A DAO holds no coin. Its transactions cost the provider traffic, and the DAO's balance with
+-- the provider — coin anyone sends to the provider with the DAO's memo, less what its
+-- transactions cost — is the provider's statement (`Meter`), not money on the ledger.
 --
 -- Built for large DAOs: a member's vote touches only that member's own contract, so thousands
 -- can vote at once, and a proposal holds counters rather than lists. The provider counts the
@@ -54,20 +53,15 @@ data Effect
       daoName : Text
       description : Text
       image : Optional Text
-  | Payout with
-      to : Party
-      amount : Decimal
-      reason : Text
-  | Dissolve with
-      remainderTo : Party
+  | Dissolve
   | SetSettings with
       routine : Settings
       sensitive : Settings
   deriving (Eq, Show)
 
 -- | What a proposal does decides which of the DAO's two settings it runs under: the routine
--- ones for a decision or a new name, the sensitive ones for anything touching members, coin,
--- the rules or the DAO's existence.
+-- ones for a decision or a new name, the sensitive ones for anything touching members, the
+-- rules or the DAO's existence.
 isSensitive : Effect -> Bool
 isSensitive Signal = False
 isSensitive (SetInfo {}) = False
@@ -150,7 +144,7 @@ template Account
 
     -- The founding share table: the first batch of members is created here, the rest as a
     -- proposal already passed, carried out by the provider in batches like any other. The
-    -- treasury is a party the app allocated for this DAO; the creator holds a share.
+    -- creator holds a share.
     nonconsuming choice Account_CreateDAO : ContractId DAO
       with
         id : Text
@@ -158,7 +152,6 @@ template Account
         description : Text
         image : Optional Text
         equal : Bool
-        treasury : Party
         routine : Settings
         sensitive : Settings
         shares : [(Party, Int)]
@@ -185,8 +178,8 @@ template Account
             eligible = sum (map snd shares); createdAt = now; closesAt = now
             yes = 0; no = 0; abstain = 0; outcome = Some Passed; executed = 0; executedAt = None
         create DAO with
-          provider; operator; creator = user; treasury; id; name = daoName; description; image
-          equal; routine; sensitive; dissolving = False; createdAt = now
+          provider; operator; creator = user; id; name = daoName; description; image
+          equal; routine; sensitive; createdAt = now
           members = length shares; units = sum (map snd shares)
 
     -- How a party presents itself: a name, a picture, a few words. One per party; replacing
@@ -207,7 +200,7 @@ template Account
         now <- getTime
         create Profile with provider; operator; user; name; avatar; bio; updatedAt = now
 
--- | A DAO: who created it, what it is called, its treasury, and how big its vote is. The
+-- | A DAO: who created it, what it is called, and how big its vote is. The
 -- members themselves are `Member` contracts, so a DAO of ten thousand is as small as one of
 -- three. Nobody changes it by hand: its one choice carries out what a vote decided. The
 -- creator's signature is what keeps the provider from archiving it alone.
@@ -216,7 +209,6 @@ template DAO
     provider : Party
     operator : Party
     creator : Party
-    treasury : Party
     id : Text
     name : Text
     description : Text
@@ -224,11 +216,9 @@ template DAO
     -- One member, one unit: the vote is by membership rather than by shares.
     equal : Bool
     -- What proposals run under: routine ones (a decision, a name) and sensitive ones (members
-    -- and shares, coin, the rules, dissolution).
+    -- and shares, the rules, dissolution).
     routine : Settings
     sensitive : Settings
-    -- A dissolution has passed: nothing new is proposed while what is left is settled.
-    dissolving : Bool
     createdAt : Time
     members : Int
     -- The whole vote: what every member's units add up to.
@@ -244,8 +234,7 @@ template DAO
     -- where the proposal says it got to, up to `upTo`: the contracts of the members it touches
     -- are handed in (the ledger checks each is this DAO's and named in the batch); those with
     -- a new number of units are reshared, those at zero leave, those without a contract join.
-    -- A payout or a dissolution is recorded here once the coin has moved; dissolving archives
-    -- the DAO and returns nothing.
+    -- A dissolution archives the DAO and returns nothing.
     choice DAO_Execute : Optional (ContractId DAO)
       with
         proposal : ContractId Proposal
@@ -263,14 +252,9 @@ template DAO
           SetInfo daoName description image -> do
             exercise proposal Proposal_Advance with upTo = 1
             Some <$> create this with name = daoName; description; image
-          Payout {} -> do
+          Dissolve -> do
             exercise proposal Proposal_Advance with upTo = 1
-            Some <$> create this
-          -- Dissolving takes two steps: first the DAO closes to new proposals, so what is open
-          -- can settle and what is owed can leave; then, at the second, it is archived.
-          Dissolve _ -> do
-            exercise proposal Proposal_Advance with upTo
-            if upTo == 1 then Some <$> create this with dissolving = True else pure None
+            pure None
           SetSettings routine sensitive -> do
             exercise proposal Proposal_Advance with upTo = 1
             Some <$> create this with routine; sensitive
@@ -357,17 +341,15 @@ template Member
         now <- getTime
         found <- fetch dao
         assertMsg "Not this member's DAO" (found.id == daoId && found.creator == creator)
-        assertMsg "The DAO is being dissolved" (not found.dissolving)
         let settings = if isSensitive action then found.sensitive else found.routine
             rule = settings.rule
             closesAt = addRelTime now (days settings.votingDays)
         case action of
           Signal -> pure ()
-          Dissolve _ -> pure ()
+          Dissolve -> pure ()
           SetSettings routine sensitive ->
             assertMsg "The settings' numbers are out of range" (validSettings routine && validSettings sensitive)
           SetInfo daoName _ _ -> assertMsg "A DAO needs a name" (daoName /= "")
-          Payout _ amount _ -> assertMsg "A payout is a positive amount" (amount > 0.0)
           SetShares changes ->
             assertMsg "The share change must be whole" (validChanges found.equal changes)
         create Proposal with
@@ -514,12 +496,8 @@ template Proposal
         assertMsg "Already executed" (isNone executedAt)
         let size = case action of
               SetShares changes -> length changes
-              Dissolve _ -> 2
               _ -> 1
         assertMsg "Progress only goes forward" (upTo > executed && upTo <= size)
-        case action of
-          Dissolve _ -> assertMsg "A dissolution goes one step at a time" (upTo == executed + 1)
-          _ -> pure ()
         now <- getTime
         create this with
           executed = upTo
@@ -622,17 +600,17 @@ template Profile
 
     ensure name /= ""
 
--- | The provider's statement of a DAO's account with it: what its transactions have cost so
--- far, and what of that the treasury has paid. The balance is the treasury's coin less the
--- difference. Rewritten as the numbers move; one contract per DAO, whatever its history.
+-- | The provider's statement of a DAO's account with it: what was paid in for the DAO (coin
+-- sent to the provider with the DAO's memo) and what its transactions have cost so far. The
+-- balance is the difference. Rewritten as the numbers move; one contract per DAO, whatever
+-- its history.
 template Meter
   with
     provider : Party
     operator : Party
     daoId : Text
-    treasury : Party
+    credited : Decimal
     charged : Decimal
-    collected : Decimal
     updatedAt : Time
   where
     signatory provider
@@ -640,9 +618,9 @@ template Meter
 
     choice Meter_Update : ContractId Meter
       with
+        newCredited : Decimal
         newCharged : Decimal
-        newCollected : Decimal
       controller provider
       do
         now <- getTime
-        create this with charged = newCharged; collected = newCollected; updatedAt = now
+        create this with credited = newCredited; charged = newCharged; updatedAt = now

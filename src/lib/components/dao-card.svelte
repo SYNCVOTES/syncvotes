@@ -19,7 +19,7 @@
 		openProposals: number;
 		role: 'creator' | 'member';
 		image?: string | null;
-		/** What the treasury can spend. */
+		/** What the DAO can still spend. */
 		balance?: number | null;
 		/** The viewer's share of the vote, in percent. */
 		share?: number | null;
@@ -79,9 +79,7 @@
 				<div class="font-mono text-[15px] font-bold {balance <= 0 ? 'text-red' : ''}">
 					{coin(balance)}
 				</div>
-				<div class="mt-0.5 font-mono text-xs tracking-[0.14em] text-ink-dim uppercase">
-					Treasury
-				</div>
+				<div class="mt-0.5 font-mono text-xs tracking-[0.14em] text-ink-dim uppercase">Balance</div>
 			</div>
 		{/if}
 		{#if share !== null && !equal}

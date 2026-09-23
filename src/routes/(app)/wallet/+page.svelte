@@ -20,6 +20,10 @@
 	import { hintOf, label } from '$lib/format';
 
 	let phraseInput = $state('');
+	let hintInput = $state('');
+	let password = $state('');
+
+	const screen = $derived(store.screen);
 	// Creating a key: the phrase is revealed on request, then one word of it is asked back.
 	let revealed = $state(false);
 	let checking = $state(false);
@@ -34,10 +38,6 @@
 		return h % n;
 	});
 	const checkOk = $derived(checkInput.trim().toLowerCase() === phraseWords[checkAt]);
-	let hintInput = $state('');
-	let password = $state('');
-
-	const screen = $derived(store.screen);
 	const selectedWallet = $derived(store.wallets.find((w) => w.id === store.selected) ?? null);
 	const chosenHint = $derived(normaliseHint(hintInput));
 	const hintIssue = $derived(hintInput.trim() ? hintProblem(chosenHint) : null);

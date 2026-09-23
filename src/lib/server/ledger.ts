@@ -15,8 +15,7 @@ export type Effect =
 	| { kind: 'signal' }
 	| { kind: 'shares'; changes: { party: string; share: number }[] }
 	| { kind: 'info'; name: string; description: string; image: string | null }
-	| { kind: 'payout'; to: string; amount: number; reason: string }
-	| { kind: 'dissolve'; remainderTo: string }
+	| { kind: 'dissolve' }
 	| { kind: 'settings'; routine: Settings; sensitive: Settings };
 
 export type Account = { contractId: string; party: string };
@@ -25,8 +24,6 @@ export type Dao = {
 	id: string;
 	/** Who created it; no powers come with that. */
 	creator: string;
-	/** The DAO's own coin address. */
-	treasury: string;
 	name: string;
 	description: string;
 	image: string | null;
@@ -34,10 +31,8 @@ export type Dao = {
 	equal: boolean;
 	/** What routine proposals (decisions, the name) run under. */
 	routine: Settings;
-	/** What sensitive ones (members, coin, settings, dissolution) run under. */
+	/** What sensitive ones (members, settings, dissolution) run under. */
 	sensitive: Settings;
-	/** A dissolution has passed: nothing new is proposed while what is left is settled. */
-	dissolving: boolean;
 	createdAt: string;
 	members: number;
 	/** The whole vote, in units. */
@@ -109,9 +104,8 @@ export type Profile = {
 export type Meter = {
 	contractId: string;
 	daoId: string;
-	treasury: string;
+	credited: number;
 	charged: number;
-	collected: number;
 	updatedAt: string;
 };
 
@@ -268,15 +262,8 @@ const effect = (v: unknown): Effect => {
 				description: text(t.value.description),
 				image: optional(t.value.image)
 			};
-		case 'Payout':
-			return {
-				kind: 'payout',
-				to: text(t.value.to),
-				amount: num(t.value.amount),
-				reason: text(t.value.reason)
-			};
 		case 'Dissolve':
-			return { kind: 'dissolve', remainderTo: text(t.value.remainderTo) };
+			return { kind: 'dissolve' };
 		case 'SetSettings':
 			return {
 				kind: 'settings',
@@ -300,14 +287,12 @@ function created({ contractId, templateId, createArgument: a }: Created) {
 				contractId,
 				id: text(a.id),
 				creator: text(a.creator),
-				treasury: text(a.treasury),
 				name: text(a.name),
 				description: text(a.description),
 				image: optional(a.image),
 				equal: a.equal === true,
 				routine: settings(a.routine),
 				sensitive: settings(a.sensitive),
-				dissolving: a.dissolving === true,
 				createdAt: text(a.createdAt),
 				members: num(a.members),
 				units: num(a.units)
@@ -417,9 +402,8 @@ function created({ contractId, templateId, createArgument: a }: Created) {
 			const row: Meter = {
 				contractId,
 				daoId: text(a.daoId),
-				treasury: text(a.treasury),
+				credited: num(a.credited),
 				charged: num(a.charged),
-				collected: num(a.collected),
 				updatedAt: text(a.updatedAt)
 			};
 			track(contractId, [keys.dao(row.daoId)], put(meters, row.daoId, row));
