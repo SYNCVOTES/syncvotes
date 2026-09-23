@@ -25,15 +25,19 @@
 	{#if billing?.ready}
 		{@const b = billing.current}
 		<div class="font-mono text-2xl font-bold {b.balance > 0 ? 'text-ink' : 'text-red'}">
-			{coin(b.holdings)}
+			{coin(b.balance)}
+			<span class="text-xs font-normal text-ink-dim">to spend</span>
 		</div>
-		<p class="font-mono text-xs text-ink-dim">
-			{#if b.due > 0.005}{coin(b.due)} owed for traffic, {coin(b.balance)} to spend.{:else}Nothing
-				owed.{/if}
-			{coin(b.charged)} spent on traffic so far; a megabyte costs {coin(b.coinPerMb)}{b.factor !== 1
-				? ` (${b.factor}× the network's price)`
-				: ''}.
-		</p>
+		<dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 font-mono text-xs">
+			<dt class="text-ink-dim">Holds</dt>
+			<dd class="text-ink">{coin(b.holdings)}</dd>
+			<dt class="text-ink-dim">Owed for traffic</dt>
+			<dd class="text-ink">{coin(b.due)}</dd>
+			<dt class="text-ink-dim">Spent so far</dt>
+			<dd class="text-ink">{coin(b.charged)}</dd>
+			<dt class="text-ink-dim">Price</dt>
+			<dd class="text-ink">{coin(b.coinPerMb)} per MB{b.factor !== 1 ? ` (${b.factor}×)` : ''}</dd>
+		</dl>
 		{#if b.balance <= 0}
 			<p class="text-[13px] text-red">
 				Empty: nothing can be signed for this DAO until someone pays in.

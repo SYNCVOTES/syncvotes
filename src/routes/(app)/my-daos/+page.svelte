@@ -52,7 +52,7 @@
 
 		{#if daos.current.length === 0}
 			<EmptyState title="No DAOs yet">
-				Create one, or give a DAO's admin your party id to be added:
+				Create one, or give a member your party id to be admitted by vote:
 				<span class="inline-block"><PartyId party={who.party} /></span>
 			</EmptyState>
 		{:else}
@@ -65,6 +65,9 @@
 						image={dao.image}
 						members={dao.members}
 						openProposals={dao.openProposals}
+						balance={dao.balance}
+						share={dao.units > 0 ? Math.round((dao.myShare / dao.units) * 1000) / 10 : 0}
+						equal={dao.equal}
 						role={dao.creator === who.party ? 'creator' : 'member'}
 					/>
 				{/each}

@@ -24,13 +24,13 @@
 
 {#if store.busy}
 	<div
-		class="fixed right-4 bottom-4 z-50 flex max-w-[calc(100vw-2rem)] items-center gap-3 border border-border bg-surface px-4 py-3 shadow-lg"
+		class="fixed right-4 bottom-4 z-50 flex max-w-[calc(100vw-2rem)] items-center gap-3 border-2 border-orange bg-surface px-5 py-3.5 shadow-[0_0_0_4px_rgba(var(--accent-rgb),0.15),0_12px_32px_rgba(0,0,0,0.35)]"
 		role="status"
 		aria-live="polite"
 	>
-		<Loader size={16} class="shrink-0 animate-spin text-orange" aria-hidden="true" />
+		<Loader size={18} class="shrink-0 animate-spin text-orange" aria-hidden="true" />
 		<div class="min-w-0 font-mono text-xs">
-			<div class="text-ink">{store.phase ?? 'Working'}…</div>
+			<div class="font-bold text-ink">{store.phase ?? 'Working'}…</div>
 			{#if elapsed >= 4}
 				<div class="mt-0.5 text-ink-dim">
 					{elapsed}s{elapsed >= 12

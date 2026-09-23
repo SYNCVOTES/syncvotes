@@ -152,18 +152,20 @@
 					{:else}
 						<List>
 							{#each ballots.current.items as b (b.voter)}
-								<ListItem class="flex items-center gap-3 font-mono text-xs">
-									<Who who={b.who} me={b.voter === me} class="min-w-0 flex-1" />
-									<span class="text-ink-mid">{pct(b.weight, p.eligible)}%</span>
-									<span class="text-ink-dim">{relative(b.castAt)}</span>
-									{#if !b.counted}<span
-											class="text-ink-dim"
-											title={p.rule.changeable
-												? 'Counted at the deadline'
-												: 'Cast; the provider has not counted it yet'}
-											>{p.rule.changeable ? 'may change' : 'pending'}</span
-										>{/if}
-									<span class={tone(b.vote)}>{b.vote}</span>
+								<ListItem class="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs">
+									<Who who={b.who} me={b.voter === me} class="min-w-0 flex-1 basis-56" />
+									<span class="flex shrink-0 items-center gap-3">
+										<span class="text-ink-mid">{pct(b.weight, p.eligible)}%</span>
+										<span class="text-ink-dim">{relative(b.castAt)}</span>
+										{#if !b.counted}<span
+												class="text-ink-dim"
+												title={p.rule.changeable
+													? 'Counted at the deadline'
+													: 'Cast; the provider has not counted it yet'}
+												>{p.rule.changeable ? 'may change' : 'pending'}</span
+											>{/if}
+										<span class="w-14 text-right {tone(b.vote)}">{b.vote}</span>
+									</span>
 								</ListItem>
 							{/each}
 						</List>

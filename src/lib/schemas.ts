@@ -43,7 +43,7 @@ export const votingDays = v.pipe(
 	v.number('The voting period is a number of days'),
 	v.integer('Whole days only'),
 	v.minValue(1, 'At least one day'),
-	v.maxValue(30, 'At most thirty days')
+	v.maxValue(90, 'At most ninety days')
 );
 export const id = v.pipe(v.string(), v.nonEmpty());
 export const partyId = v.pipe(v.string(), v.includes('::'), v.maxLength(300));
@@ -91,6 +91,59 @@ export const shareChanges = v.pipe(
 	)
 );
 
+/** A category's settings, field by field, under a prefix: `routineBasis`, `routineDays`… */
+const basisField = v.picklist(['all', 'cast']);
+const thresholdField = v.picklist(['majority', 'percent']);
+const percentField = v.pipe(
+	v.optional(v.number('A percentage'), 67),
+	v.integer('Whole percent'),
+	v.minValue(1, 'At least 1%'),
+	v.maxValue(100, 'At most 100%')
+);
+const quorumField = v.pipe(
+	v.optional(v.number('A percentage'), 0),
+	v.integer('Whole percent'),
+	v.minValue(0, 'At least 0%'),
+	v.maxValue(100, 'At most 100%')
+);
+const routineFields = {
+	routineBasis: basisField,
+	routineThreshold: thresholdField,
+	routinePercent: percentField,
+	routineQuorum: quorumField,
+	routineEarly: yesNo,
+	routineChangeable: yesNo,
+	routineDays: votingDays
+};
+const sensitiveFields = {
+	sensitiveBasis: basisField,
+	sensitiveThreshold: thresholdField,
+	sensitivePercent: percentField,
+	sensitiveQuorum: quorumField,
+	sensitiveEarly: yesNo,
+	sensitiveChangeable: yesNo,
+	sensitiveDays: votingDays
+};
+const newRoutineFields = {
+	newRoutineBasis: v.optional(basisField, 'all'),
+	newRoutineThreshold: v.optional(thresholdField, 'majority'),
+	newRoutinePercent: percentField,
+	newRoutineQuorum: quorumField,
+	newRoutineEarly: v.optional(yesNo, 'yes'),
+	newRoutineChangeable: v.optional(yesNo, 'no'),
+	newRoutineDays: v.optional(votingDays, 7)
+};
+const newSensitiveFields = {
+	newSensitiveBasis: v.optional(basisField, 'all'),
+	newSensitiveThreshold: v.optional(thresholdField, 'percent'),
+	newSensitivePercent: percentField,
+	newSensitiveQuorum: quorumField,
+	newSensitiveEarly: v.optional(yesNo, 'yes'),
+	newSensitiveChangeable: v.optional(yesNo, 'no'),
+	newSensitiveDays: v.optional(votingDays, 14)
+};
+const EXCLUSIVE = 'Votes that may change cannot settle early';
+
 export const createDaoForm = v.pipe(
 	v.object({
 		daoName,
@@ -98,29 +151,16 @@ export const createDaoForm = v.pipe(
 		image: imageUrl,
 		equal: yesNo,
 		shares: shareChanges,
-		basis: v.picklist(['all', 'cast']),
-		threshold: v.picklist(['majority', 'percent']),
-		percent: v.pipe(
-			v.optional(v.number('A percentage'), 67),
-			v.integer('Whole percent'),
-			v.minValue(1, 'At least 1%'),
-			v.maxValue(100, 'At most 100%')
-		),
-		quorum: v.pipe(
-			v.optional(v.number('A percentage'), 0),
-			v.integer('Whole percent'),
-			v.minValue(0, 'At least 0%'),
-			v.maxValue(100, 'At most 100%')
-		),
-		early: yesNo,
-		changeable: yesNo
+		...routineFields,
+		...sensitiveFields
 	}),
 	v.forward(
-		v.check(
-			(f) => !(f.early === 'yes' && f.changeable === 'yes'),
-			'Votes that may change cannot settle early'
-		),
-		['changeable']
+		v.check((f) => !(f.routineEarly === 'yes' && f.routineChangeable === 'yes'), EXCLUSIVE),
+		['routineChangeable']
+	),
+	v.forward(
+		v.check((f) => !(f.sensitiveEarly === 'yes' && f.sensitiveChangeable === 'yes'), EXCLUSIVE),
+		['sensitiveChangeable']
 	),
 	v.forward(
 		v.check((f) => f.shares.every((r) => r.share > 0), 'Every founding member holds a share'),
@@ -135,7 +175,14 @@ export const createDaoForm = v.pipe(
 	)
 );
 
-export const effectKind = v.picklist(['signal', 'shares', 'info', 'payout', 'dissolve', 'rule']);
+export const effectKind = v.picklist([
+	'signal',
+	'shares',
+	'info',
+	'payout',
+	'dissolve',
+	'settings'
+]);
 
 export const coinAmount = v.pipe(
 	v.number('An amount of coin'),
@@ -149,7 +196,6 @@ export const createProposalForm = v.pipe(
 		dao: id,
 		title: proposalTitle,
 		description: proposalDescription,
-		days: votingDays,
 		kind: effectKind,
 		shares: v.optional(v.string(), ''),
 		newName: v.optional(v.string(), ''),
@@ -159,47 +205,10 @@ export const createProposalForm = v.pipe(
 		payoutAmount: v.optional(v.number('An amount of coin'), 0),
 		payoutReason: v.optional(v.pipe(v.string(), v.maxLength(500, 'At most 500 characters')), ''),
 		remainderTo: v.optional(v.string(), ''),
-		basis: v.picklist(['all', 'cast']),
-		threshold: v.picklist(['majority', 'percent']),
-		percent: v.pipe(
-			v.optional(v.number('A percentage'), 67),
-			v.integer('Whole percent'),
-			v.minValue(1, 'At least 1%'),
-			v.maxValue(100, 'At most 100%')
-		),
-		quorum: v.pipe(
-			v.optional(v.number('A percentage'), 0),
-			v.integer('Whole percent'),
-			v.minValue(0, 'At least 0%'),
-			v.maxValue(100, 'At most 100%')
-		),
-		early: yesNo,
-		changeable: yesNo,
-		// The DAO's new rule, for a proposal that changes it.
-		newBasis: v.optional(v.picklist(['all', 'cast']), 'all'),
-		newThreshold: v.optional(v.picklist(['majority', 'percent']), 'majority'),
-		newPercent: v.pipe(
-			v.optional(v.number('A percentage'), 67),
-			v.integer('Whole percent'),
-			v.minValue(1, 'At least 1%'),
-			v.maxValue(100, 'At most 100%')
-		),
-		newQuorum: v.pipe(
-			v.optional(v.number('A percentage'), 0),
-			v.integer('Whole percent'),
-			v.minValue(0, 'At least 0%'),
-			v.maxValue(100, 'At most 100%')
-		),
-		newEarly: v.optional(yesNo, 'yes'),
-		newChangeable: v.optional(yesNo, 'no')
+		// The DAO's next settings, for a proposal that changes them.
+		...newRoutineFields,
+		...newSensitiveFields
 	}),
-	v.forward(
-		v.check(
-			(f) => f.kind !== 'rule' || !(f.newEarly === 'yes' && f.newChangeable === 'yes'),
-			'Votes that may change cannot settle early'
-		),
-		['newChangeable']
-	),
 	v.forward(
 		v.check(
 			(f) => f.kind !== 'shares' || v.safeParse(shareChanges, f.shares).success,
@@ -247,11 +256,15 @@ export const createProposalForm = v.pipe(
 		['remainderTo']
 	),
 	v.forward(
+		v.check((f) => !(f.newRoutineEarly === 'yes' && f.newRoutineChangeable === 'yes'), EXCLUSIVE),
+		['newRoutineChangeable']
+	),
+	v.forward(
 		v.check(
-			(f) => !(f.early === 'yes' && f.changeable === 'yes'),
-			'Votes that may change cannot settle early'
+			(f) => !(f.newSensitiveEarly === 'yes' && f.newSensitiveChangeable === 'yes'),
+			EXCLUSIVE
 		),
-		['changeable']
+		['newSensitiveChangeable']
 	)
 );
 

@@ -1,6 +1,6 @@
 import { Main } from '@daml.js/model';
 import { providerParty, sdk, streamActiveContracts, type Created } from './participant';
-import type { Rule } from '$lib/rules';
+import type { Rule, Settings } from '$lib/rules';
 
 /**
  * The provider's copy of the ledger, in memory: every contract of the app's templates (the
@@ -17,7 +17,7 @@ export type Effect =
 	| { kind: 'info'; name: string; description: string; image: string | null }
 	| { kind: 'payout'; to: string; amount: number; reason: string }
 	| { kind: 'dissolve'; remainderTo: string }
-	| { kind: 'rule'; rule: Rule };
+	| { kind: 'settings'; routine: Settings; sensitive: Settings };
 
 export type Account = { contractId: string; party: string };
 export type Dao = {
@@ -32,8 +32,10 @@ export type Dao = {
 	image: string | null;
 	/** One member, one unit of the vote. */
 	equal: boolean;
-	/** The least any proposal takes to pass; a proposer may ask for more. */
-	rule: Rule;
+	/** What routine proposals (decisions, the name) run under. */
+	routine: Settings;
+	/** What sensitive ones (members, coin, settings, dissolution) run under. */
+	sensitive: Settings;
 	createdAt: string;
 	members: number;
 	/** The whole vote, in units. */
@@ -236,6 +238,11 @@ const rule = (v: unknown): Rule => {
 
 const optional = (value: unknown) => (value == null ? null : text(value));
 
+const settings = (v: unknown): Settings => {
+	const x = v as { rule: unknown; votingDays: unknown };
+	return { rule: rule(x.rule), votingDays: num(x.votingDays) };
+};
+
 const effect = (v: unknown): Effect => {
 	const t = v as Tagged;
 	switch (t.tag) {
@@ -263,8 +270,12 @@ const effect = (v: unknown): Effect => {
 			};
 		case 'Dissolve':
 			return { kind: 'dissolve', remainderTo: text(t.value.remainderTo) };
-		case 'SetRule':
-			return { kind: 'rule', rule: rule(t.value.rule) };
+		case 'SetSettings':
+			return {
+				kind: 'settings',
+				routine: settings(t.value.routine),
+				sensitive: settings(t.value.sensitive)
+			};
 		default:
 			return { kind: 'signal' };
 	}
@@ -287,7 +298,8 @@ function created({ contractId, templateId, createArgument: a }: Created) {
 				description: text(a.description),
 				image: optional(a.image),
 				equal: a.equal === true,
-				rule: rule(a.rule),
+				routine: settings(a.routine),
+				sensitive: settings(a.sensitive),
 				createdAt: text(a.createdAt),
 				members: num(a.members),
 				units: num(a.units)

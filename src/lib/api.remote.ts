@@ -13,7 +13,7 @@ import * as tally from './server/tally';
 import { fingerprintOf } from './verify';
 import { normaliseHint, hintProblem } from './hint';
 import * as schemas from './schemas';
-import { atLeast, toLedger, type Rule } from './rules';
+import { settingsToLedger, type Rule, type Settings } from './rules';
 
 /**
  * The server's API as remote functions: pages call these like local functions and SvelteKit
@@ -219,15 +219,23 @@ const summarise = (d: ledger.Dao) => ({
 	proposals: proposalsOf(d.id).length,
 	openProposals: openProposals(d.id)
 });
+/** A DAO as its card shows it: with what it can spend and the caller's share of its vote. */
+const card = async (d: ledger.Dao, party: string) => ({
+	...summarise(d),
+	balance: await billing.balance(d.id),
+	myShare: ledger.members.get(d.id)?.get(party)?.share ?? 0
+});
 
 /** The DAOs a party belongs to, newest first. */
 export const myDaos = query.live(partyId, (party) =>
 	live(ledger.keys.party(party), () => {
 		session.required(party);
-		return [...(ledger.memberships.get(party)?.keys() ?? [])]
-			.flatMap((id) => ledger.daos.get(id) ?? [])
-			.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-			.map(summarise);
+		return Promise.all(
+			[...(ledger.memberships.get(party)?.keys() ?? [])]
+				.flatMap((id) => ledger.daos.get(id) ?? [])
+				.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+				.map((d) => card(d, party))
+		);
 	})
 );
 
@@ -478,7 +486,8 @@ export const createDaoForm = form(schemas.createDaoForm, async (f) => {
 		image: nullable(image),
 		equal: equal === 'yes',
 		treasury: treasuryParty,
-		rule: toLedger(ruleOf(f, '')),
+		routine: settingsToLedger(settingsOf(f, 'routine')),
+		sensitive: settingsToLedger(settingsOf(f, 'sensitive')),
 		shares: shareRows(ordered.slice(0, schemas.BATCH)),
 		more: shareRows(ordered.slice(schemas.BATCH))
 	};
@@ -489,19 +498,20 @@ export const createDaoForm = form(schemas.createDaoForm, async (f) => {
 	};
 });
 
-/** A rule from a form's fields, plain or prefixed (`newBasis`…). */
-const ruleOf = (f: Record<string, unknown>, prefix: 'new' | ''): Rule => {
-	const field = (name: string) => f[prefix ? prefix + name[0].toUpperCase() + name.slice(1) : name];
-	return {
-		basis: field('basis') as Rule['basis'],
+/** A category's settings from a form's fields under a prefix (`routineBasis`, `newSensitiveDays`…). */
+const settingsOf = (f: Record<string, unknown>, prefix: string): Settings => {
+	const field = (name: string) => f[prefix + name];
+	const rule: Rule = {
+		basis: field('Basis') as Rule['basis'],
 		threshold:
-			field('threshold') === 'percent'
-				? { kind: 'percent', percent: Number(field('percent')) }
+			field('Threshold') === 'percent'
+				? { kind: 'percent', percent: Number(field('Percent')) }
 				: { kind: 'majority' },
-		quorum: Number(field('quorum')),
-		early: field('early') === 'yes',
-		changeable: field('changeable') === 'yes'
+		quorum: Number(field('Quorum')),
+		early: field('Early') === 'yes',
+		changeable: field('Changeable') === 'yes'
 	};
+	return { rule, votingDays: Number(field('Days')) };
 };
 
 export const createProposalForm = form(schemas.createProposalForm, async (f) => {
@@ -509,7 +519,6 @@ export const createProposalForm = form(schemas.createProposalForm, async (f) => 
 	const membership = memberOnly(f.dao).contractId;
 	const d = daoOf(f.dao);
 	const pid = crypto.randomUUID();
-	const closesAt = new Date(Date.now() + f.days * 86_400_000).toISOString();
 	let action: { tag: string; value: unknown };
 	switch (f.kind) {
 		case 'info':
@@ -525,8 +534,14 @@ export const createProposalForm = form(schemas.createProposalForm, async (f) => 
 		case 'dissolve':
 			action = { tag: 'Dissolve', value: { remainderTo: f.remainderTo.trim() } };
 			break;
-		case 'rule':
-			action = { tag: 'SetRule', value: { rule: toLedger(ruleOf(f, 'new')) } };
+		case 'settings':
+			action = {
+				tag: 'SetSettings',
+				value: {
+					routine: settingsToLedger(settingsOf(f, 'newRoutine')),
+					sensitive: settingsToLedger(settingsOf(f, 'newSensitive'))
+				}
+			};
 			break;
 		case 'payout':
 			action = {
@@ -558,17 +573,7 @@ export const createProposalForm = form(schemas.createProposalForm, async (f) => 
 		default:
 			action = { tag: 'Signal', value: {} };
 	}
-	const rule = ruleOf(f, '');
-	if (!atLeast(d.rule, rule)) error(400, "A proposal cannot ask less than the DAO's rule");
-	const args = {
-		dao: d.contractId,
-		pid,
-		title: f.title,
-		description: f.description,
-		closesAt,
-		action,
-		rule: toLedger(rule)
-	};
+	const args = { dao: d.contractId, pid, title: f.title, description: f.description, action };
 	return {
 		pid,
 		membership,

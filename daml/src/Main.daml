@@ -4,6 +4,7 @@ import DA.Action (foldlA, void, when)
 import DA.Foldable (forA_)
 import DA.List (dedup)
 import DA.Optional (isNone, isSome)
+import DA.Time (addRelTime, days)
 
 -- Every contract a user acts on carries the app provider's signature, so the provider confirms
 -- every transaction (which is what earns traffic rewards) while the user's own key is the only
@@ -15,8 +16,9 @@ import DA.Optional (isNone, isSome)
 -- proposal executed) are controlled by both, and neither has the other's key. The creator has
 -- no say of their own beyond that signature: everything a DAO does, it decides by vote.
 --
--- A DAO has one rule of its own, set at the founding and changed only by vote: the least any
--- proposal takes to pass. A proposer may ask for more than that, never less.
+-- A DAO has settings of its own, set at the founding and changed only by vote: for routine
+-- proposals and for sensitive ones, the rule they pass by and how long the vote is open. A
+-- proposer chooses what to propose, never what it takes.
 --
 -- Members hold shares of the vote, counted in whole units — one each in a DAO that votes by
 -- membership, any number in one that votes by shares — and a ballot weighs the voter's units.
@@ -57,9 +59,18 @@ data Effect
       reason : Text
   | Dissolve with
       remainderTo : Party
-  | SetRule with
-      rule : Rule
+  | SetSettings with
+      routine : Settings
+      sensitive : Settings
   deriving (Eq, Show)
+
+-- | What a proposal does decides which of the DAO's two settings it runs under: the routine
+-- ones for a decision or a new name, the sensitive ones for anything touching members, coin,
+-- the rules or the DAO's existence.
+isSensitive : Effect -> Bool
+isSensitive Signal = False
+isSensitive (SetInfo {}) = False
+isSensitive _ = True
 
 -- | What counts as passing, chosen per proposal. Yes is measured against all members, or
 -- against the votes cast (yes and no; an abstention takes part but takes no side), and must be
@@ -90,29 +101,15 @@ validRule r =
       Majority -> True
       Percent p -> p >= 1 && p <= 100
 
--- | A threshold as a level, in tenths of a percent: a majority is just over half.
-level : Threshold -> Int
-level Majority = 505
-level (Percent p) = p * 10
+-- | What proposals of a category run under: the rule they pass by, and how many days the
+-- vote is open. Set at the founding, changed only by vote.
+data Settings = Settings with
+    rule : Rule
+    votingDays : Int
+  deriving (Eq, Show)
 
--- | How much of the whole vote a rule needs to see, in tenths of a percent: its quorum, or,
--- measured against the whole vote, its threshold if that is more (yes from 67% of all is
--- 67% taking part).
-turnout : Rule -> Int
-turnout r = case r.basis of
-  OfAll -> max (r.quorum * 10) (level r.threshold)
-  OfCast -> r.quorum * 10
-
--- | Whether a proposal's rule asks at least as much as the DAO's own: never measured against
--- less (the votes cast where the DAO says the whole vote), never a lower threshold, never
--- less of the vote taking part, and never settled early where the DAO waits for the
--- deadline. Letting votes change asks nothing less.
-atLeast : Rule -> Rule -> Bool
-atLeast charter r =
-  (charter.basis == OfCast || r.basis == OfAll)
-    && level r.threshold >= level charter.threshold
-    && turnout r >= turnout charter
-    && (charter.early || not r.early)
+validSettings : Settings -> Bool
+validSettings s = validRule s.rule && s.votingDays >= 1 && s.votingDays <= 90
 
 -- | Members created, reshared or removed per transaction; longer lists are carried out in
 -- several.
@@ -154,14 +151,15 @@ template Account
         image : Optional Text
         equal : Bool
         treasury : Party
-        rule : Rule
+        routine : Settings
+        sensitive : Settings
         shares : [(Party, Int)]
         more : [(Party, Int)]
       controller user
       do
         now <- getTime
         assertMsg "A DAO needs a name" (daoName /= "")
-        assertMsg "The rule's numbers are out of range" (validRule rule)
+        assertMsg "The settings' numbers are out of range" (validSettings routine && validSettings sensitive)
         assertMsg "The founding shares must be whole" (validChanges equal (shares ++ more))
         assertMsg "The first batch is one to a batch" (not (null shares) && length shares <= batch)
         assertMsg "The founding shares are all positive" (all (\(_, u) -> u > 0) (shares ++ more))
@@ -180,7 +178,7 @@ template Account
             yes = 0; no = 0; abstain = 0; outcome = Some Passed; executed = 0; executedAt = None
         create DAO with
           provider; operator; creator = user; treasury; id; name = daoName; description; image
-          equal; rule; createdAt = now; members = length shares; units = sum (map snd shares)
+          equal; routine; sensitive; createdAt = now; members = length shares; units = sum (map snd shares)
 
     -- How a party presents itself: a name, a picture, a few words. One per party; replacing
     -- it hands in the old one.
@@ -216,8 +214,10 @@ template DAO
     image : Optional Text
     -- One member, one unit: the vote is by membership rather than by shares.
     equal : Bool
-    -- What every proposal takes to pass, at the least; a proposer may ask for more, never less.
-    rule : Rule
+    -- What proposals run under: routine ones (a decision, a name) and sensitive ones (members
+    -- and shares, coin, the rules, dissolution).
+    routine : Settings
+    sensitive : Settings
     createdAt : Time
     members : Int
     -- The whole vote: what every member's units add up to.
@@ -258,9 +258,9 @@ template DAO
           Dissolve _ -> do
             exercise proposal Proposal_Advance with upTo = 1
             pure None
-          SetRule newRule -> do
+          SetSettings routine sensitive -> do
             exercise proposal Proposal_Advance with upTo = 1
-            Some <$> create this with rule = newRule
+            Some <$> create this with routine; sensitive
           SetShares changes -> do
             let from = p.executed
                 slice = take (upTo - from) (drop from changes)
@@ -330,29 +330,29 @@ template Member
         create this with share; shareSince = now
 
     -- The DAO is read as it is now (the app's operator reads alongside the member): the size
-    -- of its vote is fixed into the proposal as the electorate, and voting is open from this
-    -- moment. What members vote on is what was proposed.
+    -- of its vote is fixed into the proposal as the electorate, its settings for this kind of
+    -- action give the rule and the deadline, and voting is open from this moment. What
+    -- members vote on is what was proposed.
     nonconsuming choice Member_Propose : ContractId Proposal
       with
         dao : ContractId DAO
         pid : Text
         title : Text
         description : Text
-        closesAt : Time
         action : Effect
-        rule : Rule
       controller party
       do
         now <- getTime
         found <- fetch dao
         assertMsg "Not this member's DAO" (found.id == daoId)
-        assertMsg "The deadline must be in the future" (closesAt > now)
-        assertMsg "The rule's numbers are out of range" (validRule rule)
-        assertMsg "A proposal cannot ask less than the DAO's rule" (atLeast found.rule rule)
+        let settings = if isSensitive action then found.sensitive else found.routine
+            rule = settings.rule
+            closesAt = addRelTime now (days settings.votingDays)
         case action of
           Signal -> pure ()
           Dissolve _ -> pure ()
-          SetRule newRule -> assertMsg "The new rule's numbers are out of range" (validRule newRule)
+          SetSettings routine sensitive ->
+            assertMsg "The settings' numbers are out of range" (validSettings routine && validSettings sensitive)
           SetInfo daoName _ _ -> assertMsg "A DAO needs a name" (daoName /= "")
           Payout _ amount _ -> assertMsg "A payout is a positive amount" (amount > 0.0)
           SetShares changes ->

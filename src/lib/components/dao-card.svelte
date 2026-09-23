@@ -7,7 +7,10 @@
 		members,
 		openProposals,
 		role,
-		image = null
+		image = null,
+		balance = null,
+		share = null,
+		equal = false
 	}: {
 		id: string;
 		name: string;
@@ -16,8 +19,14 @@
 		openProposals: number;
 		role: 'creator' | 'member';
 		image?: string | null;
+		/** What the treasury can spend. */
+		balance?: number | null;
+		/** The viewer's share of the vote, in percent. */
+		share?: number | null;
+		equal?: boolean;
 	} = $props();
 	import { excerpt } from '$lib/markdown';
+	import { coin } from '$lib/format';
 
 	const monogram = $derived(name.slice(0, 3).toUpperCase());
 </script>
@@ -54,15 +63,35 @@
 		{excerpt(description) || 'No description provided.'}
 	</div>
 
-	<div class="flex items-center gap-6 border-t border-border pt-3.5">
+	<div class="flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-border pt-3.5">
 		<div>
 			<div class="font-mono text-[15px] font-bold">{members}</div>
 			<div class="mt-0.5 font-mono text-xs tracking-[0.14em] text-ink-dim uppercase">Members</div>
 		</div>
 		<div>
-			<div class="font-mono text-[15px] font-bold">{openProposals}</div>
+			<div class="font-mono text-[15px] font-bold {openProposals > 0 ? 'text-orange' : ''}">
+				{openProposals}
+			</div>
 			<div class="mt-0.5 font-mono text-xs tracking-[0.14em] text-ink-dim uppercase">Open</div>
 		</div>
+		{#if balance !== null}
+			<div>
+				<div class="font-mono text-[15px] font-bold {balance <= 0 ? 'text-red' : ''}">
+					{coin(balance)}
+				</div>
+				<div class="mt-0.5 font-mono text-xs tracking-[0.14em] text-ink-dim uppercase">
+					Treasury
+				</div>
+			</div>
+		{/if}
+		{#if share !== null && !equal}
+			<div>
+				<div class="font-mono text-[15px] font-bold">{share}%</div>
+				<div class="mt-0.5 font-mono text-xs tracking-[0.14em] text-ink-dim uppercase">
+					Your vote
+				</div>
+			</div>
+		{/if}
 		<ArrowRight
 			size={16}
 			class="ml-auto text-ink-dim transition-all group-hover:translate-x-0.5 group-hover:text-orange"

@@ -7,7 +7,6 @@
 	import { createProposalForm as schema, shareChanges, BATCH } from '$lib/schemas';
 	import type { Plain } from '$lib/verify';
 	import { Input } from '$lib/components/ui/input';
-	import { Button } from '$lib/components/ui/button';
 	import Page from '$lib/components/page.svelte';
 	import PageHeader from '$lib/components/page-header.svelte';
 	import ConnectPrompt from '$lib/components/connect-prompt.svelte';
@@ -21,9 +20,9 @@
 	import ImageField from '$lib/components/image-field.svelte';
 	import PartyChips from '$lib/components/party-chips.svelte';
 	import Note from '$lib/components/note.svelte';
-	import RulePicker from '$lib/components/rule-picker.svelte';
+	import RuleSettings from '$lib/components/rule-settings.svelte';
 	import Hint from '$lib/components/hint.svelte';
-	import { PRESETS, toLedger, describe, atLeast, type Rule } from '$lib/rules';
+	import { categoryOf, describe, settingsToLedger, type Settings } from '$lib/rules';
 	import PieChart from '@lucide/svelte/icons/pie-chart';
 	import Users from '@lucide/svelte/icons/users';
 	import Pencil from '@lucide/svelte/icons/pencil';
@@ -45,7 +44,7 @@
 	 * from the truth — and before signing the page says in one sentence what the ledger will
 	 * do: the same sentence the voters will read.
 	 */
-	type Kind = 'signal' | 'shares' | 'info' | 'payout' | 'dissolve' | 'rule';
+	type Kind = 'signal' | 'shares' | 'info' | 'payout' | 'dissolve' | 'settings';
 	let kind = $state<Kind>('signal');
 	const kinds = $derived([
 		{
@@ -118,19 +117,40 @@
 	let payoutAmount = $state<number | undefined>(undefined);
 	let payoutReason = $state('');
 
-	// The proposal passes by the DAO's own rule unless the author asks for more.
-	const copy = (r: Rule): Rule => ({ ...r, threshold: { ...r.threshold } });
-	let rule = $state<Rule>(copy(PRESETS[0].rule!));
-	let more = $state(false);
-	let ruleSeeded = $state(false);
-	$effect(() => {
-		if (!d || ruleSeeded) return;
-		ruleSeeded = true;
-		rule = copy(d.rule);
-		newRule = copy(d.rule);
+	// A settings proposal carries the DAO's next settings, starting from today's.
+	const copy = (x: Settings): Settings => ({
+		...x,
+		rule: { ...x.rule, threshold: { ...x.rule.threshold } }
 	});
-	// A rule proposal carries the DAO's next rule, starting from today's.
-	let newRule = $state<Rule>(copy(PRESETS[0].rule!));
+	let newRoutine = $state<Settings>({
+		rule: {
+			basis: 'all',
+			threshold: { kind: 'majority' },
+			quorum: 0,
+			early: true,
+			changeable: false
+		},
+		votingDays: 7
+	});
+	let newSensitive = $state<Settings>({
+		rule: {
+			basis: 'all',
+			threshold: { kind: 'percent', percent: 67 },
+			quorum: 0,
+			early: true,
+			changeable: false
+		},
+		votingDays: 14
+	});
+	let settingsSeeded = $state(false);
+	$effect(() => {
+		if (!d || settingsSeeded) return;
+		settingsSeeded = true;
+		newRoutine = copy(d.routine);
+		newSensitive = copy(d.sensitive);
+	});
+	/** The settings this proposal runs under: routine or sensitive, by what it does. */
+	const applies = $derived(d ? d[categoryOf(kind)] : null);
 
 	// The share editor starts as today's table, read once; the rest is the proposer's.
 	const today = $derived(store.who && kind === 'shares' ? remote.daoShares(id) : null);
@@ -194,8 +214,8 @@
 				return `${coin(payoutAmount)} leaves the treasury for ${payoutTo[0].split('::')[0]} the moment this passes${holdings !== null && payoutAmount > holdings ? ' — more than the treasury holds today; it waits until it can be paid' : ''}.`;
 			case 'dissolve':
 				return `The DAO is dissolved once every other vote has settled; whatever the treasury holds goes to ${remainderTo[0]?.split('::')[0] ?? 'the party named below'}. Its record stays readable; nothing new can be proposed.`;
-			case 'rule':
-				return `From then on every proposal passes when ${describe(newRule)}${newRule.early ? ', settling early once that is sure' : newRule.changeable ? ', votes may change, decided at the deadline' : ', decided at the deadline'}. A proposer may ask for more, never less.`;
+			case 'settings':
+				return `From then on routine proposals pass when ${describe(newRoutine.rule)}, open ${newRoutine.votingDays} days; sensitive ones when ${describe(newSensitive.rule)}, open ${newSensitive.votingDays} days.`;
 			default:
 				return 'The decision is recorded on the ledger. Nothing else changes.';
 		}
@@ -215,8 +235,8 @@
 					: 'Payout';
 			case 'dissolve':
 				return 'Dissolve the DAO';
-			case 'rule':
-				return 'Change the rule';
+			case 'settings':
+				return 'Change the settings';
 			default:
 				return '';
 		}
@@ -260,54 +280,41 @@
 								}
 							: fields.kind === 'dissolve'
 								? { tag: 'Dissolve', value: { remainderTo: fields.remainderTo.trim() } }
-								: fields.kind === 'rule'
+								: fields.kind === 'settings'
 									? {
-											tag: 'SetRule',
+											tag: 'SetSettings',
 											value: {
-												rule: toLedger({
-													basis: fields.newBasis,
-													threshold:
-														fields.newThreshold === 'percent'
-															? { kind: 'percent', percent: fields.newPercent }
-															: { kind: 'majority' },
-													quorum: fields.newQuorum,
-													early: fields.newEarly === 'yes',
-													changeable: fields.newChangeable === 'yes'
-												})
+												routine: settingsToLedger(settingsOf(fields, 'newRoutine')),
+												sensitive: settingsToLedger(settingsOf(fields, 'newSensitive'))
 											}
 										}
 									: { tag: 'Signal', value: {} };
-			const rule: Rule = {
-				basis: fields.basis,
-				threshold:
-					fields.threshold === 'percent'
-						? { kind: 'percent', percent: fields.percent }
-						: { kind: 'majority' },
-				quorum: fields.quorum,
-				early: fields.early === 'yes',
-				changeable: fields.changeable === 'yes'
-			};
 			return {
 				choice: 'Member_Propose',
 				contractId: membership,
-				args: {
-					dao: args.dao,
-					pid,
-					title: fields.title,
-					description: fields.description,
-					closesAt: args.closesAt,
-					action,
-					rule: toLedger(rule)
-				}
+				args: { dao: args.dao, pid, title: fields.title, description: fields.description, action }
 			};
 		},
 		({ pid }) => goto(`/proposals/${pid}`)
 	);
 
-	// A week is the usual voting period; the field starts there.
-	$effect(() => {
-		if (f.fields.days.value() === undefined) f.fields.days.set(7);
-	});
+	/** A category's settings from the submitted fields under a prefix, as the server reads them. */
+	const settingsOf = (fields: Record<string, unknown>, prefix: string): Settings => {
+		const at = (name: string) => fields[prefix + name];
+		return {
+			rule: {
+				basis: at('Basis') as Settings['rule']['basis'],
+				threshold:
+					at('Threshold') === 'percent'
+						? { kind: 'percent', percent: Number(at('Percent')) }
+						: { kind: 'majority' },
+				quorum: Number(at('Quorum')),
+				early: at('Early') === 'yes',
+				changeable: at('Changeable') === 'yes'
+			},
+			votingDays: Number(at('Days'))
+		};
+	};
 	const ready = $derived.by(() => {
 		if (!d) return false;
 		switch (kind) {
@@ -320,7 +327,7 @@
 			case 'dissolve':
 				return !!remainderTo[0];
 			default:
-				return atLeast(d.rule, rule);
+				return true;
 		}
 	});
 </script>
@@ -455,14 +462,29 @@
 							bind:value={payoutReason}
 						/>
 					</Field>
-				{:else if kind === 'rule'}
-					<Field
-						label="The rule from then on"
-						id="newRule"
-						hint="Starts from today's rule. Whatever you set here becomes the least any future proposal takes."
-					>
-						<RulePicker bind:rule={newRule} eligible={d.units} equal={d.equal} prefix="new" />
-					</Field>
+				{:else if kind === 'settings'}
+					<div class="space-y-4">
+						{#each [['Routine', 'routine'], ['Sensitive', 'sensitive']] as [title, c] (c)}
+							<div class="space-y-2">
+								<div class="font-display text-[15px] font-bold">{title}</div>
+								{#if c === 'routine'}
+									<RuleSettings
+										bind:settings={newRoutine}
+										prefix="newRoutine"
+										eligible={d.units}
+										equal={d.equal}
+									/>
+								{:else}
+									<RuleSettings
+										bind:settings={newSensitive}
+										prefix="newSensitive"
+										eligible={d.units}
+										equal={d.equal}
+									/>
+								{/if}
+							</div>
+						{/each}
+					</div>
 				{:else if kind === 'dissolve'}
 					<Field
 						label="What is left goes to"
@@ -483,43 +505,20 @@
 			</FormSection>
 
 			<FormSection title="How it passes">
-				{#if !more}
-					<input type="hidden" name="basis" value={rule.basis} />
-					<input type="hidden" name="threshold" value={rule.threshold.kind} />
-					<input
-						type="hidden"
-						name="n:percent"
-						value={rule.threshold.kind === 'percent' ? rule.threshold.percent : 67}
-					/>
-					<input type="hidden" name="n:quorum" value={rule.quorum} />
-					<input type="hidden" name="early" value={rule.early ? 'yes' : 'no'} />
-					<input type="hidden" name="changeable" value={rule.changeable ? 'yes' : 'no'} />
-					<div class="flex flex-wrap items-start justify-between gap-4">
-						<p class="text-sm text-ink-mid">
-							By the DAO's rule, it passes when {describe(d.rule)}.{d.rule.early
-								? ' Settles early once that is sure.'
-								: d.rule.changeable
-									? ' Votes may change; decided at the deadline.'
-									: ' Decided at the deadline.'}
-							<Hint
-								text="Every DAO has one rule, set at its founding and changed only by vote: the least any proposal takes. You may ask for more for this proposal — a bigger majority, a quorum, unanimity, or letting votes change — but never less."
-							/>
-						</p>
-						<Button type="button" variant="outline" size="sm" onclick={() => (more = true)}
-							>Ask for more</Button
-						>
-					</div>
-				{:else}
-					<RulePicker bind:rule eligible={d.units} equal={d.equal} floor={d.rule} />
-					<Button
-						type="button"
-						variant="ghost"
-						size="sm"
-						onclick={() => {
-							rule = copy(d.rule);
-							more = false;
-						}}>Back to the DAO's rule</Button
-					>
+				{#if applies}
+					<p class="text-sm leading-relaxed text-ink-mid">
+						A {categoryOf(kind)} proposal, so by the DAO's settings it passes when {describe(
+							applies.rule
+						)}{applies.rule.early
+							? ', settling early once that is sure'
+							: applies.rule.changeable
+								? '; votes may change, decided at the deadline'
+								: ', decided at the deadline'}. The vote is open for {applies.votingDays}
+						{applies.votingDays === 1 ? 'day' : 'days'} from the moment you sign.
+						<Hint
+							text="The DAO's settings decide this, not the proposer: routine proposals (a decision, a name) and sensitive ones (members, coin, settings, dissolution) each have their own rule and voting period, set at the founding and changed only by a sensitive proposal."
+						/>
+					</p>
 				{/if}
 			</FormSection>
 
@@ -546,14 +545,6 @@
 						placeholder="What is being decided, and why. Markdown; pictures by link."
 						disabled={store.busy}
 					/>
-				</Field>
-				<Field
-					label="Voting period (days)"
-					id="days"
-					hint="1 to 30 days."
-					issues={f.fields.days.issues()}
-				>
-					<Input {...f.fields.days.as('number')} id="days" min={1} max={30} class="w-32" />
 				</Field>
 			</FormSection>
 

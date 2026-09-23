@@ -28,8 +28,8 @@
 				return `pay ${coin(effect.amount)}`;
 			case 'dissolve':
 				return 'dissolve';
-			case 'rule':
-				return `rule: ${short(effect.rule)}`;
+			case 'settings':
+				return `settings: ${short(effect.routine.rule)} / ${short(effect.sensitive.rule)}`;
 			default:
 				return 'decision';
 		}
@@ -45,7 +45,7 @@
 					? Coins
 					: effect.kind === 'dissolve'
 						? Power
-						: effect.kind === 'rule'
+						: effect.kind === 'settings'
 							? Scale
 							: MessageSquare
 	);

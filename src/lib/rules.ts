@@ -126,25 +126,42 @@ export function standing(
 	return { needed, denominator, quorumMet, note };
 }
 
-/** A threshold as a level, in tenths of a percent: a majority is just over half. */
-const level = (t: Rule['threshold']) => (t.kind === 'majority' ? 505 : t.percent * 10);
-/** How much of the whole vote a rule needs to see: its quorum, or its threshold if that is more. */
-const turnout = (r: Rule) =>
-	r.basis === 'all' ? Math.max(r.quorum * 10, level(r.threshold)) : r.quorum * 10;
+/** What proposals of a category run under: the rule they pass by, and how long the vote is open. */
+export type Settings = { rule: Rule; votingDays: number };
 
-/**
- * Whether `r` asks at least as much as `charter`, as the ledger checks it: never measured
- * against less, never a lower threshold, never less of the vote taking part, never settled
- * early where the charter waits. Letting votes change asks nothing less.
- */
-export function atLeast(charter: Rule, r: Rule): boolean {
-	return (
-		(charter.basis === 'cast' || r.basis === 'all') &&
-		level(r.threshold) >= level(charter.threshold) &&
-		turnout(r) >= turnout(charter) &&
-		(charter.early || !r.early)
-	);
-}
+export type Category = 'routine' | 'sensitive';
+
+/** What a proposal does decides its category: routine, or touching members, coin, rules, existence. */
+export const categoryOf = (kind: string): Category =>
+	kind === 'signal' || kind === 'info' ? 'routine' : 'sensitive';
+
+export const CATEGORIES: { value: Category; title: string; text: string; covers: string }[] = [
+	{
+		value: 'routine',
+		title: 'Routine',
+		text: 'Decisions, and the name, description or picture.',
+		covers: 'A decision the DAO takes, or a new name, description or picture.'
+	},
+	{
+		value: 'sensitive',
+		title: 'Sensitive',
+		text: 'Members and shares, payouts, these settings, dissolution.',
+		covers:
+			'Who is in the DAO and with what share, coin leaving the treasury, these very settings, and winding the DAO up.'
+	}
+];
+
+/** The founding defaults: everyday decisions by a majority in a week, weightier ones by two thirds in two. */
+export const DEFAULTS: Record<Category, Settings> = {
+	routine: { rule: PRESETS[0].rule!, votingDays: 7 },
+	sensitive: { rule: PRESETS[2].rule!, votingDays: 14 }
+};
+
+/** The settings as the ledger's JSON writes them. */
+export const settingsToLedger = (s: Settings) => ({
+	rule: toLedger(s.rule),
+	votingDays: String(s.votingDays)
+});
 
 /** The rule as the ledger's JSON writes it: enums as text, ints as text, the variant tagged. */
 export const toLedger = (r: Rule) => ({

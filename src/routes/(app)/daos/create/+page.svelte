@@ -17,8 +17,8 @@
 	import ImageField from '$lib/components/image-field.svelte';
 	import Note from '$lib/components/note.svelte';
 	import Hint from '$lib/components/hint.svelte';
-	import RulePicker from '$lib/components/rule-picker.svelte';
-	import { PRESETS, toLedger, type Rule } from '$lib/rules';
+	import RuleSettings from '$lib/components/rule-settings.svelte';
+	import { CATEGORIES, DEFAULTS, settingsToLedger, type Settings } from '$lib/rules';
 	import Users from '@lucide/svelte/icons/users';
 	import PieChart from '@lucide/svelte/icons/pie-chart';
 	import { fmt } from '$lib/format';
@@ -63,7 +63,13 @@
 	let description = $state('');
 	let image = $state('');
 	// What every proposal takes to pass, at the least; a majority of all to start with.
-	let rule = $state<Rule>({ ...PRESETS[0].rule!, threshold: { ...PRESETS[0].rule!.threshold } });
+	// What proposals run under, by category; the founding defaults to start from.
+	const copy = (x: Settings): Settings => ({
+		...x,
+		rule: { ...x.rule, threshold: { ...x.rule.threshold } }
+	});
+	let routine = $state<Settings>(copy(DEFAULTS.routine));
+	let sensitive = $state<Settings>(copy(DEFAULTS.sensitive));
 
 	// The intent is the founding table as the ledger reads it: the first batch of rows, and the
 	// rest as a proposal already passed. The server orders the creator first; so does this.
@@ -72,15 +78,22 @@
 		schema,
 		(fields, { id, args }) => {
 			const { daoName, description, image, equal, shares } = fields;
-			const charter: Rule = {
-				basis: fields.basis,
-				threshold:
-					fields.threshold === 'percent'
-						? { kind: 'percent', percent: fields.percent }
-						: { kind: 'majority' },
-				quorum: fields.quorum,
-				early: fields.early === 'yes',
-				changeable: fields.changeable === 'yes'
+			const settingsOf = (prefix: 'routine' | 'sensitive'): Settings => {
+				const x = fields as unknown as Record<string, unknown>;
+				const at = (name: string) => x[prefix + name];
+				return {
+					rule: {
+						basis: at('Basis') as Settings['rule']['basis'],
+						threshold:
+							at('Threshold') === 'percent'
+								? { kind: 'percent', percent: Number(at('Percent')) }
+								: { kind: 'majority' },
+						quorum: Number(at('Quorum')),
+						early: at('Early') === 'yes',
+						changeable: at('Changeable') === 'yes'
+					},
+					votingDays: Number(at('Days'))
+				};
 			};
 			const me = store.who!.party;
 			const ordered = [
@@ -98,7 +111,8 @@
 					image: image || null,
 					equal: equal === 'yes',
 					treasury: args.treasury,
-					rule: toLedger(charter),
+					routine: settingsToLedger(settingsOf('routine')),
+					sensitive: settingsToLedger(settingsOf('sensitive')),
 					shares: ordered.slice(0, BATCH).map(tuple),
 					more: ordered.slice(BATCH).map(tuple)
 				}
@@ -181,13 +195,35 @@
 				</Note>
 			</FormSection>
 
-			<FormSection title="What it takes to pass">
+			<FormSection title="How proposals pass">
 				<p class="text-xs leading-relaxed text-ink-mid">
-					The least any proposal takes to pass. Whoever proposes may ask for more — a bigger
-					majority, a quorum, unanimity — never less. Changing this later is itself a proposal,
-					passed under this very rule.
+					Two kinds of proposal, two settings: what a vote takes to pass, and how long it is open.
+					Nobody who proposes chooses either; changing them later is itself a sensitive proposal.
 				</p>
-				<RulePicker bind:rule eligible={summary.units} equal={mode === 'equal'} />
+				{#each CATEGORIES as c (c.value)}
+					<div class="space-y-2">
+						<div class="flex items-center gap-1.5">
+							<span class="font-display text-[15px] font-bold">{c.title}</span>
+							<Hint text={c.covers} />
+							<span class="text-xs text-ink-dim">{c.text}</span>
+						</div>
+						{#if c.value === 'routine'}
+							<RuleSettings
+								bind:settings={routine}
+								prefix="routine"
+								eligible={summary.units}
+								equal={mode === 'equal'}
+							/>
+						{:else}
+							<RuleSettings
+								bind:settings={sensitive}
+								prefix="sensitive"
+								eligible={summary.units}
+								equal={mode === 'equal'}
+							/>
+						{/if}
+					</div>
+				{/each}
 			</FormSection>
 
 			<FormSection title={mode === 'equal' ? 'Founding members' : 'Founding shares'}>

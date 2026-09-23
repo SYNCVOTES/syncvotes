@@ -23,8 +23,8 @@
 	import ShareBar from '$lib/components/share-bar.svelte';
 	import Markdown from '$lib/components/markdown.svelte';
 	import Note from '$lib/components/note.svelte';
-	import { short, describe } from '$lib/rules';
-	import Hint from '$lib/components/hint.svelte';
+	import { short } from '$lib/rules';
+	import SettingsSummary from '$lib/components/settings-summary.svelte';
 	import Problem from '$lib/components/problem.svelte';
 	import TreasuryPanel from '$lib/components/treasury-panel.svelte';
 	import Plus from '@lucide/svelte/icons/plus';
@@ -75,12 +75,6 @@
 					<div class="mt-3 flex flex-wrap items-center gap-2">
 						<Badge variant="accent">Private</Badge>
 						<Badge>{d.equal ? 'By membership' : 'By shares'}</Badge>
-						<Badge>{short(d.rule)}</Badge>
-						<Hint
-							text="The DAO's rule: every proposal passes when {describe(
-								d.rule
-							)}, at the least. A proposer may ask for more, never less. The rule changes only by a proposal passed under it."
-						/>
 						{#if d.me.creator}<Badge variant="amber">You created it</Badge>{:else}<Badge
 								variant="green">Member</Badge
 							>{/if}
@@ -95,6 +89,12 @@
 
 		<div class="mt-6 max-w-[720px]">
 			<Markdown text={d.description} fallback="No description provided." />
+			<p class="mt-3 font-mono text-xs text-ink-dim">
+				Established {dateOf(d.createdAt)} · created by <PartyId
+					party={d.creator}
+					class="align-middle"
+				/>
+			</p>
 		</div>
 
 		<div class="mt-8"><Problem message={store.problem} /></div>
@@ -109,9 +109,12 @@
 		<Facts
 			items={[
 				{ label: 'Members', value: fmt(d.members) },
-				{ label: 'Open', value: fmt(d.openProposals), accent: d.openProposals > 0 },
-				{ label: 'To spend', value: coin(d.balance), accent: d.balance <= 0 },
-				{ label: 'Established', value: dateOf(d.createdAt) }
+				{ label: 'Open proposals', value: fmt(d.openProposals), accent: d.openProposals > 0 },
+				{ label: 'Treasury to spend', value: coin(d.balance), accent: d.balance <= 0 },
+				{
+					label: 'Your vote',
+					value: d.equal ? '1 of ' + fmt(d.units) : `${pct(d.me.share, d.units)}%`
+				}
 			]}
 		/>
 
@@ -182,6 +185,17 @@
 
 			<aside class="space-y-6">
 				<TreasuryPanel dao={d.id} />
+
+				<div>
+					<SectionTitle title="How proposals pass" />
+					<SettingsSummary
+						routine={d.routine}
+						sensitive={d.sensitive}
+						eligible={d.units}
+						equal={d.equal}
+						compact
+					/>
+				</div>
 
 				<div>
 					<SectionTitle title={d.equal ? 'Members' : 'Shares of the vote'} count={fmt(d.members)} />
