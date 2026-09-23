@@ -48,15 +48,17 @@ the token standard's packages are on every validator, so a treasury can be paid 
 
 ### The model
 
-`daml/src/Main.daml`, package `syncvotes-rulebook`, one idea: every contract a user acts on
+`daml/src/Main.daml`, package `syncvotes-minutes`, one idea: every contract a user acts on
 already carries the provider's signature, so the provider is a **confirmer** of every
 transaction — which is what CIP-0104 pays traffic rewards for — while the user's key is the
 only one that ever signs a submission. One constraint: a DAO may have thousands of members and
 more proposals, so nothing lists, nothing grows with history, and a member's vote touches no
 contract another member's vote touches. And one rule of authority: a DAO is signed by its
-creator and the provider, and that pair is the DAO's own authority — the choices only the DAO
-may exercise (removing a member, recording a proposal carried out) are controlled by both, and
-neither has the other's key.
+creator and the provider, and that pair is the DAO's own authority — every member, proposal,
+ballot and comment of the DAO carries both signatures, with the creator cross-checked wherever
+one contract refers to another, so neither the provider nor the creator can invent a member or
+a vote alone; and the choices only the DAO may exercise (removing a member, recording a
+proposal carried out) are controlled by both, and neither has the other's key.
 
 - `Account` — created by the provider once per party; the door through which it creates DAOs
   (`Account_CreateDAO`) and keeps a `Profile` (`Account_SetProfile`: a name, a picture by link,
@@ -71,9 +73,8 @@ neither has the other's key.
   with a share table: the first two hundred members are created on the spot, the rest as a
   proposal already passed, carried out in batches like any other.
 - `Member` — one per party per DAO, with its `share` of the vote in whole units (one each in a
-  DAO by membership) and when that share last changed, signed by whoever admitted the member
-  (the creator at the founding, or the DAO itself carrying out a vote), so the provider cannot
-  invent members; reshared or removed only with the DAO's authority. It is the member's door to
+  DAO by membership) and when that share last changed, signed by the DAO's authority (creator
+  and provider), so nobody invents members alone; reshared or removed only with the same. It is the member's door to
   proposing — `Member_Propose` reads the DAO of the moment (the app's operator reads alongside
   the member) and fixes its units into the proposal as the electorate — to commenting
   (`Member_Comment`), and their ballot box: `Member_Vote` replaces it with a copy that
@@ -83,26 +84,30 @@ neither has the other's key.
   units, of `eligible`), `outcome`, how far its effect is carried out; an `Effect`: `Signal`,
   `SetShares` (only the parties it touches, zero to leave; up to two thousand, carried out two
   hundred at a time), `SetInfo` (name, description, picture), `Payout` (coin from the treasury
-  to a party), `Dissolve` (with where the remainder goes) or `SetSettings` (both settings
-  from then on); and the `Rule` and deadline it runs under, which the proposer does not
+  to an address outside the app), `Dissolve` (with where the remainder goes, outside the app
+  too) or `SetSettings` (both settings from then on); and the `Rule` and deadline it runs under, which the proposer does not
   choose: `Member_Propose` takes them from the DAO's settings for the action's category
   (`isSensitive`), so nobody passes a payout to themselves on a rule of their own making. A
-  rule is yes measured against all of the vote or against the votes cast, a majority or a
-  percentage, a quorum of the vote that must take part, whether it settles the moment the
+  rule is yes measured against all of the vote or against the votes cast, a majority, a
+  fraction (two thirds of three is two) or a percentage, a quorum of the vote that must take part, whether it settles the moment the
   outcome cannot change, and whether votes may change until the deadline — the last two
   exclude each other, which the ledger checks (an outcome that is sure only while nobody
   changes their mind is not sure). Settings change only by a sensitive proposal, passed under
   the sensitive settings as they stand. Nobody cancels a proposal. Once passed, the provider exercises `DAO_Execute`: the ledger checks
   the proposal did pass and carries the effect out with the DAO's authority; a payout moves the
-  coin first and is recorded after; a dissolution waits until every other vote has settled.
-- `Ballot` — one vote weighing the voter's units, signed by the voter and the provider. The
-  provider counts (`Proposal_Tally`, batches of two hundred; where votes may change, only once
-  the deadline has passed) and `Ballot_Count` checks each ballot against its proposal: right DAO
+  coin first and is recorded after; a dissolution takes two steps — the DAO closes to new
+  proposals at once, and is archived once every other proposal has settled and been carried
+  out, what it owes for traffic is collected and what is left has gone where the vote said.
+- `Ballot` — one vote weighing the voter's units, signed by the voter, the provider and the
+  DAO's creator. The provider counts (`Proposal_Tally`, batches of two hundred; where votes may
+  change, only once the deadline has passed; the final count three minutes after the deadline,
+  so a ballot signed at the last moment still lands) and `Ballot_Count` checks each ballot against its proposal: right DAO
   and proposal, cast before the deadline, under the same rule, by a member of the time whose
   share has not changed since the proposal was made — so a share moved during a vote never
   votes twice — not counted before. The provider can delay a result, never change it.
-- `Comment` — a member's words on a proposal, signed by the author and the provider; the author
-  edits or removes it.
+- `Comment` — a member's words on a proposal, signed by the author, the provider and the
+  creator; the author edits or removes it. A member's writes are paced by the app (thirty an
+  hour), since the DAO pays for them.
 - `Meter` — the provider's statement of a DAO's account: traffic charged, and what of it the
   treasury has paid.
 
@@ -115,11 +120,18 @@ and accepts, as the treasury, whatever arrives as a transfer instruction meanwhi
 it in three ways only: what the DAO owes for traffic is collected to the provider once it adds
 up (ten coin, or weekly); a passed `Payout` is sent to its party through the token standard,
 then recorded on the ledger (the record of what was paid is also kept on disk, so a restart
-cannot pay twice); and when the DAO dissolves, what is left goes where the vote said.
+cannot pay twice; a payout whose receiver has yet to accept it shows as sent, not paid); and
+when the DAO dissolves, what is left goes where the vote said. Receivers are addresses outside
+the app — a validator wallet, an exchange — never a party registered here, which has no wallet
+to accept coin with.
 
 The trust here is the trust the DAO already places in the provider that counts its votes and
 carries out its decisions: the ledger records what was decided and what was done, and the app
-is what does it. A treasury the provider cannot touch — a party owned by signers' keys, m of n,
+is what does it. What the provider cannot do: invent a member, a ballot or a proposal (the
+creator's signature is on each), change a count (the ledger checks every ballot it is handed)
+or pass anything measured against the whole vote by leaving ballots out. What it can do: delay,
+and — where a rule is measured against the votes cast, or has a quorum — fail or flip a result
+by omitting ballots at the final count; the rule hints say so. A treasury the provider cannot touch — a party owned by signers' keys, m of n,
 with live signing sessions — was measured to work (git history at `bb62260`) and can come back
 as an option; only who signs the transfer would change.
 
@@ -329,7 +341,7 @@ idempotent by package id — so the code and the package it needs always land to
 - A package name and version can be uploaded once, and a later version under the same name must
   be a compatible upgrade (fields can only be added, and as `Optional`). A change that is not —
   a template dropped, a field made mandatory — needs a new package name, which is why the model
-  has changed name with every incompatible step and is `syncvotes-rulebook` now.
+  has changed name with every incompatible step and is `syncvotes-minutes` now.
 - A `.remote.ts` module may export nothing but remote functions — a shared constant next to
   them fails the build, which is why the batch size lives in `schemas.ts`.
 - The kit's `form.fields.value()` knows only the fields the user touched; `forms.ts` reads the
