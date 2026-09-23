@@ -9,6 +9,7 @@
 		role,
 		image = null,
 		balance = null,
+		actorPays = false,
 		share = null,
 		equal = false
 	}: {
@@ -19,8 +20,10 @@
 		openProposals: number;
 		role: 'creator' | 'member';
 		image?: string | null;
-		/** What the DAO can still spend. */
+		/** What the DAO can still spend; meaningless where each member pays. */
 		balance?: number | null;
+		/** Each member pays for what they sign: the DAO has no balance of its own. */
+		actorPays?: boolean;
 		/** The viewer's share of the vote, in percent. */
 		share?: number | null;
 		equal?: boolean;
@@ -74,7 +77,14 @@
 			</div>
 			<div class="mt-0.5 font-mono text-xs tracking-[0.14em] text-ink-dim uppercase">Open</div>
 		</div>
-		{#if balance !== null}
+		{#if actorPays}
+			<div>
+				<div class="font-mono text-[15px] font-bold">members</div>
+				<div class="mt-0.5 font-mono text-xs tracking-[0.14em] text-ink-dim uppercase">
+					Who pays
+				</div>
+			</div>
+		{:else if balance !== null}
 			<div>
 				<div class="font-mono text-[15px] font-bold {balance <= 0 ? 'text-red' : ''}">
 					{coin(balance)}
