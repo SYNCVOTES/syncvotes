@@ -330,7 +330,7 @@ export const dao = query.live(contractId, (id) =>
 	})
 );
 
-/** Public DAOs, for anyone signed in: by name or description, biggest first or newest. */
+/** Public DAOs, for anyone signed in: by name, description or id, biggest first or newest. */
 export const publicDaos = query.live(
 	v.object({
 		...paging,
@@ -347,7 +347,8 @@ export const publicDaos = query.live(
 						d.public &&
 						(!needle ||
 							d.name.toLowerCase().includes(needle) ||
-							d.description.toLowerCase().includes(needle))
+							d.description.toLowerCase().includes(needle) ||
+							d.id.startsWith(needle))
 				)
 				.map(summarise)
 				.sort((a, b) =>

@@ -42,7 +42,7 @@
 	{:else}
 		<div class="mb-6 flex flex-wrap items-center justify-between gap-3">
 			<div class="w-full max-w-sm">
-				<SearchInput bind:value={q} placeholder="Filter by name or description" />
+				<SearchInput bind:value={q} placeholder="Filter by name, description or DAO id" />
 			</div>
 			<div class="flex gap-1">
 				{#each [['members', 'Biggest'], ['newest', 'Newest']] as [value, label] (value)}
