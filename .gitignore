@@ -26,4 +26,5 @@ vite.config.ts.timestamp-*
 
 # Daml
 daml/.daml
+daml/test/.daml
 daml.js

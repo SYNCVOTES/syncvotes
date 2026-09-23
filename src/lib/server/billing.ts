@@ -250,11 +250,17 @@ export async function watchDeposits(): Promise<void> {
 }
 
 export function start(): void {
-	void deposits
-		.ensurePreapproval()
-		.catch((e) =>
-			console.warn('The provider has no transfer pre-approval:', e instanceof Error ? e.message : e)
-		);
+	const preapprove = () =>
+		deposits
+			.ensurePreapproval()
+			.catch((e) =>
+				console.warn(
+					'The provider has no transfer pre-approval:',
+					e instanceof Error ? e.message : e
+				)
+			);
+	void preapprove();
+	setInterval(() => void preapprove(), 24 * 3600 * 1000);
 	void watchDeposits();
 	setInterval(() => void watchDeposits(), 20_000);
 	setInterval(() => void flush(), 60 * 60_000);

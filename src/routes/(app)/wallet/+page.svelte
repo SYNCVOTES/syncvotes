@@ -53,7 +53,7 @@
 	<PageHeader
 		eyebrow="Your key"
 		title="Wallet"
-		description="Your key lives in this browser and signs every transaction; your party lives on this app's validator. Nothing to install, nobody holds the key but you."
+		description="Your key lives in this browser and signs every transaction; your party lives on this app's validator, which alone confirms what you sign: while it is down, nothing of yours moves. Nothing to install, nobody holds the key but you."
 	/>
 
 	<Problem message={store.problem} />

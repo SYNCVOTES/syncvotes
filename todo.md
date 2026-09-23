@@ -28,7 +28,8 @@
 - [x] real auth: Keycloak realm under /auth, RS256 everywhere, validator restarted with `-a`;
       the app's ledger user is a service account with participant-wide read/execute rights and no
       `CanActAs` on user parties. Measured: `prepare` needs read rights on the acting party
-- [ ] a client for the gRPC poller behind the WireGuard peer, if it still talks to the participant
+- [x] a client for the gRPC poller behind the WireGuard peer: nothing of this project's talks to
+      the participant that way; closed without one (2026-09-23)
 
 - [x] edit and delete DAOs and proposals (Daml 0.1.4: DAO_Update/Archive, Proposal_Update/Cancel,
       stable DAO id, admin copied into proposals); several keys per device; DAO page and footer as
@@ -70,12 +71,10 @@
       ledger, stake votes on coin locked in the wallet, a treasury owned by the admins' keys
       (m of n) with signing sessions, billing at the traffic the participant reports
       (`syncvotes-charter` 0.7.0; e2e council/stake/scale green on TestNet)
-- [ ] `BILLING_FACTOR`: measure rewards against traffic once the provider party is featured on
-      the network it runs on (it is not on TestNet), then set it below one
-- [ ] a treasury cannot be rotated in place (the network allows no second topology serial via
-      the JSON API); today the admins rebuild it and move the coin — an admin API path may
-      allow rotation later
-- [ ] the gRPC poller behind the WireGuard peer, if it still talks to the participant
+- [x] `BILLING_FACTOR` stays at one: rewards can only be measured once the provider party is
+      featured, which is a MainNet matter; the knob is there for that day (2026-09-23)
+- [x] a treasury cannot be rotated in place — moot: there is no treasury party any more
+      (2026-09-23)
 
 # 2026-09-22
 
@@ -83,7 +82,8 @@
       by memo to the provider from any wallet and credited from the provider's transaction
       history (`syncvotes-board` 0.8.0). Stake votes, locks, the m-of-n treasury and payouts
       live in git history (`bb62260`) if wanted again
-- [ ] rethink governance from how a real company works (partners, shares, decisions) — next
+- [x] rethink governance from how a real company works (partners, shares, decisions): shares
+      of the vote, settings per category, everything by vote — 0.11 through 0.17
 - [x] no admin at all: membership, name and dissolution are proposal effects, proposals cannot
       be withdrawn, the balance is anyone's to fill (`syncvotes-meeting` 0.9.0)
 - [x] a decision rule per proposal (all vs cast, majority vs percent, quorum, early settle), presets
@@ -101,8 +101,8 @@
       the meter; dissolution archives the DAO at once; no `paid.json`, no state off the ledger
       (`syncvotes-books` 0.17.0). The treasury party, payouts and the remainder are in git
       history at `9d8a00b`, audited four rounds, if a DAO ever needs to hold coin
-- [ ] a treasury the provider cannot touch (m-of-n signers by vote, live signing sessions) as an
-      option per DAO, if wanted: `bb62260` has the working pieces
+- [x] a treasury the provider cannot touch (m-of-n signers by vote) — not wanted: a DAO holds
+      no coin now; `bb62260` keeps the working pieces should that change (2026-09-23)
 - [x] the DAO's settings, set at the founding and changed only by vote: for routine and for
       sensitive proposals, the rule and the voting period; a proposer chooses what, never what it
       takes (`syncvotes-rulebook` 0.14.0, after a one-rule step `syncvotes-bylaws` 0.13.x with
@@ -123,12 +123,14 @@
       (nothing went vs. resend under the same id); the attempt number survives `sending`;
       collection keyed on what was collected before; locks left alone while their instruction
       stands. The logic audit stops here; what it left is below
-- [ ] `cf-connecting-ip` is trusted as it comes: reach the origin directly and the pacing is
-      yours to name (bind the origin to the proxy, or check the proxy's address)
-- [ ] Daml Script tests for the model's claims (decoy ballot, duplicate member, dissolve order)
-- [ ] a DAO-authority `Comment_Remove`; pace proposals as comments are paced
-- [ ] the provider's pre-approval is created for a year and renewed only once it is gone
-      (`TransferPreapproval` renewal ~20 days before expiry, per the docs)
-- [ ] `ParticipantAdmin` on the web process: move DAR upload and party allocation to a setup job
-- [ ] every user party has one confirming participant (this validator); a second validator, or
-      say so on the wallet page
+- [x] the client's address is Caddy's to work out: Cloudflare's ranges are the trusted proxies,
+      `X-Client-Ip` is what the app reads; a made-up header on a direct hit counts for nothing
+- [x] Daml Script tests (`daml/test`, run in the DAR build): decoy ballot, late ballot, second
+      ballot, invented member, doubled share change, dissolution, refused settings, moderation
+- [x] `Comment_Remove` by the DAO's authority through `DAO_RemoveComment`, run by hand with
+      `scripts/remove-comment.mjs`; proposals paced like comments (thirty writes an hour)
+- [x] the provider's pre-approval is renewed twenty days before it runs out, checked daily
+- [x] `ParticipantAdmin` on the web process stays: allocating a party at sign-up needs the same
+      right the DAR upload does, and sign-up is the web process's job; a setup job would move
+      the upload and leave the right where it is (2026-09-23)
+- [x] every user party has one confirming participant: the wallet page says so

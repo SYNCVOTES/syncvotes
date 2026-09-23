@@ -524,6 +524,7 @@ const settingsOf = (f: Record<string, unknown>, prefix: string): Settings => {
 
 export const createProposalForm = form(schemas.createProposalForm, async (f) => {
 	const party = session.required();
+	paced(party);
 	const membership = memberOnly(f.dao).contractId;
 	const d = daoOf(f.dao);
 	const pid = crypto.randomUUID();
@@ -620,15 +621,15 @@ export const prepareVote = command(
 const recentEnrols = new Map<string, number[]>();
 const ENROLS_PER_HOUR = 60;
 /** The visitor's address as the proxies in front report it, or the socket's as a last resort. */
+/**
+ * Who is asking, by address: the one the proxy in front worked out (`X-Client-Ip`, set by
+ * Caddy from Cloudflare's headers only where the request came through Cloudflare, else from
+ * the connection itself), so a header a visitor made up counts for nothing.
+ */
 function clientAddress(): string {
 	try {
 		const event = getRequestEvent();
-		const h = event.request.headers;
-		return (
-			h.get('cf-connecting-ip') ??
-			h.get('x-forwarded-for')?.split(',')[0]?.trim() ??
-			event.getClientAddress()
-		);
+		return event.request.headers.get('x-client-ip') ?? event.getClientAddress();
 	} catch {
 		return 'unknown';
 	}
@@ -646,7 +647,7 @@ function pacedEnrol(): () => void {
 	};
 }
 
-/** Writes a party made lately: a member's words cost the DAO, so a flood is refused. */
+/** Writes a party made lately: a member's words and proposals cost the DAO, so a flood is refused. */
 const recentWrites = new Map<string, number[]>();
 const WRITES_PER_HOUR = 30;
 function paced(party: string) {

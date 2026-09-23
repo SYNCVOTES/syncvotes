@@ -235,6 +235,17 @@ template DAO
     -- are handed in (the ledger checks each is this DAO's and named in the batch); those with
     -- a new number of units are reshared, those at zero leave, those without a contract join.
     -- A dissolution archives the DAO and returns nothing.
+    -- A comment taken down with the DAO's authority: the app moderates, and the ledger records
+    -- that it was this DAO's comment that went.
+    nonconsuming choice DAO_RemoveComment : ()
+      with
+        comment : ContractId Comment
+      controller provider
+      do
+        c <- fetch comment
+        assertMsg "Not this DAO's comment" (c.daoId == id && c.creator == creator)
+        exercise comment Comment_Remove
+
     choice DAO_Execute : Optional (ContractId DAO)
       with
         proposal : ContractId Proposal
@@ -552,7 +563,8 @@ template Ballot
         assertMsg "Already counted" (not counted)
         pure ()
 
--- | A member's comment on a proposal. The author edits or removes it; nobody else does.
+-- | A member's comment on a proposal. The author edits or removes it; the DAO's authority
+-- can take it down.
 template Comment
   with
     provider : Party
@@ -582,6 +594,12 @@ template Comment
 
     choice Comment_Delete : ()
       controller author
+      do pure ()
+
+    -- Removed by the DAO's own authority (creator and provider together, through the DAO):
+    -- what the app takes down, for what its members may not say.
+    choice Comment_Remove : ()
+      controller provider, creator
       do pure ()
 
 -- | How a party presents itself to the DAOs it is in.

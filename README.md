@@ -102,10 +102,18 @@ proposal carried out) are controlled by both, and neither has the other's key.
   share has not changed since the proposal was made — so a share moved during a vote never
   votes twice — not counted before. The provider can delay a result, never change it.
 - `Comment` — a member's words on a proposal, signed by the author, the provider and the
-  creator; the author edits or removes it. Comments are paced by the app (thirty writes an
-  hour per party), since the DAO pays for them.
+  creator; the author edits or removes it, and the DAO's authority can take it down
+  (`DAO_RemoveComment`, run by hand: `scripts/remove-comment.mjs`). Comments and proposals
+  are paced by the app (thirty writes an hour per party), since the DAO pays for them.
 - `Meter` — the provider's statement of a DAO's account: what was paid in for it, and what
   its traffic has cost.
+
+The model's claims are checked in Daml Script (`daml/test/daml/Test.daml`, run by `dpm test`
+in the DAR build stage, so a failing claim fails the build): a decoy ballot naming another
+deadline is refused at the count, as is one cast after the deadline or a second one where
+votes cannot change; nobody creates a member alone; a share change names each party once;
+a dissolution archives the DAO and nothing is proposed on it after; settings the ledger
+refuses; a comment only its author edits and only the DAO's authority takes down.
 
 ### The balance
 
@@ -298,6 +306,11 @@ into `build/`.
 
 Caddy's config is inline in `compose.yaml` (a compose `configs` entry with `content:`) rather than
 bind-mounted — a host path would be resolved on the server, where this tree does not exist.
+The site sits behind Cloudflare, and Caddy is what works the visitor's address out: Cloudflare's
+published ranges are its trusted proxies, so a request that came through Cloudflare is known by
+the address in Cloudflare's header and one that reached the origin directly by the connection
+itself; the app reads only the `X-Client-Ip` Caddy sets (sign-ups are paced by it), so a header a
+visitor made up counts for nothing.
 
 Building on the server is deliberate: it is amd64, the laptop is not, and the layer cache is there.
 

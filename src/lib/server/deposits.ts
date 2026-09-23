@@ -27,16 +27,25 @@ const MEMO = /^syncvotes:([0-9a-f-]{36})$/;
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
+/** How long before a pre-approval runs out a fresh one is made, as the docs advise. */
+const RENEW_BEFORE = 20 * 24 * 3600 * 1000;
+
 /**
- * The provider's transfer pre-approval, created once (it runs a year; a fresh one is created
- * when none stands) and paid by the provider itself.
+ * The provider's transfer pre-approval, created when none stands and again when the standing
+ * one has less than twenty days to run (it runs a year), paid by the provider itself.
  */
 export async function ensurePreapproval(): Promise<void> {
 	const standing = await activeContracts(providerParty(), [PREAPPROVAL]);
 	const mine = standing.filter(
 		(c) => (c.createArgument as { receiver?: string }).receiver === providerParty()
 	);
-	if (mine.length > 0) return;
+	const latest = Math.max(
+		0,
+		...mine.map((c) =>
+			new Date((c.createArgument as { expiresAt?: string }).expiresAt ?? 0).getTime()
+		)
+	);
+	if (latest > Date.now() + RENEW_BEFORE) return;
 	const [rules, round] = await Promise.all([splice.amuletRules(), splice.openRound()]);
 	const inputs = await activeContracts(providerParty(), [AMULET]);
 	if (inputs.length === 0) throw new Error('The provider holds no coin');
