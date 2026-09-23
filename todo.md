@@ -108,7 +108,15 @@
       cross-checks; Fraction thresholds; two-step dissolution; backoff and "stuck" reasons; final
       count after a grace; refused ballots isolated; collection meter-first; paced comments;
       payouts only to addresses outside the app (`syncvotes-minutes` 0.15.0)
-- [ ] audit rounds 2+ until nothing is found
+- [x] audit round 2 (`tmp/audit-2.md`) → ballot on record only, one step of dissolution at a time,
+      counts that wait out the network, payouts taken back by instruction, receivers outside the
+      app and known to the network (`syncvotes-register` 0.16.0)
+- [x] audit round 3 (`tmp/audit-3.md`) → one command id per payment (duplicates count as sent),
+      remainder waits to land, write-offs against balance, sign-up paced per visitor, failed
+      share changes unblock their parties
+- [ ] audit round 4: confirm the money-moving paths, then stop the logic audit
+- [ ] Daml Script tests for the model's claims (decoy ballot, duplicate member, dissolve order)
+- [ ] a DAO-authority `Comment_Remove`; pace proposals as comments are paced
 - [ ] a treasury pre-approval is created once for a year and never renewed (`TransferPreapproval`
       renewal ~20 days before expiry, per the docs)
 - [ ] `ParticipantAdmin` on the web process: move DAR upload and party allocation to a setup job
