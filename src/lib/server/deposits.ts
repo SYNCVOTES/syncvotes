@@ -107,28 +107,34 @@ export type Deposit = {
 	from: string;
 	updateId: string;
 	offset: number;
+	recordTime: string;
 };
 
 /**
- * Coin that arrived at the provider after `afterOffset`, carrying a DAO's memo: the token
- * standard's view of the provider's transactions, filtered to transfers in. Everything else
- * that lands (fees, rewards, unmarked coin) is the provider's own. Resolves with what was
- * found and the offset to read from next time.
+ * Coin that arrived at the provider in this window of offsets, carrying a DAO's memo: the
+ * token standard's view of the provider's transactions, filtered to transfers in. Everything
+ * else that lands (fees, rewards, unmarked coin) is the provider's own. The participant lists
+ * at most two hundred transactions per call, so a window that holds more comes back as
+ * `null` for the caller to split.
  */
 export async function deposits(
-	afterOffset?: number
-): Promise<{ found: Deposit[]; nextOffset: number }> {
-	const ledger = (await sdk()).ledger;
-	const beforeOffset = await ledger.ledgerEnd();
-	const page = await (
-		await sdk()
-	).token.holdings({
-		partyId: providerParty(),
-		afterOffset,
-		beforeOffset
-	});
+	afterOffset: number,
+	beforeOffset: number
+): Promise<{ found: Deposit[]; oldest: string | null } | null> {
+	let page;
+	try {
+		page = await (
+			await sdk()
+		).token.holdings({ partyId: providerParty(), afterOffset, beforeOffset });
+	} catch (e) {
+		const text = e instanceof Error ? e.message : JSON.stringify(e);
+		if (/MAXIMUM_LIST_ELEMENTS/.test(text)) return null;
+		throw e;
+	}
 	const found: Deposit[] = [];
+	let oldest: string | null = null;
 	for (const tx of page.transactions) {
+		if (!oldest || tx.recordTime < oldest) oldest = tx.recordTime;
 		for (const e of tx.events) {
 			if (e.label.type !== 'TransferIn') continue;
 			const daoId = e.label.reason?.match(MEMO)?.[1];
@@ -140,10 +146,11 @@ export async function deposits(
 					amount,
 					from: e.label.sender,
 					updateId: tx.updateId,
-					offset: tx.offset
+					offset: tx.offset,
+					recordTime: tx.recordTime
 				});
 			}
 		}
 	}
-	return { found, nextOffset: beforeOffset };
+	return { found, oldest };
 }
