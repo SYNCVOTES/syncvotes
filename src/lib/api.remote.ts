@@ -332,7 +332,7 @@ const proposalReader = (p: ledger.Proposal): ledger.Member | null => {
 
 /** Whether this member may cast a ballot now: none cast, or one that may still be replaced. */
 /** Signing takes a moment; a ballot prepared this close to the deadline could land after it. */
-export const SIGNING_MARGIN = 90_000;
+const SIGNING_MARGIN = 90_000;
 const mayVote = (p: ledger.Proposal, m: ledger.Member | null) => {
 	if (!m || p.outcome) return false;
 	if (ledger.time(p.closesAt) - Date.now() < SIGNING_MARGIN) return false;
