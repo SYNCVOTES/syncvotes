@@ -12,7 +12,8 @@
 	>
 	<span
 		>Daml-native governance · <a href={github} target="_blank" rel="noopener">GitHub</a> ·
-		<a href="/version">build</a></span
+		<a href="/version">build</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> ·
+		<a href="/brand">Brand</a></span
 	>
 	<span>© {new Date().getFullYear()}</span>
 </footer>
