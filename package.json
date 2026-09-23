@@ -11,7 +11,10 @@
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"lint": "prettier --check . && eslint .",
 		"format": "prettier --write .",
-		"daml:codegen": "cd daml && rm -rf .daml/dist && dpm build && cd .. && rm -rf daml.js && dpm codegen-js daml/.daml/dist/*.dar -o daml.js",
+		"daml:codegen": "cd daml && rm -rf .daml/dist && dpm build && cd .. && rm -rf daml.js && dpm codegen-js daml/.daml/dist/*.dar -o daml.js"
+	},
+	"dependencies": {
+		"@canton-network/wallet-sdk": "^1.5.0",
 		"@daml.js/model": "workspace:@daml.js/syncvotes-options-0.21.0@*",
 		"@daml/types": "3.5.2",
 		"dompurify": "^3.4.15",
