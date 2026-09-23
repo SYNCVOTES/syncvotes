@@ -59,7 +59,7 @@
 					value: 'shares',
 					title: 'Members',
 					text: 'Who is in the DAO: parties join or leave.',
-					more: 'Adds or removes members; every member has one vote. Only the parties you add or remove are put to the vote, everyone else stays as is. A member removed loses their vote the moment this is carried out; on proposals that were already open, their ballot no longer counts.',
+					more: "Adds or removes members; every member has one vote. Only the parties you add or remove are put to the vote, everyone else stays as is. A member removed has no vote from the moment this is carried out; a ballot they cast before on a proposal that was already open still counts, since that vote's electorate was fixed when it opened.",
 					icon: Users
 				}
 			: {
@@ -80,7 +80,7 @@
 			value: 'payout',
 			title: 'Payout',
 			text: 'Coin from the treasury to a party.',
-			more: "Sends Canton Coin from the DAO's treasury to a party, a member or anyone else on the network. Paid the moment the vote passes if the treasury can cover it, otherwise the moment it can. Where the party accepts transfers automatically the coin lands at once; otherwise they accept it in their wallet.",
+			more: "Sends Canton Coin from the DAO's treasury to a party, a member or anyone else on the network. Paid the moment the vote passes if the treasury can cover it, otherwise the moment it can. Where the party accepts transfers automatically the coin lands at once; a SyncVotes member accepts it on their Wallet page, with their key.",
 			icon: Coins
 		},
 		{
@@ -94,10 +94,16 @@
 			value: 'dissolve',
 			title: 'Dissolve',
 			text: 'The DAO is wound up for good.',
-			more: 'Winds the DAO up for good. Carried out only once every other open proposal has settled; then whatever the treasury holds goes to the party you name and the DAO is archived. Its record stays readable; nothing can be proposed again.',
+			more: 'Winds the DAO up for good. Once it passes nothing new can be proposed; when every other proposal has settled and been carried out, what is owed for traffic is collected, whatever the treasury still holds goes to the party you name, and the DAO is archived. Its record stays readable.',
 			icon: Power
 		}
-	] as const);
+	] as const satisfies readonly {
+		value: Kind;
+		title: string;
+		text: string;
+		more: string;
+		icon: unknown;
+	}[]);
 
 	// What is there today, to start from.
 	let newName = $state('');
@@ -111,7 +117,6 @@
 		newName = d.name;
 		newDescription = d.description;
 		newImage = d.image ?? '';
-		remainderTo = [d.creator];
 	});
 	let payoutTo = $state<string[]>([]);
 	let payoutAmount = $state<number | undefined>(undefined);
@@ -135,7 +140,7 @@
 	let newSensitive = $state<Settings>({
 		rule: {
 			basis: 'all',
-			threshold: { kind: 'percent', percent: 67 },
+			threshold: { kind: 'fraction', num: 2, den: 3 },
 			quorum: 0,
 			early: true,
 			changeable: false
@@ -307,7 +312,9 @@
 				threshold:
 					at('Threshold') === 'percent'
 						? { kind: 'percent', percent: Number(at('Percent')) }
-						: { kind: 'majority' },
+						: at('Threshold') === 'fraction'
+							? { kind: 'fraction', num: Number(at('Num')), den: Number(at('Den')) }
+							: { kind: 'majority' },
 				quorum: Number(at('Quorum')),
 				early: at('Early') === 'yes',
 				changeable: at('Changeable') === 'yes'
@@ -338,7 +345,7 @@
 	<PageHeader
 		eyebrow="New proposal"
 		title="Propose"
-		description="Every member votes with their share. You choose what passing takes; the ledger counts by that rule, and what the proposal does when it passes, the ledger does."
+		description="Every member votes with their share. The DAO's settings decide what passing takes and how long the vote runs; you choose what the proposal does, and the ledger does it once it passes."
 	/>
 
 	{#if store.screen.at === 'loading'}

@@ -1,6 +1,7 @@
 <script lang="ts">
-	import { flow, describe, transient } from '$lib/wallet-store.svelte';
+	import { flow, describe, transient, store } from '$lib/wallet-store.svelte';
 	import Problem from './problem.svelte';
+	import PartyId from './party-id.svelte';
 
 	/**
 	 * What a page shows when a live query failed. A lost read session (401) while the key is
@@ -36,6 +37,14 @@
 		<span class="size-2 animate-pulse rounded-full bg-amber"></span>
 		{transient(error) ? 'The app is being updated; reconnecting…' : 'Reconnecting…'}
 	</p>
+{:else if (error as { status?: number })?.status === 403 && store.who}
+	<div class="space-y-3">
+		<Problem message={describe(error)} />
+		<p class="text-[13px] text-ink-mid">
+			To be admitted, give a member your party id and ask them to propose it:
+			<span class="inline-block"><PartyId party={store.who.party} /></span>
+		</p>
+	</div>
 {:else}
 	<Problem message={describe(error)} />
 {/if}

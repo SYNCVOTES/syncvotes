@@ -93,7 +93,13 @@ export const shareChanges = v.pipe(
 
 /** A category's settings, field by field, under a prefix: `routineBasis`, `routineDays`… */
 const basisField = v.picklist(['all', 'cast']);
-const thresholdField = v.picklist(['majority', 'percent']);
+const thresholdField = v.picklist(['majority', 'percent', 'fraction']);
+const fractionField = v.pipe(
+	v.optional(v.number('A whole number'), 2),
+	v.integer('A whole number'),
+	v.minValue(1, 'At least 1'),
+	v.maxValue(100, 'At most 100')
+);
 const percentField = v.pipe(
 	v.optional(v.number('A percentage'), 67),
 	v.integer('Whole percent'),
@@ -110,6 +116,8 @@ const routineFields = {
 	routineBasis: basisField,
 	routineThreshold: thresholdField,
 	routinePercent: percentField,
+	routineNum: fractionField,
+	routineDen: fractionField,
 	routineQuorum: quorumField,
 	routineEarly: yesNo,
 	routineChangeable: yesNo,
@@ -119,6 +127,8 @@ const sensitiveFields = {
 	sensitiveBasis: basisField,
 	sensitiveThreshold: thresholdField,
 	sensitivePercent: percentField,
+	sensitiveNum: fractionField,
+	sensitiveDen: fractionField,
 	sensitiveQuorum: quorumField,
 	sensitiveEarly: yesNo,
 	sensitiveChangeable: yesNo,
@@ -128,6 +138,8 @@ const newRoutineFields = {
 	newRoutineBasis: v.optional(basisField, 'all'),
 	newRoutineThreshold: v.optional(thresholdField, 'majority'),
 	newRoutinePercent: percentField,
+	newRoutineNum: fractionField,
+	newRoutineDen: fractionField,
 	newRoutineQuorum: quorumField,
 	newRoutineEarly: v.optional(yesNo, 'yes'),
 	newRoutineChangeable: v.optional(yesNo, 'no'),
@@ -135,14 +147,17 @@ const newRoutineFields = {
 };
 const newSensitiveFields = {
 	newSensitiveBasis: v.optional(basisField, 'all'),
-	newSensitiveThreshold: v.optional(thresholdField, 'percent'),
+	newSensitiveThreshold: v.optional(thresholdField, 'fraction'),
 	newSensitivePercent: percentField,
+	newSensitiveNum: fractionField,
+	newSensitiveDen: fractionField,
 	newSensitiveQuorum: quorumField,
 	newSensitiveEarly: v.optional(yesNo, 'yes'),
 	newSensitiveChangeable: v.optional(yesNo, 'no'),
 	newSensitiveDays: v.optional(votingDays, 14)
 };
 const EXCLUSIVE = 'Votes that may change cannot settle early';
+const FRACTION = 'A fraction is at most one';
 
 export const createDaoForm = v.pipe(
 	v.object({
@@ -159,8 +174,19 @@ export const createDaoForm = v.pipe(
 		['routineChangeable']
 	),
 	v.forward(
+		v.check((f) => f.routineThreshold !== 'fraction' || f.routineNum <= f.routineDen, FRACTION),
+		['routineNum']
+	),
+	v.forward(
 		v.check((f) => !(f.sensitiveEarly === 'yes' && f.sensitiveChangeable === 'yes'), EXCLUSIVE),
 		['sensitiveChangeable']
+	),
+	v.forward(
+		v.check(
+			(f) => f.sensitiveThreshold !== 'fraction' || f.sensitiveNum <= f.sensitiveDen,
+			FRACTION
+		),
+		['sensitiveNum']
 	),
 	v.forward(
 		v.check((f) => f.shares.every((r) => r.share > 0), 'Every founding member holds a share'),
@@ -238,7 +264,11 @@ export const createProposalForm = v.pipe(
 		['newDescription']
 	),
 	v.forward(
-		v.check((f) => f.kind !== 'payout' || f.payoutTo.includes('::'), 'A party id to pay'),
+		v.check(
+			(f) =>
+				f.kind !== 'payout' || /^[A-Za-z0-9_-]{1,255}::1220[0-9a-f]{64}$/.test(f.payoutTo.trim()),
+			'A full party id: hint::1220 and 64 hex characters'
+		),
 		['payoutTo']
 	),
 	v.forward(
@@ -250,8 +280,10 @@ export const createProposalForm = v.pipe(
 	),
 	v.forward(
 		v.check(
-			(f) => f.kind !== 'dissolve' || f.remainderTo.includes('::'),
-			'A party id to receive what is left'
+			(f) =>
+				f.kind !== 'dissolve' ||
+				/^[A-Za-z0-9_-]{1,255}::1220[0-9a-f]{64}$/.test(f.remainderTo.trim()),
+			'A full party id to receive what is left'
 		),
 		['remainderTo']
 	),
@@ -261,10 +293,24 @@ export const createProposalForm = v.pipe(
 	),
 	v.forward(
 		v.check(
+			(f) => f.newRoutineThreshold !== 'fraction' || f.newRoutineNum <= f.newRoutineDen,
+			FRACTION
+		),
+		['newRoutineNum']
+	),
+	v.forward(
+		v.check(
 			(f) => !(f.newSensitiveEarly === 'yes' && f.newSensitiveChangeable === 'yes'),
 			EXCLUSIVE
 		),
 		['newSensitiveChangeable']
+	),
+	v.forward(
+		v.check(
+			(f) => f.newSensitiveThreshold !== 'fraction' || f.newSensitiveNum <= f.newSensitiveDen,
+			FRACTION
+		),
+		['newSensitiveNum']
 	)
 );
 

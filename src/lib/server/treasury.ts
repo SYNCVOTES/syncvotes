@@ -190,33 +190,74 @@ export async function transferAll(treasury: string, to: string, memo: string): P
 	throw last ?? error(400, 'The treasury holds nothing to move');
 }
 
-/** Coin sent to the treasury that waits for its acceptance: accepted, as the treasury. */
-export async function acceptIncoming(treasury: string): Promise<number> {
+type Instruction = { receiver: string; sender: string; amount: number };
+const view = (p: { interfaceViewValue: { transfer?: unknown } }): Instruction => {
+	const t = (p.interfaceViewValue.transfer ?? {}) as {
+		receiver?: string;
+		sender?: string;
+		amount?: string;
+	};
+	return { receiver: t.receiver ?? '', sender: t.sender ?? '', amount: Number(t.amount ?? 0) };
+};
+
+/** Transfers the treasury sent that still wait for their receiver; read with `acceptIncoming`. */
+const outgoingCache = new Map<string, Instruction[]>();
+export const outgoing = (treasury: string): Instruction[] => outgoingCache.get(treasury) ?? [];
+
+/**
+ * Coin sent to the treasury that waits for its acceptance: accepted, as the treasury. What
+ * the treasury itself sent and still waits for is remembered for the pages. Resolves with the
+ * transactions of the acceptances, for the DAO to be charged.
+ */
+export async function acceptIncoming(treasury: string): Promise<string[]> {
 	const token = (await sdk()).token;
-	// What waits for the treasury's word: coin sent to it. A payout it sent, waiting for the
-	// receiver, is listed too and is not its to accept.
-	const pending = (await token.transfer.pending(treasury)).filter(
-		(p) =>
-			(p.interfaceViewValue.transfer as { receiver?: string } | undefined)?.receiver === treasury
+	const all = (await token.transfer.pending(treasury)).map((p) => ({
+		cid: p.contractId,
+		...view(p)
+	}));
+	outgoingCache.set(
+		treasury,
+		all.filter((p) => p.sender === treasury && p.receiver !== treasury)
 	);
-	let accepted = 0;
+	const pending = all.filter((p) => p.receiver === treasury);
+	const accepted: string[] = [];
 	for (const p of pending) {
 		try {
 			const [command, disclosed] = await token.transfer.accept({
-				transferInstructionCid: p.contractId,
+				transferInstructionCid: p.cid,
 				registryUrl: splice.scanUrl()
 			});
-			await submitAs(
-				[treasury],
-				[command] as Commands,
-				`accept-${p.contractId.slice(0, 16)}`,
-				disclosed as DisclosedContract[]
+			accepted.push(
+				await submitAs(
+					[treasury],
+					[command] as Commands,
+					`accept-${p.cid.slice(0, 16)}`,
+					disclosed as DisclosedContract[]
+				)
 			);
-			accepted++;
 		} catch (e) {
 			console.warn(`Transfer to ${treasury.slice(0, 20)} not accepted:`, message(e));
 		}
 	}
-	if (accepted) forget(treasury);
+	if (accepted.length) forget(treasury);
 	return accepted;
+}
+
+/** Coin a party holds that waits for its acceptance, and what the party holds already. */
+export async function incoming(party: string) {
+	const token = (await sdk()).token;
+	const pending = (await token.transfer.pending(party))
+		.map((p) => ({ cid: p.contractId, ...view(p) }))
+		.filter((p) => p.receiver === party);
+	return { pending, held: await holdings(party, true) };
+}
+
+/** The command a party signs to accept a transfer sent to it, with what it discloses. */
+export async function acceptCommand(cid: string) {
+	const token = (await sdk()).token;
+	const [command, disclosed] = await token.transfer.accept({
+		transferInstructionCid: cid,
+		registryUrl: splice.scanUrl()
+	});
+	return { command, disclosed: disclosed as DisclosedContract[] };
 }

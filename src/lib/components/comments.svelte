@@ -90,7 +90,7 @@
 							<span class="text-ink-dim"
 								>{relative(c.createdAt)}{c.editedAt ? ' · edited' : ''}</span
 							>
-							{#if c.mine && !c.editedAt && editing !== c.contractId}
+							{#if c.mine && editing !== c.contractId}
 								<span class="ml-auto flex items-center gap-1">
 									<button
 										type="button"
@@ -103,17 +103,6 @@
 											draft = c.body;
 										}}><Pencil size={12} /></button
 									>
-									<button
-										type="button"
-										class="p-1 text-ink-dim hover:text-red"
-										title="Delete"
-										aria-label="Delete"
-										disabled={store.busy}
-										onclick={() => remove(c.contractId)}><Trash size={12} /></button
-									>
-								</span>
-							{:else if c.mine && editing !== c.contractId}
-								<span class="ml-auto">
 									<button
 										type="button"
 										class="p-1 text-ink-dim hover:text-red"
@@ -179,7 +168,7 @@
 						{store.busy ? 'Signing…' : 'Comment'}
 					</Button>
 					<span class="font-mono text-[0.6875rem] text-ink-dim"
-						>Signed with your key; the DAO pays the traffic.</span
+						>Signed with your key; the DAO pays the traffic, about 0.2 CC a comment.</span
 					>
 				</div>
 			</form>

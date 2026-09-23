@@ -43,8 +43,8 @@
 			eyebrow="Membership"
 			title="Members"
 			description={d.equal
-				? `${fmt(d.members)} ${d.members === 1 ? 'party holds' : 'parties hold'} this DAO's vote, one vote each. Who is in changes by vote.`
-				: `${fmt(d.members)} ${d.members === 1 ? 'party holds' : 'parties hold'} this DAO's vote, in ${fmt(d.units)} units. Who holds what changes by vote.`}
+				? `${fmt(d.members)} ${d.members === 1 ? 'member holds' : 'members hold'} this DAO's vote${d.members === 1 ? '' : ', one vote each'}. Who is in changes by vote.`
+				: `${fmt(d.members)} ${d.members === 1 ? 'member holds' : 'members hold'} this DAO's vote, in ${fmt(d.units)} units. Who holds what changes by vote.`}
 		/>
 
 		<div class="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -62,14 +62,16 @@
 		{:else}
 			<List>
 				{#each members.current.items as m (m.party)}
-					<ListItem class="flex items-center gap-3 font-mono text-xs">
-						<Who who={m.who} me={m.party === me} size="md" class="min-w-0 flex-1" />
-						<span class="hidden text-ink-dim sm:inline">since {dateOf(m.since)}</span>
-						{#if !d.equal}
-							<span class="w-20 text-right text-ink-dim">{fmt(m.share)} units</span>
-							<span class="w-16 text-right text-ink">{pct(m.share, d.units)}%</span>
-						{/if}
-						{#if m.party === d.creator}<RoleTag role="creator" />{/if}
+					<ListItem class="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs">
+						<Who who={m.who} me={m.party === me} size="md" class="min-w-0 flex-1 basis-60" />
+						<span class="flex shrink-0 items-center gap-3">
+							<span class="text-ink-dim">since {dateOf(m.since)}</span>
+							{#if !d.equal}
+								<span class="text-ink-dim">{fmt(m.share)} units</span>
+								<span class="w-14 text-right text-ink">{pct(m.share, d.units)}%</span>
+							{/if}
+							{#if m.party === d.creator}<RoleTag role="creator" />{/if}
+						</span>
 					</ListItem>
 				{/each}
 			</List>

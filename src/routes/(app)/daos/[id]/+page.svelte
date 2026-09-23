@@ -23,7 +23,8 @@
 	import ShareBar from '$lib/components/share-bar.svelte';
 	import Markdown from '$lib/components/markdown.svelte';
 	import Note from '$lib/components/note.svelte';
-	import { short } from '$lib/rules';
+	import { categoryOf } from '$lib/rules';
+	import Hint from '$lib/components/hint.svelte';
 	import SettingsSummary from '$lib/components/settings-summary.svelte';
 	import Problem from '$lib/components/problem.svelte';
 	import TreasuryPanel from '$lib/components/treasury-panel.svelte';
@@ -74,7 +75,11 @@
 					<h1 class="display text-3xl md:text-4xl">{d.name}</h1>
 					<div class="mt-3 flex flex-wrap items-center gap-2">
 						<Badge variant="accent">Private</Badge>
+						<Hint
+							text="Only its members and the app see this DAO, its proposals, votes and comments; nothing about it is public on the network."
+						/>
 						<Badge>{d.equal ? 'By membership' : 'By shares'}</Badge>
+						{#if d.dissolving}<Badge variant="red">Dissolving</Badge>{/if}
 						{#if d.me.creator}<Badge variant="amber">You created it</Badge>{:else}<Badge
 								variant="green">Member</Badge
 							>{/if}
@@ -82,8 +87,19 @@
 				</div>
 			</div>
 			<div class="flex shrink-0 items-center gap-2">
-				<Button href="/daos/{d.id}/proposals/create"><Plus strokeWidth={2.5} /> New proposal</Button
-				>
+				{#if d.dissolving}
+					<span class="font-mono text-xs text-ink-dim"
+						>Being dissolved; nothing new is proposed.</span
+					>
+				{:else if d.balance <= 0}
+					<span class="max-w-[16rem] text-right font-mono text-xs text-red"
+						>Nothing can be signed for this DAO until someone pays in.</span
+					>
+				{:else}
+					<Button href="/daos/{d.id}/proposals/create"
+						><Plus strokeWidth={2.5} /> New proposal</Button
+					>
+				{/if}
 			</div>
 		</div>
 
@@ -158,11 +174,13 @@
 									</div>
 									<div class="mt-2 flex flex-wrap items-center gap-1.5">
 										<span class={tag}><EffectLabel effect={p.effect} equal={d.equal} /></span>
-										<span class={tag}>{short(p.rule)}</span>
-										<span class={tag}>{pct(p.yes + p.no + p.abstain, p.eligible)}% counted</span>
+										<span class={tag}>{categoryOf(p.effect.kind)}</span>
 										<span class={tag}
-											>{p.outcome ? 'closed' : `closes ${relative(p.closesAt)}`}</span
+											>{p.yes + p.no + p.abstain === 0
+												? 'no votes yet'
+												: `${pct(p.yes + p.no + p.abstain, p.eligible)}% voted`}</span
 										>
+										{#if !p.outcome}<span class={tag}>closes {relative(p.closesAt)}</span>{/if}
 									</div>
 								</div>
 								<StatusBadge outcome={p.outcome} closesAt={p.closesAt} executedAt={p.executedAt} />

@@ -8,7 +8,8 @@
 		standing,
 		type Preset,
 		type Rule,
-		type Settings
+		type Settings,
+		fractionWords
 	} from '$lib/rules';
 	import { fmt } from '$lib/format';
 
@@ -37,6 +38,8 @@
 		if (found) set({ basis: found.basis, threshold: { ...found.threshold }, quorum: found.quorum });
 	};
 	const percent = $derived(rule.threshold.kind === 'percent' ? rule.threshold.percent : 67);
+	const num = $derived(rule.threshold.kind === 'fraction' ? rule.threshold.num : 2);
+	const den = $derived(rule.threshold.kind === 'fraction' ? rule.threshold.den : 3);
 	const unit = (n: number) => (equal ? (n === 1 ? 'member' : 'members') : 'units');
 	const here = $derived.by(() => {
 		if (eligible <= 0) return '';
@@ -47,15 +50,22 @@
 				: '';
 		if (rule.basis === 'all')
 			return `Here: ${fmt(standing(rule, 0, 0, 0, eligible).needed)} of ${of} must say yes.${quorum}`;
-		return `Here: ${rule.threshold.kind === 'majority' ? 'more yes than no' : `at least ${rule.threshold.percent}% yes`} among those who vote.${quorum}`;
+		const t = rule.threshold;
+		const need =
+			t.kind === 'majority'
+				? 'more yes than no'
+				: t.kind === 'percent'
+					? `at least ${t.percent}% yes`
+					: `at least ${fractionWords(t.num, t.den)} yes`;
+		return `Here: ${need} among those who vote.${quorum}`;
 	});
 	const help = {
 		preset:
-			'A starting point for the three dials below. Majority of the vote: more than half of everyone who could vote. Majority of votes cast: more yes than no among those who vote, a quarter taking part. Two thirds and unanimous: of the whole vote. Move any dial and it becomes custom.',
+			'A starting point for the three settings below. Majority of the vote: more than half of everyone who could vote. Majority of votes cast: more yes than no among those who vote, a quarter taking part. Two thirds and unanimous: of the whole vote. Change any setting and it reads custom.',
 		basis:
-			'The whole vote: everyone who could vote is the denominator, so a member who stays silent counts as a no. The votes cast: only the yes and no actually cast count, so a few voters can decide unless a quorum says how many must take part.',
+			'The whole vote: yes is compared with everyone who could vote, so a member who stays silent counts as a no. The votes cast: yes is compared with the yes and no actually cast, so a few voters can decide unless a quorum says how many must take part.',
 		threshold:
-			'More than half: strictly over 50% of the denominator; 50 of 100 is not enough, 51 is. A percentage: at least that share of the denominator; 100% means everyone.',
+			'More than half: strictly over 50% of what yes is compared with; 50 of 100 is not enough, 51 is. A fraction, say two thirds: at least that much, rounded up — two of three. A percentage: at least that share; 100% means everyone.',
 		quorum:
 			'How much of the whole vote must take part, yes, no or abstain, for the result to count at all. Below it the proposal fails at the deadline whatever the yes count. 0 means no minimum. Matters most with "the votes cast".',
 		early:
@@ -73,6 +83,8 @@
 <input type="hidden" name="{prefix}Basis" value={rule.basis} />
 <input type="hidden" name="{prefix}Threshold" value={rule.threshold.kind} />
 <input type="hidden" name="n:{prefix}Percent" value={percent} />
+<input type="hidden" name="n:{prefix}Num" value={num} />
+<input type="hidden" name="n:{prefix}Den" value={den} />
 <input type="hidden" name="n:{prefix}Quorum" value={rule.quorum} />
 <input type="hidden" name="{prefix}Early" value={rule.early ? 'yes' : 'no'} />
 <input type="hidden" name="{prefix}Changeable" value={rule.changeable ? 'yes' : 'no'} />
@@ -80,7 +92,7 @@
 
 <div class="divide-y divide-border border border-border">
 	<div class="{row} px-4 py-3">
-		<span class={label}>Start from <Hint text={help.preset} /></span>
+		<span class={label}>Preset <Hint text={help.preset} /></span>
 		<select
 			class={select}
 			value={preset}
@@ -98,8 +110,8 @@
 			onchange={(e) =>
 				set({ basis: (e.currentTarget as HTMLSelectElement).value as Rule['basis'] })}
 		>
-			<option value="all">the whole vote (silence counts as no)</option>
-			<option value="cast">the votes cast (yes and no only)</option>
+			<option value="all">the whole vote</option>
+			<option value="cast">the votes cast</option>
 		</select>
 	</div>
 	<div class="{row} px-4 py-3">
@@ -108,16 +120,21 @@
 			<select
 				class={select}
 				value={rule.threshold.kind}
-				onchange={(e) =>
+				onchange={(e) => {
+					const kind = (e.currentTarget as HTMLSelectElement).value;
 					set({
 						threshold:
-							(e.currentTarget as HTMLSelectElement).value === 'percent'
+							kind === 'percent'
 								? { kind: 'percent', percent }
-								: { kind: 'majority' }
-					})}
+								: kind === 'fraction'
+									? { kind: 'fraction', num, den }
+									: { kind: 'majority' }
+					});
+				}}
 			>
 				<option value="majority">more than half</option>
-				<option value="percent">at least</option>
+				<option value="fraction">at least a fraction</option>
+				<option value="percent">at least a percentage</option>
 			</select>
 			{#if rule.threshold.kind === 'percent'}
 				<Input
@@ -136,6 +153,40 @@
 						})}
 				/>
 				<span class="font-mono text-xs text-ink-dim">%</span>
+			{:else if rule.threshold.kind === 'fraction'}
+				<Input
+					type="number"
+					min={1}
+					max={100}
+					class="w-16 text-right"
+					aria-label="Fraction, numerator"
+					value={rule.threshold.num}
+					oninput={(e) =>
+						set({
+							threshold: {
+								kind: 'fraction',
+								num: Number((e.currentTarget as HTMLInputElement).value) || 1,
+								den
+							}
+						})}
+				/>
+				<span class="font-mono text-xs text-ink-dim">/</span>
+				<Input
+					type="number"
+					min={1}
+					max={100}
+					class="w-16 text-right"
+					aria-label="Fraction, denominator"
+					value={rule.threshold.den}
+					oninput={(e) =>
+						set({
+							threshold: {
+								kind: 'fraction',
+								num,
+								den: Number((e.currentTarget as HTMLInputElement).value) || 1
+							}
+						})}
+				/>
 			{/if}
 		</div>
 	</div>

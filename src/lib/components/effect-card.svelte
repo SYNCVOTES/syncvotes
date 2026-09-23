@@ -24,7 +24,8 @@
 		executedAt,
 		equal = false,
 		current,
-		paid = null
+		paid = null,
+		awaiting = false
 	}: {
 		effect: Effect;
 		executed: number;
@@ -34,6 +35,8 @@
 		current: { party: string; share: number }[];
 		/** The transaction that paid a payout or the remainder, once it went out. */
 		paid?: string | null;
+		/** The payout went out and waits for the receiver to accept it. */
+		awaiting?: boolean;
 	} = $props();
 	const title = $derived.by(() => {
 		switch (effect.kind) {
@@ -124,9 +127,12 @@
 				treasury to <PartyId party={effect.to} class="align-middle" />
 			</p>
 			{#if effect.reason}<Markdown text={effect.reason} />{/if}
-			{#if paid}<p class="font-mono text-xs text-green">
-					Paid: transaction {paid.slice(0, 16)}…
-				</p>{:else if executedAt}<p class="font-mono text-xs text-green">Paid.</p>{/if}
+			{#if awaiting}
+				<p class="font-mono text-xs text-amber">
+					Sent; waiting for the receiver to accept it (a SyncVotes member does so on their Wallet
+					page). Unaccepted, it returns to the treasury.
+				</p>
+			{:else if paid || executedAt}<p class="font-mono text-xs text-green">Paid.</p>{/if}
 		</div>
 	{:else if effect.kind === 'dissolve'}
 		<p class="flex flex-wrap items-center gap-x-2 text-[13px] text-ink-mid">

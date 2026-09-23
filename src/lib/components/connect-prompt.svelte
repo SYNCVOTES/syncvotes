@@ -19,7 +19,7 @@
 		{locked ? 'Your wallet is locked' : 'Connect your wallet'}
 	</p>
 	<p class="text-[13px] text-ink-dim">
-		This page is derived from your on-chain party.<br />
+		This page shows what your party can see.<br />
 		{locked ? `Unlock it to ${what}.` : `Create or restore a key to ${what}.`}
 	</p>
 	{#if locked}

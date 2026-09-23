@@ -15,6 +15,7 @@
 	import Phrase from '$lib/components/phrase.svelte';
 	import WalletSources from '$lib/components/wallet-sources.svelte';
 	import ProfileForm from '$lib/components/profile-form.svelte';
+	import CoinPanel from '$lib/components/coin-panel.svelte';
 	import { normaliseHint, hintProblem } from '$lib/hint';
 	import { hintOf, label } from '$lib/format';
 
@@ -37,7 +38,7 @@
 
 <Page width="narrow">
 	<PageHeader
-		eyebrow="Embedded wallet"
+		eyebrow="Your key"
 		title="Wallet"
 		description="Your key lives in this browser and signs every transaction; your party lives on this app's validator. Nothing to install, nobody holds the key but you."
 	/>
@@ -201,6 +202,7 @@
 				The key is disposed after fifteen quiet minutes and whenever you leave the page; the
 				encrypted copy stays on this device.
 			</p>
+			<Panel><CoinPanel /></Panel>
 			<Panel><ProfileForm party={screen.who.party} /></Panel>
 		</section>
 		<div class="mt-6"><WalletSources /></div>

@@ -5,8 +5,11 @@
 export type Rule = {
 	/** Yes is measured against everyone eligible, or against the votes cast (yes and no). */
 	basis: 'all' | 'cast';
-	/** Strictly more than half, or at least this many percent. */
-	threshold: { kind: 'majority' } | { kind: 'percent'; percent: number };
+	/** Strictly more than half, at least this many percent, or at least a fraction (two thirds). */
+	threshold:
+		| { kind: 'majority' }
+		| { kind: 'percent'; percent: number }
+		| { kind: 'fraction'; num: number; den: number };
 	/** Percent of the vote that must take part (abstentions count); 0 for none. */
 	quorum: number;
 	/** Settle the moment the outcome can no longer change. */
@@ -48,7 +51,7 @@ export const PRESETS: { value: Preset; title: string; text: string; rule?: Rule 
 		text: 'At least 67% of the whole vote says yes.',
 		rule: {
 			basis: 'all',
-			threshold: { kind: 'percent', percent: 67 },
+			threshold: { kind: 'fraction', num: 2, den: 3 },
 			quorum: 0,
 			early: true,
 			changeable: false
@@ -83,14 +86,37 @@ const same = (a: Rule, b: Rule) =>
 	a.early === b.early &&
 	a.changeable === b.changeable &&
 	a.threshold.kind === b.threshold.kind &&
-	(a.threshold.kind !== 'percent' ||
-		b.threshold.kind !== 'percent' ||
-		a.threshold.percent === b.threshold.percent);
+	sameThreshold(a.threshold, b.threshold);
+
+const sameThreshold = (a: Rule['threshold'], b: Rule['threshold']) =>
+	a.kind === 'majority'
+		? b.kind === 'majority'
+		: a.kind === 'percent'
+			? b.kind === 'percent' && a.percent === b.percent
+			: b.kind === 'fraction' && a.num === b.num && a.den === b.den;
+
+/** "two thirds", "three quarters", or "2/5". */
+export const fractionWords = (num: number, den: number) => {
+	const names: Record<string, string> = {
+		'1/2': 'half',
+		'2/3': 'two thirds',
+		'3/4': 'three quarters',
+		'1/3': 'a third',
+		'3/5': 'three fifths',
+		'4/5': 'four fifths'
+	};
+	return names[`${num}/${den}`] ?? `${num}/${den}`;
+};
 
 /** "more than half of all members" — the rule in a sentence fragment. */
 export function describe(r: Rule): string {
+	const t = r.threshold;
 	const amount =
-		r.threshold.kind === 'majority' ? 'more than half' : `at least ${r.threshold.percent}%`;
+		t.kind === 'majority'
+			? 'more than half'
+			: t.kind === 'percent'
+				? `at least ${t.percent}%`
+				: `at least ${fractionWords(t.num, t.den)}`;
 	const of = r.basis === 'all' ? 'of the whole vote' : 'of the votes cast';
 	const quorum = r.quorum > 0 ? `, if ${r.quorum}% of the vote takes part` : '';
 	return `${amount} ${of} say yes${quorum}`;
@@ -98,7 +124,13 @@ export function describe(r: Rule): string {
 
 /** "majority of all", "≥67% of cast · quorum 25%" — the rule in a few characters, for lists. */
 export function short(r: Rule): string {
-	const amount = r.threshold.kind === 'majority' ? 'majority' : `≥${r.threshold.percent}%`;
+	const t = r.threshold;
+	const amount =
+		t.kind === 'majority'
+			? 'majority'
+			: t.kind === 'percent'
+				? `≥${t.percent}%`
+				: `≥${t.num}/${t.den}`;
 	const of = r.basis === 'all' ? 'of all' : 'of cast';
 	return `${amount} ${of}${r.quorum > 0 ? ` · quorum ${r.quorum}%` : ''}`;
 }
@@ -114,10 +146,13 @@ export function standing(
 	const cast = yes + no + abstain;
 	const denominator = r.basis === 'all' ? eligible : yes + no;
 	// The smallest number of units that passes.
+	const t = r.threshold;
 	const needed =
-		r.threshold.kind === 'majority'
+		t.kind === 'majority'
 			? Math.floor(denominator / 2) + 1
-			: Math.ceil((denominator * r.threshold.percent) / 100);
+			: t.kind === 'percent'
+				? Math.ceil((denominator * t.percent) / 100)
+				: Math.ceil((denominator * t.num) / t.den);
 	const quorumMet = r.quorum === 0 || cast * 100 >= eligible * r.quorum;
 	const pct = (n: number) => (eligible > 0 ? Math.round((n / eligible) * 1000) / 10 : 0);
 	const note = quorumMet
@@ -164,12 +199,28 @@ export const settingsToLedger = (s: Settings) => ({
 });
 
 /** The rule as the ledger's JSON writes it: enums as text, ints as text, the variant tagged. */
-export const toLedger = (r: Rule) => ({
+type LedgerThreshold =
+	| { tag: 'Majority'; value: Record<string, never> }
+	| { tag: 'Percent'; value: string }
+	| { tag: 'Fraction'; value: { num: string; den: string } };
+export type LedgerRule = {
+	basis: string;
+	threshold: LedgerThreshold;
+	quorum: string;
+	early: boolean;
+	changeable: boolean;
+};
+export const toLedger = (r: Rule): LedgerRule => ({
 	basis: r.basis === 'all' ? 'OfAll' : 'OfCast',
 	threshold:
 		r.threshold.kind === 'majority'
 			? { tag: 'Majority', value: {} }
-			: { tag: 'Percent', value: String(r.threshold.percent) },
+			: r.threshold.kind === 'percent'
+				? { tag: 'Percent', value: String(r.threshold.percent) }
+				: {
+						tag: 'Fraction',
+						value: { num: String(r.threshold.num), den: String(r.threshold.den) }
+					},
 	quorum: String(r.quorum),
 	early: r.early,
 	changeable: r.changeable

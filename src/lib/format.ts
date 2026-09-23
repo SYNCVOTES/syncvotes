@@ -26,4 +26,4 @@ export const fmt = (n: number) => n.toLocaleString('en-US');
 
 /** "12,345.67 CC" — coin, to the cents that matter on screen. */
 export const coin = (n: number) =>
-	`${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: n < 1 ? 6 : 2 })} CC`;
+	`${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: Math.abs(n) < 1 ? 6 : 2 })} CC`;

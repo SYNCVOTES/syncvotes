@@ -12,7 +12,7 @@
 </script>
 
 <Panel padding="lg" class="space-y-4">
-	<SectionTitle title="Wallet sources" count={store.wallets.length} />
+	<SectionTitle title="Keys on this device" count={store.wallets.length} />
 	<ul class="divide-y divide-border">
 		{#each store.wallets as w (w.id)}
 			{@const unlocked = screen.at === 'home' && w.party === screen.who.party}

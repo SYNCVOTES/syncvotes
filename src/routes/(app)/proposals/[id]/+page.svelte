@@ -125,8 +125,14 @@
 						equal={p.daoEqual}
 						current={holders?.current ?? []}
 						paid={p.paidBy}
+						awaiting={p.awaiting}
 					/>
-					{#if p.outcome === 'Passed' && !p.executedAt}
+					{#if p.stuck}
+						<Note mono={false}>
+							<span class="text-red">Could not be carried out yet:</span>
+							{p.stuck}. The provider keeps trying.
+						</Note>
+					{:else if p.outcome === 'Passed' && !p.executedAt}
 						<Note mono={false}>
 							{#if p.effect.kind === 'payout'}Passed; paid the moment the treasury can cover it.{:else if p.effect.kind === 'dissolve'}Passed;
 								carried out once every other vote has settled.{:else}Passed; being carried out.{/if}
@@ -162,7 +168,7 @@
 												title={p.rule.changeable
 													? 'Counted at the deadline'
 													: 'Cast; the provider has not counted it yet'}
-												>{p.rule.changeable ? 'may change' : 'pending'}</span
+												>{p.rule.changeable ? 'may change' : 'not counted yet'}</span
 											>{/if}
 										<span class="w-14 text-right {tone(b.vote)}">{b.vote}</span>
 									</span>
@@ -181,7 +187,7 @@
 				<Comments proposal={id} member={!!p.me.membership} />
 			</section>
 
-			<aside class="space-y-6">
+			<aside class="order-first space-y-6 lg:order-none">
 				<Tally
 					yes={p.yes}
 					no={p.no}
@@ -255,6 +261,8 @@
 								<span class="block text-ink-dim">Counted; it can no longer change.</span>
 							{/if}</Note
 						>
+					{:else if p.me.membership && new Date(p.closesAt).getTime() - Date.now() < 90_000}
+						<Note mono={false}>Too close to the deadline to sign a ballot in time.</Note>
 					{:else if p.me.membership}
 						<Note mono={false}
 							>{p.me.reshared

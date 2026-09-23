@@ -1,6 +1,6 @@
 <script lang="ts">
 	import Hint from './hint.svelte';
-	import { CATEGORIES, describe, standing, type Settings } from '$lib/rules';
+	import { CATEGORIES, describe, standing, fractionWords, type Settings } from '$lib/rules';
 	import { fmt } from '$lib/format';
 
 	/**
@@ -31,7 +31,14 @@
 			r.quorum > 0 ? `; ${fmt(Math.ceil((eligible * r.quorum) / 100))} of ${of} must vote` : '';
 		if (r.basis === 'all')
 			return `${fmt(standing(r, 0, 0, 0, eligible).needed)} of ${of} say yes${quorum}`;
-		return `${r.threshold.kind === 'majority' ? 'more yes than no' : `${r.threshold.percent}% yes`} among those who vote${quorum}`;
+		const t = r.threshold;
+		const need =
+			t.kind === 'majority'
+				? 'more yes than no'
+				: t.kind === 'percent'
+					? `${t.percent}% yes`
+					: `${fractionWords(t.num, t.den)} yes`;
+		return `${need} among those who vote${quorum}`;
 	}
 	const timing = (s: Settings) =>
 		s.rule.early

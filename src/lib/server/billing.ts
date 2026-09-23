@@ -187,6 +187,45 @@ export async function flush(): Promise<void> {
 }
 
 /**
+ * What a DAO owes, collected from its treasury: the meter is written first, so that a
+ * transfer that goes out is never collected twice, and written back should the transfer fail.
+ */
+export async function collectFrom(daoId: string): Promise<void> {
+	const dao = ledger.daos.get(daoId);
+	if (!dao) return;
+	await flush();
+	const meter = ledger.meters.get(daoId);
+	const due = (meter?.charged ?? 0) - (meter?.collected ?? 0);
+	if (due <= 0.01) return;
+	if ((await treasury.holdings(dao.treasury, true)) < due + 0.5) return;
+	const charged = meter?.charged ?? 0;
+	const collected = meter?.collected ?? 0;
+	await write(daoId, charged, collected + due);
+	collectedAt.set(daoId, Date.now());
+	try {
+		const updateId = await treasury.transfer(
+			dao.treasury,
+			providerParty(),
+			due,
+			`syncvotes traffic ${daoId}`
+		);
+		void settle(daoId, updateId, dao.treasury);
+	} catch (e) {
+		console.warn(
+			`Collecting from ${daoId} failed; the meter is written back:`,
+			e instanceof Error ? e.message : e
+		);
+		await write(daoId, charged, collected).catch((e2) =>
+			console.error(
+				`Meter of ${daoId} overstates what was collected by ${due}:`,
+				e2 instanceof Error ? e2.message : e2
+			)
+		);
+	}
+	ledger.notify(ledger.keys.dao(daoId));
+}
+
+/**
  * What each DAO owes, collected from its treasury once it is worth a transfer — or once a
  * week regardless. The transfer is the DAO's transaction too, and is charged like any other.
  */
@@ -194,24 +233,13 @@ export async function collect(): Promise<void> {
 	if (collecting) return;
 	collecting = true;
 	try {
-		await flush();
 		for (const dao of ledger.daos.values()) {
 			const meter = ledger.meters.get(dao.id);
-			const due = (meter?.charged ?? 0) - (meter?.collected ?? 0);
+			const due = (meter?.charged ?? 0) - (meter?.collected ?? 0) + (pending.get(dao.id) ?? 0);
 			const since = collectedAt.get(dao.id) ?? bootedAt;
 			if (due <= 0.01 || (due < COLLECT_AT && Date.now() - since < COLLECT_AFTER)) continue;
-			if ((await treasury.holdings(dao.treasury, true)) < due + 0.5) continue;
 			try {
-				const updateId = await treasury.transfer(
-					dao.treasury,
-					providerParty(),
-					due,
-					`syncvotes traffic ${dao.id}`
-				);
-				collectedAt.set(dao.id, Date.now());
-				await write(dao.id, meter?.charged ?? 0, (meter?.collected ?? 0) + due);
-				void settle(dao.id, updateId, dao.treasury);
-				ledger.notify(ledger.keys.dao(dao.id));
+				await collectFrom(dao.id);
 			} catch (e) {
 				console.warn(`Collecting from ${dao.id} failed:`, e instanceof Error ? e.message : e);
 			}
@@ -230,7 +258,9 @@ async function acceptIncoming(): Promise<void> {
 	try {
 		for (const dao of ledger.daos.values()) {
 			try {
-				if (await treasury.acceptIncoming(dao.treasury)) ledger.notify(ledger.keys.dao(dao.id));
+				const accepted = await treasury.acceptIncoming(dao.treasury);
+				for (const updateId of accepted) void settle(dao.id, updateId, dao.treasury);
+				if (accepted.length) ledger.notify(ledger.keys.dao(dao.id));
 			} catch (e) {
 				console.warn(`Incoming coin of ${dao.id} not read:`, e instanceof Error ? e.message : e);
 			}

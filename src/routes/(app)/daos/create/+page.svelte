@@ -87,7 +87,9 @@
 						threshold:
 							at('Threshold') === 'percent'
 								? { kind: 'percent', percent: Number(at('Percent')) }
-								: { kind: 'majority' },
+								: at('Threshold') === 'fraction'
+									? { kind: 'fraction', num: Number(at('Num')), den: Number(at('Den')) }
+									: { kind: 'majority' },
 						quorum: Number(at('Quorum')),
 						early: at('Early') === 'yes',
 						changeable: at('Changeable') === 'yes'
@@ -128,7 +130,7 @@
 	<PageHeader
 		eyebrow="New organisation"
 		title="Create DAO"
-		description="A DAO is private to its members: only they, and the app as provider, ever see it. It gets a treasury of its own — an address anyone can send Canton Coin to — which pays for everything it does, and which it spends only by vote. From here on, everything about it changes by vote."
+		description="A DAO is private to its members: only they, and the app as provider, ever see it. It gets a treasury of its own — an address anyone can send Canton Coin to — which pays for everything it does, and which it spends by vote: a payout, or what is left when it dissolves. The app collects what the DAO owes for traffic from it, and the app is what moves the coin. From here on, everything about it changes by vote."
 	/>
 
 	{#if store.screen.at === 'loading'}

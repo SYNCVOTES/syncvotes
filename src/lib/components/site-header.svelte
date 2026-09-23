@@ -11,7 +11,11 @@
 	let { nav }: { nav: { href: string; label: string }[] } = $props();
 
 	const walletLabel = $derived(
-		store.who ? hintOf(store.who.party) : store.hasKey ? 'Unlock wallet' : 'Connect wallet'
+		store.who
+			? `${hintOf(store.who.party)} ·${store.who.party.split('::')[1]?.slice(4, 8) ?? ''}`
+			: store.hasKey
+				? 'Unlock wallet'
+				: 'Connect wallet'
 	);
 </script>
 

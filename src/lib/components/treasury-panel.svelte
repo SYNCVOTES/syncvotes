@@ -4,6 +4,7 @@
 	import Panel from './panel.svelte';
 	import Skeleton from './skeleton.svelte';
 	import CopyField from './copy-field.svelte';
+	import QueryError from './query-error.svelte';
 	import Hint from './hint.svelte';
 	import { coin } from '$lib/format';
 
@@ -45,11 +46,14 @@
 		{/if}
 		<div class="space-y-3 border-t border-border pt-3">
 			<p class="text-[13px] text-ink-mid">
-				Anyone pays in by sending Canton Coin to this address from any wallet. It leaves only by
-				vote: a payout, or the remainder when the DAO dissolves.
+				Anyone pays in by sending Canton Coin to this address from any wallet. It leaves by vote — a
+				payout, or what is left when the DAO dissolves — and as the app collects what the DAO owes
+				for traffic. The app is what moves it.
 			</p>
 			<CopyField label="Address" value={b.treasury} />
 		</div>
+	{:else if billing?.error}
+		<QueryError error={billing.error} refresh={() => billing?.reconnect()} />
 	{:else}
 		<Skeleton height="h-16" />
 	{/if}

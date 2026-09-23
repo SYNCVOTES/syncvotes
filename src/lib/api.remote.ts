@@ -331,8 +331,11 @@ const proposalReader = (p: ledger.Proposal): ledger.Member | null => {
 };
 
 /** Whether this member may cast a ballot now: none cast, or one that may still be replaced. */
+/** Signing takes a moment; a ballot prepared this close to the deadline could land after it. */
+export const SIGNING_MARGIN = 90_000;
 const mayVote = (p: ledger.Proposal, m: ledger.Member | null) => {
 	if (!m || p.outcome) return false;
+	if (ledger.time(p.closesAt) - Date.now() < SIGNING_MARGIN) return false;
 	const now = new Date().toISOString();
 	if (!ledger.eligible(p, { since: m.since, shareSince: m.shareSince, castAt: now })) return false;
 	const mine = ledger.ballots.get(p.id)?.get(m.party);
@@ -374,6 +377,10 @@ export const proposal = query.live(contractId, (id) =>
 			comments: ledger.comments.get(id)?.size ?? 0,
 			proposedBy: who(p.proposer),
 			paidBy: tally.paid.get(id) ?? null,
+			/** For a payout that went out: whether the receiver still has to accept it. */
+			awaiting: tally.paid.has(id) && p.effect.kind === 'payout' ? tally.awaiting(p) : false,
+			/** Why the provider could not carry it out, after repeated attempts. */
+			stuck: tally.stuck.get(id) ?? null,
 			me: {
 				party: me?.party ?? session.required(),
 				membership: me?.contractId ?? null,
@@ -506,7 +513,9 @@ const settingsOf = (f: Record<string, unknown>, prefix: string): Settings => {
 		threshold:
 			field('Threshold') === 'percent'
 				? { kind: 'percent', percent: Number(field('Percent')) }
-				: { kind: 'majority' },
+				: field('Threshold') === 'fraction'
+					? { kind: 'fraction', num: Number(field('Num')), den: Number(field('Den')) }
+					: { kind: 'majority' },
 		quorum: Number(field('Quorum')),
 		early: field('Early') === 'yes',
 		changeable: field('Changeable') === 'yes'
@@ -582,6 +591,16 @@ export const createProposalForm = form(schemas.createProposalForm, async (f) => 
 	};
 });
 
+/** Coin sent to the caller's party that waits for their acceptance, and what they hold. */
+export const incoming = query(async () => treasury.incoming(session.required()));
+
+/** The acceptance of one such transfer, prepared for the caller's signature. Their own cost. */
+export const prepareAccept = command(v.object({ cid: contractId }), async ({ cid }) => {
+	const party = session.required();
+	const { command: cmd, disclosed } = await treasury.acceptCommand(cid);
+	return participant.prepare(party, [cmd], { disclosedContracts: disclosed });
+});
+
 /** A ballot, cast from the voter's own membership contract; a replaced one is handed in. */
 export const prepareVote = command(
 	v.object({ proposal: contractId, vote: v.picklist(['Yes', 'No', 'Abstain']) }),
@@ -601,10 +620,23 @@ export const prepareVote = command(
 	}
 );
 
+/** Writes a party made lately: a member's words cost the DAO, so a flood is refused. */
+const recentWrites = new Map<string, number[]>();
+const WRITES_PER_HOUR = 30;
+function paced(party: string) {
+	const now = Date.now();
+	const mine = (recentWrites.get(party) ?? []).filter((t) => now - t < 3_600_000);
+	if (mine.length >= WRITES_PER_HOUR)
+		error(429, 'That is a lot of writing for one hour; try later');
+	mine.push(now);
+	recentWrites.set(party, mine);
+}
+
 export const commentForm = form(schemas.commentForm, async ({ proposal, body }) => {
 	const p = proposalOf(proposal);
 	const me = proposalReader(p);
 	if (!me) error(403, 'Only members comment');
+	paced(me.party);
 	const cid = crypto.randomUUID();
 	const args = { proposalId: proposal, cid, body };
 	return {
@@ -631,6 +663,7 @@ const myComment = (contractId: string): ledger.Comment => {
 
 export const editCommentForm = form(schemas.editCommentForm, async ({ comment, body }) => {
 	const c = myComment(comment);
+	paced(c.author);
 	return {
 		comment: c.contractId,
 		body,

@@ -119,7 +119,11 @@
 	let checking = $state(false);
 	$effect(() => {
 		const fresh = added.filter((p) => !rows.some((r) => r.party === p));
-		if (fresh.length) rows = [...rows, ...fresh.map((party) => ({ party, share: 1 }))];
+		if (fresh.length) {
+			rows = [...rows, ...fresh.map((party) => ({ party, share: 1 }))];
+			// Taken into the table, the chips have done their job.
+			queueMicrotask(() => chips?.settle());
+		}
 	});
 
 	let importing = $state(false);
@@ -202,8 +206,19 @@
 			return na - nb || b.share - a.share || a.party.localeCompare(b.party);
 		});
 	});
-	const ROW = 52;
+	// Rows are taller on a phone, where the units go under the name.
+	let narrow = $state(false);
+	$effect(() => {
+		const media = window.matchMedia('(max-width: 640px)');
+		const follow = () => (narrow = media.matches);
+		follow();
+		media.addEventListener('change', follow);
+		return () => media.removeEventListener('change', follow);
+	});
+	const ROW = $derived(narrow ? 84 : 52);
 	const VIEW = 440;
+	let focused = $state<string | null>(null);
+	let chips = $state<{ settle: () => void } | null>(null);
 	let scrollTop = $state(0);
 	const first = $derived(Math.max(0, Math.floor(scrollTop / ROW) - 3));
 	const last = $derived(Math.min(shown.length, Math.ceil((scrollTop + VIEW) / ROW) + 3));
@@ -279,9 +294,10 @@
 		</div>
 	{:else}
 		<PartyChips
+			bind:this={chips}
 			{dao}
 			{busy}
-			placeholder="Add a party by id — one, or a whole list"
+			placeholder="Add party ids"
 			bind:parties={added}
 			bind:checking
 		/>
@@ -298,14 +314,14 @@
 					{@const s = status(r)}
 					{@const gone = unitsOf(r) === 0}
 					<div
-						class="absolute right-0 left-0 flex items-center gap-3 border-b border-border px-3 {gone
+						class="absolute right-0 left-0 flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-3 py-2 {gone
 							? 'opacity-60'
 							: ''}"
 						style="top: {(first + i) * ROW}px; height: {ROW}px"
 					>
 						<Who
 							who={r.who ?? { party: r.party, name: null, avatar: null }}
-							class="min-w-0 flex-1 {gone ? 'line-through' : ''}"
+							class="min-w-0 flex-1 basis-52 {gone ? 'line-through' : ''}"
 						/>
 						{#if s}
 							<span
@@ -317,7 +333,7 @@
 										: 'text-amber'}">{s}</span
 							>
 						{/if}
-						{#if mode === 'shares' && !gone}
+						{#if mode === 'shares' && (!gone || focused === r.party)}
 							<Input
 								type="number"
 								min={0}
@@ -326,6 +342,8 @@
 								value={r.share}
 								disabled={busy}
 								aria-label="Units of {r.party}"
+								onfocus={() => (focused = r.party)}
+								onblur={() => (focused = null)}
 								oninput={(e) => set(r.party, (e.currentTarget as HTMLInputElement).value)}
 							/>
 						{/if}

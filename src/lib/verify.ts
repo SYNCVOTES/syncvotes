@@ -45,7 +45,14 @@ const CHOICES: Record<string, Home> = {
 	Member_Vote: { template: 'Main:Member', pkg: PACKAGE_NAME },
 	Member_Comment: { template: 'Main:Member', pkg: PACKAGE_NAME },
 	Comment_Edit: { template: 'Main:Comment', pkg: PACKAGE_NAME },
-	Comment_Delete: { template: 'Main:Comment', pkg: PACKAGE_NAME }
+	Comment_Delete: { template: 'Main:Comment', pkg: PACKAGE_NAME },
+	// Coin sent to the user, accepted through the token standard's interface: the choice is on
+	// the coin's own instruction template, whatever package that is.
+	TransferInstruction_Accept: {
+		template: 'Splice.AmuletTransferInstruction:AmuletTransferInstruction',
+		pkg: 'splice-amulet',
+		iface: 'Splice.Api.Token.TransferInstructionV1:TransferInstruction'
+	}
 };
 
 // ---- Sign-up: the party topology --------------------------------------------------------

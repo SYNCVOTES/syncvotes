@@ -36,6 +36,8 @@ export type Dao = {
 	routine: Settings;
 	/** What sensitive ones (members, coin, settings, dissolution) run under. */
 	sensitive: Settings;
+	/** A dissolution has passed: nothing new is proposed while what is left is settled. */
+	dissolving: boolean;
 	createdAt: string;
 	members: number;
 	/** The whole vote, in units. */
@@ -45,7 +47,6 @@ export type Member = {
 	contractId: string;
 	daoId: string;
 	party: string;
-	sponsor: string;
 	since: string;
 	/** Units of the vote. */
 	share: number;
@@ -229,7 +230,13 @@ const rule = (v: unknown): Rule => {
 		threshold:
 			r.threshold.tag === 'Percent'
 				? { kind: 'percent', percent: num(r.threshold.value) }
-				: { kind: 'majority' },
+				: r.threshold.tag === 'Fraction'
+					? {
+							kind: 'fraction',
+							num: num((r.threshold.value as { num: unknown }).num),
+							den: num((r.threshold.value as { den: unknown }).den)
+						}
+					: { kind: 'majority' },
 		quorum: num(r.quorum),
 		early: r.early === true,
 		changeable: r.changeable === true
@@ -300,6 +307,7 @@ function created({ contractId, templateId, createArgument: a }: Created) {
 				equal: a.equal === true,
 				routine: settings(a.routine),
 				sensitive: settings(a.sensitive),
+				dissolving: a.dissolving === true,
 				createdAt: text(a.createdAt),
 				members: num(a.members),
 				units: num(a.units)
@@ -312,7 +320,6 @@ function created({ contractId, templateId, createArgument: a }: Created) {
 				contractId,
 				daoId: text(a.daoId),
 				party: text(a.party),
-				sponsor: text(a.sponsor),
 				since: text(a.since),
 				share: num(a.share),
 				shareSince: text(a.shareSince)

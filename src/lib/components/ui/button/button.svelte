@@ -5,7 +5,7 @@
 
 	export const buttonVariants = tv({
 		// v1: every button is a pill of mono uppercase text; the accent is the one colour.
-		base: "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-full border font-mono text-xs uppercase tracking-[0.14em] transition-all outline-none select-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+		base: "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-full border font-mono text-xs uppercase tracking-[0.14em] transition-all outline-none select-none focus-visible:ring-2 focus-visible:ring-orange focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
 		variants: {
 			variant: {
 				default: 'border-transparent bg-primary text-primary-foreground hover:bg-primary/85',

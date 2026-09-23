@@ -24,7 +24,7 @@
 	<PageHeader
 		eyebrow="Personal workspace"
 		title="My DAOs"
-		description="DAOs your key is a member of. On-chain membership only — derived from the DAO contracts on Canton Network."
+		description="The DAOs the ledger says you are in: as their creator, or admitted by vote."
 	>
 		{#snippet action()}
 			<Button href="/daos/create" size="lg"><Plus strokeWidth={2.5} /> Create DAO</Button>
@@ -47,7 +47,7 @@
 		<div class="mb-8 grid grid-cols-2 gap-3 md:grid-cols-3">
 			<Stat value={daos.current.length} label="Total" sub="DAOs joined" />
 			<Stat value={created} label="Created" sub="by you" />
-			<Stat value={daos.current.length - created} label="Joined" sub="by vote" />
+			<Stat value={daos.current.length - created} label="Admitted" sub="by vote" />
 		</div>
 
 		{#if daos.current.length === 0}
