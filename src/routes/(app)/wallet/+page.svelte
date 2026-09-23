@@ -19,7 +19,20 @@
 	import { hintOf, label } from '$lib/format';
 
 	let phraseInput = $state('');
-	let savedPhrase = $state(false);
+	// Creating a key: the phrase is revealed on request, then one word of it is asked back.
+	let revealed = $state(false);
+	let checking = $state(false);
+	let checkInput = $state('');
+	const phraseWords = $derived(screen.at === 'create' ? screen.phrase.split(' ') : []);
+	// Which word is asked is settled once per phrase, not once per keystroke.
+	const checkAt = $derived.by(() => {
+		const n = phraseWords.length;
+		if (!n) return 0;
+		let h = 0;
+		for (const c of phraseWords.join(' ')) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+		return h % n;
+	});
+	const checkOk = $derived(checkInput.trim().toLowerCase() === phraseWords[checkAt]);
 	let hintInput = $state('');
 	let password = $state('');
 
@@ -62,20 +75,54 @@
 		</Panel>
 	{:else if screen.at === 'create'}
 		<Panel padding="lg" class="space-y-5">
-			<h2 class="eyebrow">Your recovery phrase</h2>
-			<p class="text-sm text-ink-mid">
-				Write these twelve words down. They are the only way back to this party from another device,
-				and nobody — this app included — can restore them for you.
-			</p>
-			<Phrase words={screen.phrase} />
-			<label class="flex items-center gap-2 text-sm">
-				<input type="checkbox" class="accent-orange" bind:checked={savedPhrase} />
-				I have written it down
-			</label>
-			<div class="flex gap-3">
-				<Button disabled={store.busy || !savedPhrase} onclick={flow.confirmCreate}>Continue</Button>
-				<Button variant="ghost" onclick={flow.back}>Back</Button>
-			</div>
+			{#if checking}
+				<h2 class="eyebrow">Check your notes</h2>
+				<p class="text-sm text-ink-mid">
+					Word number <strong class="text-ink">{checkAt + 1}</strong> of the twelve, as you wrote it down.
+					One word, to be sure the phrase is where you can find it.
+				</p>
+				<form
+					class="flex gap-3"
+					onsubmit={(e) => {
+						e.preventDefault();
+						if (checkOk) flow.confirmCreate();
+					}}
+				>
+					<Input
+						placeholder="word {checkAt + 1}"
+						class="flex-1 font-mono"
+						autocomplete="off"
+						autocapitalize="off"
+						spellcheck={false}
+						aria-label="Word {checkAt + 1}"
+						bind:value={checkInput}
+					/>
+					<Button type="submit" disabled={store.busy || !checkOk}>Continue</Button>
+				</form>
+				{#if checkInput.trim() && !checkOk}
+					<p class="font-mono text-xs text-red">
+						Not word {checkAt + 1}. Look at your notes again.
+					</p>
+				{/if}
+				<Button variant="ghost" onclick={() => (checking = false)}>Show the phrase again</Button>
+			{:else}
+				<h2 class="eyebrow">Your recovery phrase</h2>
+				<p class="text-sm text-ink-mid">
+					Write these twelve words down, in order. They are the only way back to this party from
+					another device, and nobody — this app included — can restore them for you.
+				</p>
+				<Phrase words={screen.phrase} bind:revealed />
+				<div class="flex gap-3">
+					<Button
+						disabled={store.busy || !revealed}
+						onclick={() => {
+							checkInput = '';
+							checking = true;
+						}}>I have written it down</Button
+					>
+					<Button variant="ghost" onclick={flow.back}>Back</Button>
+				</div>
+			{/if}
 		</Panel>
 	{:else if screen.at === 'restore'}
 		<form
