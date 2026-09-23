@@ -48,7 +48,7 @@ the token standard's packages are on every validator, so a treasury can be paid 
 
 ### The model
 
-`daml/src/Main.daml`, package `syncvotes-treasury`, one idea: every contract a user acts on
+`daml/src/Main.daml`, package `syncvotes-bylaws`, one idea: every contract a user acts on
 already carries the provider's signature, so the provider is a **confirmer** of every
 transaction — which is what CIP-0104 pays traffic rewards for — while the user's key is the
 only one that ever signs a submission. One constraint: a DAO may have thousands of members and
@@ -63,8 +63,9 @@ neither has the other's key.
   a few words). A party is its hint plus its key's fingerprint (`alice::1220…`); a returning
   key is found by the fingerprint alone.
 - `DAO` — signatory creator and provider: name, description (Markdown), a picture, a stable
-  `id`, its `treasury` party, whether it votes by membership (`equal`), a member count and the
-  size of the vote in `units`. One choice, `DAO_Execute`, which carries out what a vote
+  `id`, its `treasury` party, whether it votes by membership (`equal`), its own `rule` — the
+  least any proposal takes to pass, set at the founding — a member count and the size of the
+  vote in `units`. One choice, `DAO_Execute`, which carries out what a vote
   decided, a batch of entries at a time; nobody changes it by hand. No member list. Founded
   with a share table: the first two hundred members are created on the spot, the rest as a
   proposal already passed, carried out in batches like any other.
@@ -81,12 +82,16 @@ neither has the other's key.
   units, of `eligible`), `outcome`, how far its effect is carried out; an `Effect`: `Signal`,
   `SetShares` (only the parties it touches, zero to leave; up to two thousand, carried out two
   hundred at a time), `SetInfo` (name, description, picture), `Payout` (coin from the treasury
-  to a party) or `Dissolve` (with where the remainder goes); and a `Rule` the proposer picked:
-  yes measured against all of the vote or against the votes cast, a majority or a percentage,
-  a quorum of the vote that must take part, whether it settles the moment the outcome cannot
-  change, and whether votes may change until the deadline — the last two exclude each other,
-  which the ledger checks (an outcome that is sure only while nobody changes their mind is not
-  sure). Nobody cancels it. Once passed, the provider exercises `DAO_Execute`: the ledger checks
+  to a party), `Dissolve` (with where the remainder goes) or `SetRule` (the DAO's rule from
+  then on); and a `Rule`: yes measured against all of the vote or against the votes cast, a
+  majority or a percentage, a quorum of the vote that must take part, whether it settles the
+  moment the outcome cannot change, and whether votes may change until the deadline — the last
+  two exclude each other, which the ledger checks (an outcome that is sure only while nobody
+  changes their mind is not sure). The proposal's rule is the DAO's own unless the proposer
+  asks for more; `Member_Propose` refuses one that asks less (`atLeast`: a lower threshold,
+  less turnout, the votes cast where the DAO says the whole vote, or early settlement where the
+  DAO waits), so nobody passes a payout to themselves on a rule of their own making. A rule is
+  changed only by a proposal passed under the rule as it stands. Nobody cancels it. Once passed, the provider exercises `DAO_Execute`: the ledger checks
   the proposal did pass and carries the effect out with the DAO's authority; a payout moves the
   coin first and is recorded after; a dissolution waits until every other vote has settled.
 - `Ballot` — one vote weighing the voter's units, signed by the voter and the provider. The
@@ -323,7 +328,7 @@ idempotent by package id — so the code and the package it needs always land to
 - A package name and version can be uploaded once, and a later version under the same name must
   be a compatible upgrade (fields can only be added, and as `Optional`). A change that is not —
   a template dropped, a field made mandatory — needs a new package name, which is why the model
-  has changed name with every incompatible step and is `syncvotes-treasury` now.
+  has changed name with every incompatible step and is `syncvotes-bylaws` now.
 - A `.remote.ts` module may export nothing but remote functions — a shared constant next to
   them fails the build, which is why the batch size lives in `schemas.ts`.
 - The kit's `form.fields.value()` knows only the fields the user touched; `forms.ts` reads the

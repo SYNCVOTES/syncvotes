@@ -99,3 +99,7 @@
 - [ ] a treasury the provider cannot touch (m-of-n signers by vote, live signing sessions) as an
       option per DAO, if wanted: `bb62260` has the working pieces
 - [ ] dividends: a payout split among members by share (one transfer per member, ~7.5 KB each)
+- [x] a rule of the DAO's own, set at the founding: the least any proposal takes; a proposer may
+      ask for more, never less (ledger-checked); changed only by a `SetRule` proposal passed
+      under the standing rule (`syncvotes-bylaws` 0.13.x). Hints on every option; rules say what
+      they come to in this DAO's numbers
