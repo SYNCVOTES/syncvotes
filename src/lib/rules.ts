@@ -177,14 +177,15 @@ export type Category = 'routine' | 'sensitive';
 
 /** What a proposal does decides its category: routine, or touching members, coin, rules, existence. */
 export const categoryOf = (kind: string): Category =>
-	kind === 'signal' || kind === 'info' ? 'routine' : 'sensitive';
+	kind === 'signal' || kind === 'choose' || kind === 'info' ? 'routine' : 'sensitive';
 
 export const CATEGORIES: { value: Category; title: string; text: string; covers: string }[] = [
 	{
 		value: 'routine',
 		title: 'Routine',
-		text: 'Decisions, and the name, description or picture.',
-		covers: 'A decision the DAO takes, or a new name, description or picture.'
+		text: 'Decisions and choices, and the name, description or picture.',
+		covers:
+			'A decision the DAO takes, yes or no or among options, or a new name, description or picture.'
 	},
 	{
 		value: 'sensitive',

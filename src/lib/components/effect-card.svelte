@@ -13,6 +13,7 @@
 	 */
 	export type Effect =
 		| { kind: 'signal' }
+		| { kind: 'choose'; options: string[] }
 		| { kind: 'shares'; changes: { party: string; share: number }[] }
 		| { kind: 'info'; name: string; description: string; image: string | null }
 		| { kind: 'dissolve' }
@@ -35,6 +36,8 @@
 		switch (effect.kind) {
 			case 'shares':
 				return equal ? 'Membership' : 'Shares of the vote';
+			case 'choose':
+				return 'Choice';
 			case 'info':
 				return 'Name and description';
 			case 'dissolve':
@@ -116,6 +119,11 @@
 			The DAO is archived the moment this passes: nothing more can be proposed or voted on, what was
 			paid in for it is spent, and its record stays readable.
 		</p>
+	{:else if effect.kind === 'choose'}
+		<p class="text-[13px] text-ink-mid">Decides among these, and does nothing else:</p>
+		<ol class="list-decimal space-y-1 pl-5 text-[13px] text-ink">
+			{#each effect.options as o, i (i)}<li>{o}</li>{/each}
+		</ol>
 	{:else if effect.kind === 'settings'}
 		<p class="text-[13px] text-ink-mid">From then on:</p>
 		<SettingsSummary routine={effect.routine} sensitive={effect.sensitive} />

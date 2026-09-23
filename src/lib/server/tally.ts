@@ -174,7 +174,13 @@ async function count(id: string) {
  * moot, what was paid in is spent, the record stays readable.
  */
 async function execute(p: ledger.Proposal) {
-	if (p.outcome !== 'Passed' || p.executedAt || p.effect.kind === 'signal') return;
+	if (
+		p.outcome !== 'Passed' ||
+		p.executedAt ||
+		p.effect.kind === 'signal' ||
+		p.effect.kind === 'choose'
+	)
+		return;
 	const dao = ledger.daos.get(p.daoId);
 	if (!dao || executing.has(p.id) || !due(p.id)) return;
 	if (consumedDao.get(p.daoId) === dao.contractId) return;

@@ -9,10 +9,22 @@ import type { Rule, Settings } from '$lib/rules';
  * map lookup. A page waits on the keys it shows (`nextChange`); a transaction wakes only those.
  */
 
-export type Vote = 'Yes' | 'No' | 'Abstain';
-export type Outcome = 'Passed' | 'Failed';
+/** Yes, no, abstain — or `Pick:<n>`, the option picked on a choice among options. */
+export type Vote = 'Yes' | 'No' | 'Abstain' | `Pick:${number}`;
+/** Passed, failed — or `Chosen:<n>`, the option a choice decided on. */
+export type Outcome = 'Passed' | 'Failed' | `Chosen:${number}`;
+/** The option a vote picked, or a choice decided on. */
+export const pickOf = (v: string | null): number | null =>
+	v?.startsWith('Pick:')
+		? Number(v.slice(5))
+		: v?.startsWith('Chosen:')
+			? Number(v.slice(7))
+			: null;
+/** Whether an outcome is a decision in favour: passed, or an option chosen. */
+export const passed = (o: Outcome | null): boolean => o === 'Passed' || !!o?.startsWith('Chosen:');
 export type Effect =
 	| { kind: 'signal' }
+	| { kind: 'choose'; options: string[] }
 	| { kind: 'shares'; changes: { party: string; share: number }[] }
 	| { kind: 'info'; name: string; description: string; image: string | null }
 	| { kind: 'dissolve' }
@@ -64,6 +76,8 @@ export type Proposal = {
 	yes: number;
 	no: number;
 	abstain: number;
+	/** Units per option on a choice; empty otherwise. */
+	tallies: number[];
 	outcome: Outcome | null;
 	/** Entries of the effect carried out so far. */
 	executed: number;
@@ -237,6 +251,21 @@ const rule = (v: unknown): Rule => {
 };
 
 const optional = (value: unknown) => (value == null ? null : text(value));
+/**
+ * A variant with at most one payload-carrying constructor, as the JSON API writes it: a bare
+ * string while every constructor is empty, `{tag, value}` once one is not. Read as
+ * `Tag` or `Tag:<int>`.
+ */
+const tagged = (value: unknown): string => {
+	if (typeof value === 'string') return value;
+	const v = value as { tag?: unknown; value?: unknown };
+	const tag = text(v?.tag);
+	return typeof v?.value === 'object' && v.value !== null && !Array.isArray(v.value)
+		? tag
+		: v?.value == null
+			? tag
+			: `${tag}:${num(v.value)}`;
+};
 
 const settings = (v: unknown): Settings => {
 	const x = v as { rule: unknown; votingDays: unknown };
@@ -260,6 +289,11 @@ const effect = (v: unknown): Effect => {
 				name: text(t.value.daoName),
 				description: text(t.value.description),
 				image: optional(t.value.image)
+			};
+		case 'Choose':
+			return {
+				kind: 'choose',
+				options: ((t.value as { options: unknown[] }).options ?? []).map(text)
 			};
 		case 'Dissolve':
 			return { kind: 'dissolve' };
@@ -333,7 +367,8 @@ function created({ contractId, templateId, createArgument: a }: Created) {
 				yes: num(a.yes),
 				no: num(a.no),
 				abstain: num(a.abstain),
-				outcome: (a.outcome as Outcome | null | undefined) ?? null,
+				tallies: ((a.tallies as unknown[] | undefined) ?? []).map(num),
+				outcome: a.outcome == null ? null : (tagged(a.outcome) as Outcome),
 				executed: num(a.executed),
 				executedAt: optional(a.executedAt)
 			};
@@ -352,7 +387,7 @@ function created({ contractId, templateId, createArgument: a }: Created) {
 				daoId: text(a.daoId),
 				voter: text(a.voter),
 				since: text(a.since),
-				vote: a.vote as Vote,
+				vote: tagged(a.vote) as Vote,
 				weight: num(a.weight),
 				shareSince: text(a.shareSince),
 				closesAt: text(a.closesAt),

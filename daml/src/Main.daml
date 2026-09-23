@@ -2,8 +2,9 @@ module Main where
 
 import DA.Action (foldlA, void, when)
 import DA.Foldable (forA_)
-import DA.List (dedup)
-import DA.Optional (isNone, isSome)
+import DA.List (dedup, elemIndex, sortBy)
+import DA.Optional (fromSome, isNone, isSome)
+import qualified DA.Text as T
 import DA.Time (addRelTime, days)
 
 -- Every contract a user acts on carries the app provider's signature, so the provider confirms
@@ -35,18 +36,24 @@ import DA.Time (addRelTime, days)
 -- ballots in batches; the ledger checks each one it is handed, so the provider can delay a
 -- result but never change it. Nothing here grows with history.
 
-data Vote = Yes | No | Abstain
+-- | Yes, no or abstain on a proposal; or, on a choice among options, the option picked.
+data Vote = Yes | No | Abstain | Pick Int
   deriving (Eq, Show)
 
-data Outcome = Passed | Failed
+-- | Passed or failed; a choice among options is decided as the option chosen, or fails when
+-- none reached the rule (a tie at the deadline fails too).
+data Outcome = Passed | Failed | Chosen Int
   deriving (Eq, Show)
 
 -- | What a proposal does when it passes (`Effect`: `Action` is the Prelude's). `Signal`
--- decides and does nothing else; the rest is everything a DAO can change about itself. A
--- share change lists only the parties it touches, zero meaning they leave; carried out in
--- batches, so one proposal can reshape a DAO of thousands.
+-- decides yes or no and does nothing else; `Choose` decides among options the same way,
+-- the winning option measured against the rule as yes would be; the rest is everything a DAO
+-- can change about itself. A share change lists only the parties it touches, zero meaning
+-- they leave; carried out in batches, so one proposal can reshape a DAO of thousands.
 data Effect
   = Signal
+  | Choose with
+      options : [Text]
   | SetShares with
       changes : [(Party, Int)]
   | SetInfo with
@@ -64,6 +71,7 @@ data Effect
 -- rules or the DAO's existence.
 isSensitive : Effect -> Bool
 isSensitive Signal = False
+isSensitive (Choose _) = False
 isSensitive (SetInfo {}) = False
 isSensitive _ = True
 
@@ -112,6 +120,13 @@ data Settings = Settings with
 
 validSettings : Settings -> Bool
 validSettings s = validRule s.rule && s.votingDays >= 1 && s.votingDays <= 90
+
+-- | A choice offers two to ten distinct options, a few words each.
+validOptions : [Text] -> Bool
+validOptions options =
+  length options >= 2 && length options <= 10
+    && all (\o -> o /= "" && T.length o <= 80) options
+    && dedup options == options
 
 -- | Members created, reshared or removed per transaction; longer lists are carried out in
 -- several.
@@ -176,7 +191,8 @@ template Account
             action = SetShares with changes = more
             rule = Rule OfAll Majority 0 True False
             eligible = sum (map snd shares); createdAt = now; closesAt = now
-            yes = 0; no = 0; abstain = 0; outcome = Some Passed; executed = 0; executedAt = None
+            yes = 0; no = 0; abstain = 0; tallies = []; outcome = Some Passed; executed = 0
+            executedAt = None
         create DAO with
           provider; operator; creator = user; id; name = daoName; description; image
           equal; routine; sensitive; createdAt = now
@@ -247,6 +263,9 @@ template DAO
         now <- getTime
         case p.action of
           Signal -> do
+            exercise proposal Proposal_Advance with upTo = 1
+            Some <$> create this
+          Choose _ -> do
             exercise proposal Proposal_Advance with upTo = 1
             Some <$> create this
           SetInfo daoName description image -> do
@@ -346,6 +365,8 @@ template Member
             closesAt = addRelTime now (days settings.votingDays)
         case action of
           Signal -> pure ()
+          Choose options ->
+            assertMsg "Two to ten distinct options, eighty characters each at most" (validOptions options)
           Dissolve -> pure ()
           SetSettings routine sensitive ->
             assertMsg "The settings' numbers are out of range" (validSettings routine && validSettings sensitive)
@@ -356,6 +377,9 @@ template Member
           provider; operator; creator; daoId; proposer = party; id = pid; title; description
           action; rule; eligible = found.units; createdAt = now; closesAt
           yes = 0; no = 0; abstain = 0; outcome = None; executed = 0; executedAt = None
+          tallies = case action of
+            Choose options -> map (const 0) options
+            _ -> []
 
     -- Nothing here reads the proposal, so a vote never waits on the count or on other voters.
     -- Whether the ballot is valid for its proposal (right DAO, member in time, before the
@@ -430,6 +454,8 @@ template Proposal
     yes : Int
     no : Int
     abstain : Int
+    -- Units per option, for a choice among options; empty otherwise.
+    tallies : [Int]
     outcome : Optional Outcome
     executed : Int
     executedAt : Optional Time
@@ -451,39 +477,52 @@ template Proposal
         assertMsg "Already settled" (isNone outcome)
         now <- getTime
         assertMsg "Votes may change until the deadline" (not rule.changeable || now >= closesAt)
-        (y, n, a) <- foldlA
-          (\(y, n, a) cid -> do
+        (y, n, a, ts) <- foldlA
+          (\(y, n, a, ts) cid -> do
             (vote, weight) <- exercise cid Ballot_Count with proposal = this
             pure case vote of
-              Yes -> (y + weight, n, a)
-              No -> (y, n + weight, a)
-              Abstain -> (y, n, a + weight))
-          (yes, no, abstain) ballots
-        let cast = y + n + a
+              Yes -> (y + weight, n, a, ts)
+              No -> (y, n + weight, a, ts)
+              Abstain -> (y, n, a + weight, ts)
+              Pick i -> (y, n, a, zipWith (\j t -> if j == i then t + weight else t) [0 .. length ts - 1] ts))
+          (yes, no, abstain, tallies) ballots
+        let isChoice = case action of
+              Choose _ -> True
+              _ -> False
+            -- On a choice, the leading option stands where yes stands and the rest where no does.
+            lead = if isChoice then foldl max 0 ts else y
+            second = case (isChoice, sortBy (\p q -> compare q p) ts) of
+              (True, _ :: s :: _) -> s
+              _ -> 0
+            rest = if isChoice then sum ts - lead else n
+            cast = y + n + a + sum ts
             outstanding = eligible - cast
             quorumMet = rule.quorum == 0 || cast * 100 >= rule.quorum * eligible
             meets yes denom = denom > 0 && case rule.threshold of
               Majority -> yes * 2 > denom
               Percent p -> yes * 100 >= denom * p
               Fraction num den -> yes * den >= denom * num
-            -- What yes is measured against now, and in the worst case still to come.
+            -- What the leader is measured against now, and in the worst case still to come.
             denomNow = case rule.basis of
               OfAll -> eligible
-              OfCast -> y + n
+              OfCast -> lead + rest
             denomWorst = case rule.basis of
               OfAll -> eligible
-              OfCast -> y + n + outstanding
-            passedNow = quorumMet && meets y denomNow
-            -- Sure: yes wins whatever the rest do. Lost: yes cannot win even if the rest all say yes.
-            sure = quorumMet && meets y denomWorst
-            lost = not (meets (y + outstanding) denomWorst)
+              OfCast -> lead + rest + outstanding
+            -- A choice needs one leader: a tie is no decision.
+            passedNow = quorumMet && meets lead denomNow && (not isChoice || lead > second)
+            -- Sure: the leader wins whatever the rest do. Lost: nothing can reach the rule
+            -- even if the rest all agree.
+            sure = quorumMet && meets lead denomWorst && (not isChoice || lead - second > outstanding)
+            lost = not (meets (lead + outstanding) denomWorst)
             over = final && now >= closesAt
+            won = if isChoice then Chosen (fromSome (elemIndex lead ts)) else Passed
             decided
-              | rule.early && sure = Some Passed
+              | rule.early && sure = Some won
               | rule.early && lost = Some Failed
-              | over = Some (if passedNow then Passed else Failed)
+              | over = Some (if passedNow then won else Failed)
               | otherwise = None
-        create this with yes = y; no = n; abstain = a; outcome = decided
+        create this with yes = y; no = n; abstain = a; tallies = ts; outcome = decided
 
     -- Only the DAO (creator and provider together) records progress on a passed proposal:
     -- how many of its entries are carried out, and the moment the last one was.
@@ -492,7 +531,10 @@ template Proposal
         upTo : Int
       controller provider, creator
       do
-        assertMsg "The proposal did not pass" (outcome == Some Passed)
+        assertMsg "The proposal did not pass" (case outcome of
+          Some Passed -> True
+          Some (Chosen _) -> True
+          _ -> False)
         assertMsg "Already executed" (isNone executedAt)
         let size = case action of
               SetShares changes -> length changes
@@ -540,6 +582,12 @@ template Ballot
         assertMsg "Cast against another rule" (changeable == proposal.rule.changeable)
         assertMsg "Joined after the vote opened" (since <= proposal.createdAt)
         assertMsg "The share changed after the vote opened" (shareSince <= proposal.createdAt)
+        case (proposal.action, vote) of
+          (Choose options, Pick i) -> assertMsg "No such option" (i >= 0 && i < length options)
+          (Choose _, Abstain) -> pure ()
+          (Choose _, _) -> abort "This proposal is a choice among options, not yes or no"
+          (_, Pick _) -> abort "This proposal takes yes or no, not an option"
+          _ -> pure ()
         create this with counted = True
         pure (vote, weight)
 

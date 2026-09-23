@@ -71,7 +71,8 @@ const preparing = () => working('Preparing the transaction');
 
 // ---- Proposals ----------------------------------------------------------------------------
 
-export type Choice = 'Yes' | 'No' | 'Abstain';
+/** Yes, no, abstain — or `Pick:<n>` on a choice among options. */
+export type Choice = 'Yes' | 'No' | 'Abstain' | `Pick:${number}`;
 
 /**
  * A ballot is cast from the voter's own membership contract, which the proposal page names
@@ -91,10 +92,14 @@ export async function vote(
 ) {
 	preparing();
 	const prepared = await remote.prepareVote({ proposal: proposalId, vote: choice });
+	// A vote is a variant on the ledger (one constructor carries the option picked).
+	const vote = choice.startsWith('Pick:')
+		? { tag: 'Pick', value: choice.slice(5) }
+		: { tag: choice, value: {} };
 	const intent = {
 		choice: 'Member_Vote',
 		contractId: membership,
-		args: { proposalId, closesAt, changeable, vote: choice, previous }
+		args: { proposalId, closesAt, changeable, vote, previous }
 	};
 	await sign(s, who, intent, prepared);
 }

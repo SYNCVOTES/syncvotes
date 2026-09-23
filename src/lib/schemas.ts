@@ -201,7 +201,27 @@ export const createDaoForm = v.pipe(
 	)
 );
 
-export const effectKind = v.picklist(['signal', 'shares', 'info', 'dissolve', 'settings']);
+export const effectKind = v.picklist([
+	'signal',
+	'choose',
+	'shares',
+	'info',
+	'dissolve',
+	'settings'
+]);
+
+/** A choice's options as typed, one per line, blanks dropped. */
+export const parseOptions = (raw: string): string[] =>
+	raw
+		.split('\n')
+		.map((o) => o.trim())
+		.filter(Boolean);
+export const validOptions = (options: string[]): boolean =>
+	options.length >= 2 &&
+	options.length <= 10 &&
+	options.every((o) => o.length <= 80) &&
+	new Set(options).size === options.length;
+const OPTIONS = 'Two to ten distinct options, eighty characters each at most';
 
 export const coinAmount = v.pipe(
 	v.number('An amount of coin'),
@@ -220,6 +240,8 @@ export const createProposalForm = v.pipe(
 		newName: v.optional(v.string(), ''),
 		newDescription: v.optional(v.string(), ''),
 		newImage: imageUrl,
+		/** A choice's options, one per line. */
+		options: v.optional(v.string(), ''),
 		// The DAO's next settings, for a proposal that changes them.
 		...newRoutineFields,
 		...newSensitiveFields
@@ -230,6 +252,10 @@ export const createProposalForm = v.pipe(
 			'The share change is not whole'
 		),
 		['shares']
+	),
+	v.forward(
+		v.check((f) => f.kind !== 'choose' || validOptions(parseOptions(f.options)), OPTIONS),
+		['options']
 	),
 	v.forward(
 		v.check(

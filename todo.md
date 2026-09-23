@@ -125,8 +125,11 @@
       stands. The logic audit stops here; what it left is below
 - [x] the client's address is Caddy's to work out: Cloudflare's ranges are the trusted proxies,
       `X-Client-Ip` is what the app reads; a made-up header on a direct hit counts for nothing
-- [x] Daml Script tests (`daml/test`, run in the DAR build): decoy ballot, late ballot, second
-      ballot, invented member, doubled share change, dissolution, refused settings, moderation
+- [x] Daml Script tests — written (decoy ballot, late ballot, invented member, dissolution,
+      refused settings), then removed at the user's word: the e2e runs against TestNet are the
+      tests (2026-09-23)
+- [x] a choice among options: `Choose` proposals, two to ten options, a ballot picks one; the
+      leader is measured as a yes would be, a tie fails (`syncvotes-options` 0.20.0)
 - [x] `Comment_Remove` — not wanted: a member who may propose may comment, and nobody moderates
       a DAO run by nobody; a comment is its author's alone (built, then taken out the same
       day; removing a choice is no upgrade, so the package is `syncvotes-quorum` 0.18.0).

@@ -16,6 +16,7 @@
 	import Panel from '$lib/components/panel.svelte';
 	import Note from '$lib/components/note.svelte';
 	import Tally from '$lib/components/tally.svelte';
+	import ChoiceTally from '$lib/components/choice-tally.svelte';
 	import EffectCard from '$lib/components/effect-card.svelte';
 	import Markdown from '$lib/components/markdown.svelte';
 	import Comments from '$lib/components/comments.svelte';
@@ -59,7 +60,16 @@
 		}
 	}
 	const tone = (v: string) =>
-		v === 'Yes' ? 'text-green' : v === 'No' ? 'text-red' : 'text-ink-dim';
+		v === 'Yes'
+			? 'text-green'
+			: v === 'No'
+				? 'text-red'
+				: v === 'Abstain'
+					? 'text-ink-dim'
+					: 'text-ink';
+	/** A vote as words: yes, no, abstain, or the option picked. */
+	const said = (v: string, options: string[] = []) =>
+		v.startsWith('Pick:') ? (options[Number(v.slice(5))] ?? `option ${Number(v.slice(5)) + 1}`) : v;
 	const pct = (units: number, of: number) => (of > 0 ? Math.round((units / of) * 1000) / 10 : 0);
 	// Time moves without a ledger event: the deadline and the signing margin are re-read each minute.
 	let now = $state(Date.now());
@@ -124,7 +134,7 @@
 					<Markdown text={p.description} fallback="No description." />
 				</Panel>
 
-				{#if p.effect.kind !== 'signal'}
+				{#if p.effect.kind !== 'signal' && p.effect.kind !== 'choose'}
 					<EffectCard
 						effect={p.effect}
 						executed={p.executed}
@@ -174,7 +184,9 @@
 													: 'Cast; the provider has not counted it yet'}
 												>{p.rule.changeable ? 'may change' : 'not counted yet'}</span
 											>{/if}
-										<span class="w-14 text-right {tone(b.vote)}">{b.vote}</span>
+										<span class="max-w-40 truncate text-right {tone(b.vote)}"
+											>{said(b.vote, p.effect.kind === 'choose' ? p.effect.options : [])}</span
+										>
 									</span>
 								</ListItem>
 							{/each}
@@ -192,21 +204,42 @@
 			</section>
 
 			<aside class="order-first min-w-0 space-y-6 lg:order-none">
-				<Tally
-					yes={p.yes}
-					no={p.no}
-					abstain={p.abstain}
-					eligible={p.eligible}
-					cast={p.cast}
-					rule={p.rule}
-					counted={p.counted > 0 || !!p.outcome}
-				/>
+				{#if p.effect.kind === 'choose'}
+					<ChoiceTally
+						options={p.effect.options}
+						tallies={p.tallies}
+						abstain={p.abstain}
+						eligible={p.eligible}
+						cast={p.cast}
+						rule={p.rule}
+						counted={p.counted > 0 || !!p.outcome}
+					/>
+				{:else}
+					<Tally
+						yes={p.yes}
+						no={p.no}
+						abstain={p.abstain}
+						eligible={p.eligible}
+						cast={p.cast}
+						rule={p.rule}
+						counted={p.counted > 0 || !!p.outcome}
+					/>
+				{/if}
 
 				{#if p.outcome}
 					<Note>
-						Settled as <span class={p.outcome === 'Passed' ? 'text-green' : 'text-red'}
-							>{p.outcome}</span
-						>.
+						{#if p.outcome.startsWith('Chosen:')}
+							Decided: <span class="text-green"
+								>{said(
+									p.outcome.replace('Chosen:', 'Pick:'),
+									p.effect.kind === 'choose' ? p.effect.options : []
+								)}</span
+							>.
+						{:else}
+							Settled as <span class={p.outcome === 'Passed' ? 'text-green' : 'text-red'}
+								>{p.outcome}</span
+							>.
+						{/if}
 					</Note>
 				{:else if ended}
 					<Note>The deadline has passed; the last ballots are being counted.</Note>
@@ -222,19 +255,37 @@
 						<Panel padding="sm" class="space-y-3">
 							<Problem message={store.problem} />
 							<p class="text-[13px] text-ink-dim">
-								{#if changing}You voted {p.me.vote}; cast again to change it.{:else}Your vote weighs {pct(
+								{#if changing}You voted {said(
+										p.me.vote ?? '',
+										p.effect.kind === 'choose' ? p.effect.options : []
+									)}; cast again to change it.{:else}Your vote weighs {pct(
 										p.me.weight ?? 0,
 										p.eligible
 									)}%.{/if}
 							</p>
-							<div class="grid grid-cols-2 gap-3">
-								<Button variant="accent" disabled={store.busy} onclick={() => vote('Yes')}>
-									{#if casting === 'Yes'}<Loader size={14} class="animate-spin" />{/if}Yes
-								</Button>
-								<Button variant="destructive" disabled={store.busy} onclick={() => vote('No')}>
-									{#if casting === 'No'}<Loader size={14} class="animate-spin" />{/if}No
-								</Button>
-							</div>
+							{#if p.effect.kind === 'choose'}
+								<div class="grid gap-2">
+									{#each p.effect.options as o, i (i)}
+										<Button
+											variant="outline"
+											class="justify-start"
+											disabled={store.busy}
+											onclick={() => vote(`Pick:${i}`)}
+										>
+											{#if casting === `Pick:${i}`}<Loader size={14} class="animate-spin" />{/if}{o}
+										</Button>
+									{/each}
+								</div>
+							{:else}
+								<div class="grid grid-cols-2 gap-3">
+									<Button variant="accent" disabled={store.busy} onclick={() => vote('Yes')}>
+										{#if casting === 'Yes'}<Loader size={14} class="animate-spin" />{/if}Yes
+									</Button>
+									<Button variant="destructive" disabled={store.busy} onclick={() => vote('No')}>
+										{#if casting === 'No'}<Loader size={14} class="animate-spin" />{/if}No
+									</Button>
+								</div>
+							{/if}
 							<Button
 								variant="ghost"
 								size="sm"
@@ -253,7 +304,9 @@
 					{:else if p.me.vote}
 						<Note
 							>You voted <span class={tone(p.me.vote)}
-								>{p.me.vote === 'Abstain' ? 'to abstain' : p.me.vote}</span
+								>{p.me.vote === 'Abstain'
+									? 'to abstain'
+									: said(p.me.vote, p.effect.kind === 'choose' ? p.effect.options : [])}</span
 							>{p.me.weight !== null ? ` with ${pct(p.me.weight, p.eligible)}%` : ''}.
 							{#if canVote}
 								<button

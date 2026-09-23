@@ -3,6 +3,5 @@ daml.js
 build
 .svelte-kit
 daml/.daml
-daml/test/.daml
 .git
 *.env

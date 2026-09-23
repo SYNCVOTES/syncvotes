@@ -4,7 +4,7 @@
 	import * as remote from '$lib/api.remote';
 	import { store } from '$lib/wallet-store.svelte';
 	import { signedForm } from '$lib/forms';
-	import { createProposalForm as schema, shareChanges, BATCH } from '$lib/schemas';
+	import { createProposalForm as schema, shareChanges, validOptions, BATCH } from '$lib/schemas';
 	import type { Plain } from '$lib/verify';
 	import { Input } from '$lib/components/ui/input';
 	import Page from '$lib/components/page.svelte';
@@ -28,6 +28,8 @@
 	import Power from '@lucide/svelte/icons/power';
 	import Scale from '@lucide/svelte/icons/scale';
 	import MessageSquare from '@lucide/svelte/icons/message-square';
+	import ListChecks from '@lucide/svelte/icons/list-checks';
+	import X from '@lucide/svelte/icons/x';
 	import { fmt } from '$lib/format';
 	import * as v from 'valibot';
 
@@ -41,7 +43,7 @@
 	 * from the truth — and before signing the page says in one sentence what the ledger will
 	 * do: the same sentence the voters will read.
 	 */
-	type Kind = 'signal' | 'shares' | 'info' | 'dissolve' | 'settings';
+	type Kind = 'signal' | 'choose' | 'shares' | 'info' | 'dissolve' | 'settings';
 	let kind = $state<Kind>('signal');
 	const kinds = $derived([
 		{
@@ -50,6 +52,13 @@
 			text: 'The DAO takes a position. Nothing else changes.',
 			more: "Records the DAO's position on a question: an opinion, an approval, a mandate for someone. Nothing on the ledger changes but the record of the vote itself. For anything that does not need the ledger to act.",
 			icon: MessageSquare
+		},
+		{
+			value: 'choose',
+			title: 'Choice',
+			text: 'The DAO picks one of several options.',
+			more: 'Puts two to ten options to the vote; each member picks one, or abstains. The option with the most votes wins if it reaches what the DAO’s routine rule asks of a yes — more than half of the whole vote, say — and stands alone at the top; a tie decides nothing. Nothing on the ledger changes but the record of the choice.',
+			icon: ListChecks
 		},
 		d?.equal
 			? {
@@ -94,6 +103,10 @@
 		more: string;
 		icon: unknown;
 	}[]);
+
+	// A choice's options: two to start with, ten at most.
+	let options = $state<string[]>(['', '']);
+	const optionList = $derived(options.map((o) => o.trim()).filter(Boolean));
 
 	// What is there today, to start from.
 	let newName = $state('');
@@ -199,6 +212,12 @@
 				if (!newName.trim()) return 'Give the DAO its name below.';
 				if (!infoChanged) return 'Nothing changes yet — edit the name, description or picture.';
 				return `The DAO is ${newName.trim() !== d?.name ? `renamed to “${newName.trim()}”` : 'kept as is'}${newDescription !== d?.description ? ', with a new description' : ''}${(newImage.trim() || null) !== d?.image ? (newImage.trim() ? ', with a new picture' : ', without a picture') : ''}.`;
+			case 'choose':
+				if (!validOptions(optionList))
+					return optionList.length < 2
+						? 'Give at least two options below.'
+						: 'Two to ten distinct options, eighty characters each at most.';
+				return `Members pick one of ${fmt(optionList.length)} options; the one with the most votes wins if it reaches what a yes would need, and stands alone at the top.`;
 			case 'dissolve':
 				return 'The DAO is archived the moment this passes: nothing more can be proposed or voted on, what was paid in for it is spent, and its record stays readable.';
 			case 'settings':
@@ -216,6 +235,10 @@
 				return newName.trim() && newName.trim() !== d?.name
 					? `Rename to ${newName.trim()}`
 					: 'Update the description';
+			case 'choose':
+				return optionList.length >= 2
+					? `Choose: ${optionList.slice(0, 3).join(' / ')}`
+					: 'A choice';
 			case 'dissolve':
 				return 'Dissolve the DAO';
 			case 'settings':
@@ -252,17 +275,27 @@
 									image: fields.newImage || null
 								}
 							}
-						: fields.kind === 'dissolve'
-							? { tag: 'Dissolve', value: {} }
-							: fields.kind === 'settings'
-								? {
-										tag: 'SetSettings',
-										value: {
-											routine: settingsToLedger(settingsOf(fields, 'newRoutine')),
-											sensitive: settingsToLedger(settingsOf(fields, 'newSensitive'))
-										}
+						: fields.kind === 'choose'
+							? {
+									tag: 'Choose',
+									value: {
+										options: fields.options
+											.split('\n')
+											.map((o) => o.trim())
+											.filter(Boolean)
 									}
-								: { tag: 'Signal', value: {} };
+								}
+							: fields.kind === 'dissolve'
+								? { tag: 'Dissolve', value: {} }
+								: fields.kind === 'settings'
+									? {
+											tag: 'SetSettings',
+											value: {
+												routine: settingsToLedger(settingsOf(fields, 'newRoutine')),
+												sensitive: settingsToLedger(settingsOf(fields, 'newSensitive'))
+											}
+										}
+									: { tag: 'Signal', value: {} };
 			return {
 				choice: 'Member_Propose',
 				contractId: membership,
@@ -298,6 +331,8 @@
 				return summary.valid;
 			case 'info':
 				return newName.trim().length >= 2 && infoChanged;
+			case 'choose':
+				return validOptions(optionList);
 			case 'settings':
 				return validRule(newRoutine.rule) && validRule(newSensitive.rule);
 			default:
@@ -328,6 +363,7 @@
 			<input {...f.fields.dao.as('hidden', id)} />
 			<input type="hidden" name="kind" value={kind} />
 			<input type="hidden" name="title" value={title.trim() || suggested} />
+			<input type="hidden" name="options" value={optionList.join('\n')} />
 
 			<FormSection title="What happens when it passes">
 				<div class="grid gap-3 sm:grid-cols-2">
@@ -377,6 +413,46 @@
 							/>
 						{:else}
 							<Skeleton height="h-24" />
+						{/if}
+					</Field>
+				{:else if kind === 'choose'}
+					<Field
+						label="Options"
+						id="option-0"
+						hint="Two to ten, a few words each. Members pick one; an abstention takes part without picking."
+						issues={f.fields.options.issues()}
+					>
+						<ol class="space-y-2">
+							{#each options, i (i)}
+								<li class="flex items-center gap-2">
+									<span class="w-5 shrink-0 text-right font-mono text-xs text-ink-dim">{i + 1}</span
+									>
+									<Input
+										id="option-{i}"
+										maxlength={80}
+										placeholder={i === 0 ? 'Telecaster' : i === 1 ? 'Stratocaster' : ''}
+										class="flex-1"
+										disabled={store.busy}
+										bind:value={options[i]}
+									/>
+									{#if options.length > 2}
+										<button
+											type="button"
+											class="p-1 text-ink-dim hover:text-red"
+											aria-label="Remove option {i + 1}"
+											onclick={() => (options = options.filter((_, j) => j !== i))}
+											><X size={14} /></button
+										>
+									{/if}
+								</li>
+							{/each}
+						</ol>
+						{#if options.length < 10}
+							<button
+								type="button"
+								class="mt-2 font-mono text-xs text-ink-dim underline hover:text-ink"
+								onclick={() => (options = [...options, ''])}>Add an option</button
+							>
 						{/if}
 					</Field>
 				{:else if kind === 'info'}

@@ -25,12 +25,10 @@ RUN dpm install "$(grep '^sdk-version:' daml/daml.yaml | cut -d' ' -f2)"
 
 # The DAR and its TypeScript bindings, as a stage of their own: `pnpm daml:codegen` builds this
 # stage on the server and copies both back, since damlc is x86_64-only and Macs no longer run it.
-# The model's Daml Script tests (daml/test) run here too: a claim that fails fails the build.
 FROM builder AS dar
 COPY daml ./daml
-RUN cd daml && rm -rf .daml/dist test/.daml && dpm build \
-	&& cd test && dpm build && dpm test \
-	&& cd ../.. && dpm codegen-js daml/.daml/dist/*.dar -o daml.js
+RUN cd daml && rm -rf .daml/dist && dpm build \
+	&& cd .. && dpm codegen-js daml/.daml/dist/*.dar -o daml.js
 
 FROM dar AS app
 # Codegen writes workspace packages, so it has to happen before install.
