@@ -33,7 +33,8 @@ async function token(clientId, secret) {
 }
 // Where the participant does not trust our realm yet (MainNet, HMAC for the validator's own
 // backend), an admin token minted elsewhere is passed in as ADMIN_TOKEN instead.
-const admin = env.ADMIN_TOKEN ?? (await token('validator-app-backend', need('VALIDATOR_CLIENT_SECRET')));
+const admin =
+	env.ADMIN_TOKEN ?? (await token('validator-app-backend', need('VALIDATOR_CLIENT_SECRET')));
 async function api(path, body, method = body ? 'POST' : 'GET') {
 	const r = await fetch(LEDGER + path, {
 		method,

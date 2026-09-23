@@ -301,7 +301,8 @@ signature the server cannot forge.
 ## Deployment
 
 ```sh
-pnpm deploy:testnet   # either refuses an uncommitted tree: what runs is always a commit
+pnpm deploy:testnet   # each refuses an uncommitted tree: what runs is always a commit
+pnpm deploy:devnet
 pnpm deploy:mainnet
 ```
 
@@ -339,6 +340,14 @@ Building on the server is deliberate: it is amd64, the laptop is not, and the la
 has its own `start.sh`, which does more than `compose up`, so a deploy must never recreate its
 containers. Caddy binds the public IP because the validator's nginx already holds `:80` on
 loopback. The app reaches the participant directly at `participant:7575` on that network.
+
+A fresh validator is set up once with `scripts/setup-participant.mjs`, run inside the app image
+before the app's first start: as the validator's ledger admin it makes the app's ledger user,
+allocates the operator party and grants the rights listed under Authentication, then prints the
+two party ids for the env file. Where a host's ports 80/443 belong to another proxy, Caddy is put
+on loopback (`CADDY_HTTP_BIND`, `CADDY_HTTPS_BIND`), serves the plain-HTTP site named by
+`CADDY_SITE`, trusts that proxy (`CADDY_TRUSTED_EXTRA`), and either traefik routes the domain to it
+by the labels compose sets (`TRAEFIK=true`, `PROXY_NETWORK`) or an nginx site forwards it.
 
 One image runs everywhere; what differs between networks and deployments is in the env file
 (`testnet.env`, `mainnet.env`, `devnet.env`, never in git): the participant, the parties, the
