@@ -27,19 +27,15 @@
 	}: { settings: Settings; prefix: string; eligible?: number; equal?: boolean } = $props();
 
 	const arithmetic = (r: Rule) => ({ ...r, early: true, changeable: false });
-	let preset = $state<Preset>(presetOf(arithmetic(settings.rule)));
 	const rule = $derived(settings.rule);
+	// The preset the dials stand at, or custom; a dial moved by hand changes it accordingly.
+	const preset = $derived<Preset>(presetOf(arithmetic(rule)));
 	const set = (patch: Partial<Rule>) =>
 		(settings = { ...settings, rule: { ...settings.rule, ...patch } });
 	const pick = (p: Preset) => {
-		preset = p;
 		const found = PRESETS.find((x) => x.value === p)?.rule;
 		if (found) set({ basis: found.basis, threshold: { ...found.threshold }, quorum: found.quorum });
 	};
-	// A dial moved by hand makes the preset "custom" unless it lands on one.
-	$effect(() => {
-		preset = presetOf(arithmetic(rule));
-	});
 	const percent = $derived(rule.threshold.kind === 'percent' ? rule.threshold.percent : 67);
 	const unit = (n: number) => (equal ? (n === 1 ? 'member' : 'members') : 'units');
 	const here = $derived.by(() => {
