@@ -294,19 +294,30 @@ export async function allocateMultiKeyParty(
  * found without its Account — for a key that comes back after the app's package changed.
  */
 export async function partyByFingerprint(fingerprint: string): Promise<string | null> {
+	return (await localParties()).find((p) => p.split('::')[1] === fingerprint) ?? null;
+}
+
+let partiesCache: { at: number; promise: Promise<string[]> } | undefined;
+/** The parties this participant hosts, read once a minute at most: a key search is a map lookup. */
+function localParties(): Promise<string[]> {
+	if (partiesCache && Date.now() - partiesCache.at < 60_000) return partiesCache.promise;
+	const promise = listLocalParties();
+	promise.catch(() => (partiesCache = undefined));
+	partiesCache = { at: Date.now(), promise };
+	return promise;
+}
+async function listLocalParties(): Promise<string[]> {
+	const found: string[] = [];
 	let token: string | undefined;
 	do {
 		const page = await api<{
 			partyDetails: { party: string; isLocal: boolean }[];
 			nextPageToken?: string;
 		}>(`/v2/parties?pageSize=1000${token ? `&pageToken=${encodeURIComponent(token)}` : ''}`);
-		const found = page.partyDetails.find(
-			(p) => p.isLocal && p.party.split('::')[1] === fingerprint
-		);
-		if (found) return found.party;
+		for (const p of page.partyDetails) if (p.isLocal) found.push(p.party);
 		token = page.nextPageToken || undefined;
 	} while (token);
-	return null;
+	return found;
 }
 
 /** Whether the synchronizer knows this party yet. */

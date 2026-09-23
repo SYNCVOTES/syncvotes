@@ -144,6 +144,7 @@ async function ensureAccount(
  * key nobody has seen gets to choose the hint its party id will carry.
  */
 export const lookup = query(base64, async (publicKey) => {
+	paceLookups();
 	const fingerprint = await fingerprintOf(new Uint8Array(Buffer.from(publicKey, 'base64')));
 	for (const account of ledger.accounts.values()) {
 		if (account.party.split('::')[1] === fingerprint) {
@@ -803,6 +804,18 @@ export const prepareVote = command(
 		return prepare(me.party, Main.Member, me.contractId, 'Member_Vote', args, p.daoId);
 	}
 );
+
+/** Keys looked up lately from one address: each unknown key has the participant's parties searched. */
+const recentLookups = new Map<string, number[]>();
+const LOOKUPS_PER_HOUR = 300;
+function paceLookups() {
+	const address = clientAddress();
+	const now = Date.now();
+	const mine = (recentLookups.get(address) ?? []).filter((t) => now - t < 3_600_000);
+	if (mine.length >= LOOKUPS_PER_HOUR) error(429, 'That is a lot of keys for one hour; try later');
+	mine.push(now);
+	recentLookups.set(address, mine);
+}
 
 /** Parties made lately from one address: the provider pays for each, so a flood is refused. */
 const recentEnrols = new Map<string, number[]>();
