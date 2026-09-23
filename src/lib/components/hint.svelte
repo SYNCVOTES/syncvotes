@@ -26,7 +26,7 @@
 		aria-hidden="true"
 	/>
 	<span
-		class="pointer-events-none fixed inset-x-4 bottom-4 z-30 hidden border border-border bg-surface p-3 text-left font-sans text-xs leading-relaxed font-normal tracking-normal text-ink-mid normal-case shadow-lg group-hover:block group-focus:block sm:absolute sm:inset-x-auto sm:top-full sm:bottom-auto sm:mt-1.5 sm:w-72 {align ===
+		class="pointer-events-none fixed inset-x-4 bottom-4 z-30 hidden border border-border bg-surface p-3 text-left font-sans text-xs leading-relaxed font-normal tracking-normal whitespace-normal text-ink-mid normal-case shadow-lg group-hover:block group-focus:block sm:absolute sm:inset-x-auto sm:top-full sm:bottom-auto sm:mt-1.5 sm:w-72 {align ===
 		'end'
 			? 'sm:right-0'
 			: 'sm:left-0'}"
