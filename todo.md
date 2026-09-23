@@ -121,8 +121,8 @@
       stands. The logic audit stops here; what it left is below
 - [ ] `cf-connecting-ip` is trusted as it comes: reach the origin directly and the pacing is
       yours to name (bind the origin to the proxy, or check the proxy's address)
-- [ ] a withdrawal that fails and a lock that expires leave an instruction nobody can close;
-      one live 1 CC payout to the bank party is in that state — close it by hand
+- [ ] a withdrawal that fails and a lock that expires leave an instruction nobody can close
+      (the 1 CC test payout the audit named was in fact whole, and was taken back by hand)
 - [ ] a remainder's lowered attempts (`-0..-3`) and a receiver swapped for the same address:
       dust guard (below 0.01 CC, write off), and `known` keyed on the instruction, not the receiver
 - [ ] Daml Script tests for the model's claims (decoy ballot, duplicate member, dissolve order)
