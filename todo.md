@@ -99,7 +99,7 @@
 - [x] the treasury gone again, payouts with it: a DAO holds no coin; its balance is paid in
       by memo to the provider from any wallet, read off the provider's transactions, credited to
       the meter; dissolution archives the DAO at once; no `paid.json`, no state off the ledger
-      (`syncvotes-books` 0.17.0). The treasury party, payouts and the remainder are in git
+      (`syncvotes-books` 0.17). The treasury party, payouts and the remainder are in git
       history at `9d8a00b`, audited four rounds, if a DAO ever needs to hold coin
 - [x] a treasury the provider cannot touch (m-of-n signers by vote) — not wanted: a DAO holds
       no coin now; `bb62260` keeps the working pieces should that change (2026-09-23)

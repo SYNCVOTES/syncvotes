@@ -15,7 +15,7 @@
 	},
 	"dependencies": {
 		"@canton-network/wallet-sdk": "^1.5.0",
-		"@daml.js/model": "workspace:@daml.js/syncvotes-books-0.17.0@*",
+		"@daml.js/model": "workspace:@daml.js/syncvotes-books-0.17.1@*",
 		"@daml/types": "3.5.2",
 		"dompurify": "^3.4.15",
 		"marked": "^18.0.13"
