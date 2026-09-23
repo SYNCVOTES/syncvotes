@@ -79,6 +79,7 @@
 						members={dao.members}
 						openProposals={dao.openProposals}
 						balance={dao.balance}
+						actorPays={dao.actorPays}
 						share={dao.units > 0 ? Math.round((dao.myShare / dao.units) * 1000) / 10 : 0}
 						equal={dao.equal}
 						role={dao.creator === who.party ? 'creator' : 'member'}
