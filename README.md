@@ -48,7 +48,7 @@ the token standard's packages are on every validator, so a balance can be paid i
 
 ### The model
 
-`daml/src/Main.daml`, package `syncvotes-books`, one idea: every contract a user acts on
+`daml/src/Main.daml`, package `syncvotes-quorum`, one idea: every contract a user acts on
 already carries the provider's signature, so the provider is a **confirmer** of every
 transaction — which is what CIP-0104 pays traffic rewards for — while the user's key is the
 only one that ever signs a submission. One constraint: a DAO may have thousands of members and
@@ -201,7 +201,7 @@ Codegen names its output `@daml.js/<name>-<version>` from `daml/daml.yaml` — n
 `@daml.js/model`, and everything else uses the alias or a glob. Bumping the version means editing
 `daml/daml.yaml` and that one alias line.
 
-`Main.Proposal.templateId` is `#syncvotes-books:Main:Proposal` — the package-name-scoped id the
+`Main.Proposal.templateId` is `#syncvotes-quorum:Main:Proposal` — the package-name-scoped id the
 ledger accepts in commands and ACS filters, which is what keeps a package upgrade from breaking
 submissions. `verify.ts` takes the package name from the same place.
 
@@ -344,7 +344,7 @@ idempotent by package id — so the code and the package it needs always land to
 - A package name and version can be uploaded once, and a later version under the same name must
   be a compatible upgrade (fields can only be added, and as `Optional`). A change that is not —
   a template dropped, a field made mandatory — needs a new package name, which is why the model
-  has changed name with every incompatible step and is `syncvotes-books` now.
+  has changed name with every incompatible step and is `syncvotes-quorum` now.
 - A `.remote.ts` module may export nothing but remote functions — a shared constant next to
   them fails the build, which is why the batch size lives in `schemas.ts`.
 - The kit's `form.fields.value()` knows only the fields the user touched; `forms.ts` reads the
