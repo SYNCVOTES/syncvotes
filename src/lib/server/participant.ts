@@ -285,6 +285,26 @@ export async function allocateMultiKeyParty(
 	});
 }
 
+/**
+ * A party this participant hosts whose namespace is this fingerprint: the party a key made,
+ * found without its Account — for a key that comes back after the app's package changed.
+ */
+export async function partyByFingerprint(fingerprint: string): Promise<string | null> {
+	let token: string | undefined;
+	do {
+		const page = await api<{
+			partyDetails: { party: string; isLocal: boolean }[];
+			nextPageToken?: string;
+		}>(`/v2/parties?pageSize=1000${token ? `&pageToken=${encodeURIComponent(token)}` : ''}`);
+		const found = page.partyDetails.find(
+			(p) => p.isLocal && p.party.split('::')[1] === fingerprint
+		);
+		if (found) return found.party;
+		token = page.nextPageToken || undefined;
+	} while (token);
+	return null;
+}
+
 /** Whether the synchronizer knows this party yet. */
 export const partyKnown = (party: string): Promise<boolean> =>
 	api<{ connectedSynchronizers?: unknown[] }>(

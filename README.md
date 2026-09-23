@@ -319,6 +319,17 @@ loopback. The app reaches the participant directly at `participant:7575` on that
 The DAR is built inside the image, and the app uploads it on startup (`src/hooks.server.ts`) —
 idempotent by package id — so the code and the package it needs always land together.
 
+The package is a lineage, `syncvotes-options`, and its name never changes again: every release
+is a Canton Smart Contract Upgrade of the one before, checked by the compiler against the previous
+DAR (`upgrades:` in `daml/daml.yaml`, the DAR kept in `daml/upgrades/`), so live contracts —
+parties' Accounts, DAOs, members, proposals — carry over. What an upgrade may do: change a
+choice's body, add a template, add a choice, append an `Optional` field or choice argument.
+What it may not: remove or retype a field or a choice, change signatories or observers, tighten
+`ensure`. A change outside that list is a new lineage and a fresh ledger, which is what the
+renames of September 2026 were; a party whose Account is on an old lineage is found again by
+its key's fingerprint among the participant's parties and given a new Account, but its DAOs
+stay behind. Release: bump the version, point `upgrades:` at the release before.
+
 ## Notes
 
 - An external party's namespace is the fingerprint of its own key, so the party id is a pure

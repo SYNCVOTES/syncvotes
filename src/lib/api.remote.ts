@@ -93,9 +93,34 @@ const accountOf = (party: string): ledger.Account => {
 	return account;
 };
 
+/** The party's Account, created by the provider if it has none: its door to the app. */
+async function ensureAccount(party: string): Promise<ledger.Account> {
+	const known = ledger.accounts.get(party);
+	if (known) return known;
+	const updateId = await participant.submitAsProvider(
+		[
+			{
+				CreateCommand: {
+					templateId: Main.Account.templateId,
+					createArguments: {
+						provider: participant.providerParty(),
+						operator: participant.operatorParty(),
+						user: party
+					}
+				}
+			}
+		],
+		`register-${party.split('::')[1]}-${Date.now()}`
+	);
+	await ledger.applied(updateId);
+	return accountOf(party);
+}
+
 /**
  * Who is this key? A party's namespace is the fingerprint of its key, so a registered party is
- * found by that alone. A key nobody has seen gets to choose the hint its party id will carry.
+ * found by that alone. A party the participant hosts that has no Account here — made under an
+ * earlier package of this app — gets one again, and is back with everything that survived. A
+ * key nobody has seen gets to choose the hint its party id will carry.
  */
 export const lookup = query(base64, async (publicKey) => {
 	const fingerprint = await fingerprintOf(new Uint8Array(Buffer.from(publicKey, 'base64')));
@@ -103,6 +128,11 @@ export const lookup = query(base64, async (publicKey) => {
 		if (account.party.split('::')[1] === fingerprint) {
 			return { exists: true as const, party: account.party, account: account.contractId };
 		}
+	}
+	const hosted = await participant.partyByFingerprint(fingerprint);
+	if (hosted) {
+		const account = await ensureAccount(hosted);
+		return { exists: true as const, party: hosted, account: account.contractId };
 	}
 	return { exists: false as const, fingerprint };
 });
@@ -139,24 +169,7 @@ export const enrol = command(
 			multiHash,
 			signature
 		);
-		if (!ledger.accounts.has(party)) {
-			const updateId = await participant.submitAsProvider(
-				[
-					{
-						CreateCommand: {
-							templateId: Main.Account.templateId,
-							createArguments: {
-								provider: participant.providerParty(),
-								operator: participant.operatorParty(),
-								user: party
-							}
-						}
-					}
-				],
-				`register-${party.split('::')[1]}`
-			);
-			await ledger.applied(updateId);
-		}
+		await ensureAccount(party);
 		count();
 		return { party, account: accountOf(party).contractId };
 	}

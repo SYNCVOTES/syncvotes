@@ -128,6 +128,9 @@
 - [x] Daml Script tests — written (decoy ballot, late ballot, invented member, dissolution,
       refused settings), then removed at the user's word: the e2e runs against TestNet are the
       tests (2026-09-23)
+- [x] no more renames: `syncvotes-options` is the lineage, every release an SCU of the one
+      before, gated by `upgrades:`; a key whose Account is on an old lineage gets its party
+      back by fingerprint (its DAOs are not carried over) (2026-09-23)
 - [x] a choice among options: `Choose` proposals, two to ten options, a ballot picks one; the
       leader is measured as a yes would be, a tie fails (`syncvotes-options` 0.20.0)
 - [x] `Comment_Remove` — not wanted: a member who may propose may comment, and nobody moderates
