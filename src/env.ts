@@ -63,7 +63,7 @@ export const variables = defineEnvVars({
 	NETWORK: {
 		description: 'The Canton network this deployment is on, as shown to users: TestNet or MainNet',
 		public: true,
-		schema: v.optional(v.picklist(['TestNet', 'MainNet']), 'TestNet')
+		schema: v.optional(v.picklist(['DevNet', 'TestNet', 'MainNet']), 'TestNet')
 	},
 	GIT_SHA: {
 		description: 'The commit this image was built from, baked in by the Dockerfile',

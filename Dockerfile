@@ -64,6 +64,8 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=app /app/daml.js ./daml.js
 COPY --from=app /app/build ./build
 COPY package.json ./
+# Setup run by hand against a fresh validator (scripts/setup-participant.mjs).
+COPY scripts ./scripts
 # The DAR rides along: on startup the app uploads exactly the package this image was built from.
 COPY --from=app /app/daml/.daml/dist ./dar
 

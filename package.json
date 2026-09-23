@@ -6,6 +6,7 @@
 	"packageManager": "pnpm@11.6.0",
 	"scripts": {
 		"deploy:testnet": "[ -z \"$(git status --porcelain)\" ] && GIT_SHA=$(git rev-parse --short=12 HEAD) docker --context syncvotes-testnet compose --env-file testnet.env build && docker --context syncvotes-testnet compose --env-file testnet.env up -d",
+		"deploy:devnet": "[ -z \"$(git status --porcelain)\" ] && GIT_SHA=$(git rev-parse --short=12 HEAD) docker --context syncvotes-devnet compose --env-file devnet.env build && docker --context syncvotes-devnet compose --env-file devnet.env up -d",
 		"deploy:mainnet": "[ -z \"$(git status --porcelain)\" ] && GIT_SHA=$(git rev-parse --short=12 HEAD) docker --context syncvotes-mainnet compose --env-file mainnet.env build && docker --context syncvotes-mainnet compose --env-file mainnet.env up -d",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
