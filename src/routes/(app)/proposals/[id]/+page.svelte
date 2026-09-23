@@ -195,7 +195,7 @@
 							shown={ballots.current.items.length}
 							total={ballots.current.total}
 							noun="ballots"
-							onmore={() => (limit += 20)}
+							onmore={(n) => (limit = n)}
 						/>
 					{/if}
 				</div>

@@ -20,7 +20,8 @@
 	 * author, and the DAO pays its traffic like any other.
 	 */
 	let { proposal, member }: { proposal: string; member: boolean } = $props();
-	const comments = $derived(store.who ? remote.proposalComments(proposal) : null);
+	let limit = $state(20);
+	const comments = $derived(store.who ? remote.proposalComments({ id: proposal, limit }) : null);
 
 	let body = $state('');
 	const f = remote.commentForm;
@@ -38,18 +39,28 @@
 
 <div class="space-y-4">
 	<h2 class="eyebrow">
-		Comments{comments?.ready && comments.current.length ? ` · ${comments.current.length}` : ''}
+		Comments{comments?.ready && comments.current.total ? ` · ${comments.current.total}` : ''}
 	</h2>
 
 	{#if comments?.error}
 		<QueryError error={comments.error} refresh={() => comments?.reconnect()} />
 	{:else if !comments?.ready}
 		<Skeleton height="h-16" />
-	{:else if comments.current.length === 0}
+	{:else if comments.current.total === 0}
 		<p class="text-[13px] text-ink-dim">Nothing said yet.</p>
 	{:else}
+		{#if comments.current.total > comments.current.items.length}
+			<button
+				type="button"
+				class="font-mono text-xs text-ink-dim underline hover:text-ink"
+				onclick={() => (limit = Math.min(1000, limit * 2))}
+				>Show earlier comments ({(
+					comments.current.total - comments.current.items.length
+				).toLocaleString('en-US')} more)</button
+			>
+		{/if}
 		<ol class="space-y-3">
-			{#each comments.current as c (c.id)}
+			{#each comments.current.items as c (c.id)}
 				<li class="flex gap-3">
 					<Avatar who={c.who} size="md" class="mt-1" />
 					<div class="min-w-0 flex-1 border border-border">

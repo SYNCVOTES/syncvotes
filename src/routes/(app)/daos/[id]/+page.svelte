@@ -18,6 +18,7 @@
 	import EmptyState from '$lib/components/empty-state.svelte';
 	import Skeleton from '$lib/components/skeleton.svelte';
 	import LoadMore from '$lib/components/load-more.svelte';
+	import SearchInput from '$lib/components/search-input.svelte';
 	import RoleTag from '$lib/components/role-tag.svelte';
 	import EffectLabel from '$lib/components/effect-label.svelte';
 	import ShareBar from '$lib/components/share-bar.svelte';
@@ -39,7 +40,8 @@
 	// The proposal list is paged and filtered on the server; more pages append below.
 	let status = $state<'open' | 'closed' | undefined>(undefined);
 	let limit = $state(20);
-	const proposals = $derived(me ? remote.daoProposals({ id, offset: 0, limit, status }) : null);
+	let q = $state('');
+	const proposals = $derived(me ? remote.daoProposals({ id, offset: 0, limit, status, q }) : null);
 	const preview = $derived(me ? remote.daoMembers({ id, offset: 0, limit: 8, q: '' }) : null);
 
 	const pct = (units: number, of: number) => (of > 0 ? Math.round((units / of) * 1000) / 10 : 0);
@@ -138,20 +140,25 @@
 			<section class="min-w-0">
 				<div class="mb-4 flex items-center justify-between gap-4">
 					<h2 class="eyebrow">Proposals</h2>
-					<div class="flex gap-1">
-						{#each [[undefined, 'All'], ['open', 'Open'], ['closed', 'Closed']] as [value, label] (label)}
-							<button
-								type="button"
-								class="rounded-full px-3 py-1 font-mono text-[0.6875rem] tracking-[0.14em] uppercase transition-colors {status ===
-								value
-									? 'bg-orange-dim text-orange'
-									: 'text-ink-dim hover:text-ink'}"
-								onclick={() => {
-									status = value as typeof status;
-									limit = 20;
-								}}>{label}</button
-							>
-						{/each}
+					<div class="flex flex-wrap items-center gap-3">
+						<div class="w-56">
+							<SearchInput bind:value={q} placeholder="Filter by title or proposer" />
+						</div>
+						<div class="flex gap-1">
+							{#each [[undefined, 'All'], ['open', 'Open'], ['closed', 'Closed']] as [value, label] (label)}
+								<button
+									type="button"
+									class="rounded-full px-3 py-1 font-mono text-[0.6875rem] tracking-[0.14em] uppercase transition-colors {status ===
+									value
+										? 'bg-orange-dim text-orange'
+										: 'text-ink-dim hover:text-ink'}"
+									onclick={() => {
+										status = value as typeof status;
+										limit = 20;
+									}}>{label}</button
+								>
+							{/each}
+						</div>
 					</div>
 				</div>
 				{#if proposals?.error}
@@ -196,7 +203,7 @@
 						shown={proposals.current.items.length}
 						total={proposals.current.total}
 						noun="proposals"
-						onmore={() => (limit += 20)}
+						onmore={(n) => (limit = n)}
 					/>
 				{/if}
 			</section>

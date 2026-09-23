@@ -79,7 +79,7 @@
 				shown={members.current.items.length}
 				total={members.current.total}
 				noun="members"
-				onmore={() => (limit += 50)}
+				onmore={(n) => (limit = n)}
 			/>
 		{/if}
 	{/if}

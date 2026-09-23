@@ -48,9 +48,10 @@ async function* live<T>(key: string, load: () => T | Promise<T>): AsyncGenerator
 const base64 = v.pipe(v.string(), v.nonEmpty(), v.base64());
 const partyId = schemas.partyId;
 const contractId = v.pipe(v.string(), v.nonEmpty());
+/** A page of a list: up to a thousand at once, so "show all" reaches a whole DAO. */
 const paging = {
 	offset: v.pipe(v.number(), v.integer(), v.minValue(0)),
-	limit: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(schemas.BATCH))
+	limit: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(1000))
 };
 const filter = v.optional(v.pipe(v.string(), v.maxLength(100)), '');
 
@@ -296,13 +297,22 @@ export const daoShares = query(contractId, (id) => {
 		.map((m) => ({ party: m.party, share: m.share, who: who(m.party) }));
 });
 
+/** Proposals, newest first, by status, filtered by a substring of the title or the proposer. */
 export const daoProposals = query.live(
-	v.object({ id: contractId, ...paging, status: v.optional(v.picklist(['open', 'closed'])) }),
-	({ id, offset, limit, status }) =>
+	v.object({
+		id: contractId,
+		...paging,
+		status: v.optional(v.picklist(['open', 'closed'])),
+		q: filter
+	}),
+	({ id, offset, limit, status, q }) =>
 		live(ledger.keys.dao(id), () => {
 			memberOnly(id);
-			const all = proposalsOf(id).filter((p) =>
-				status === 'open' ? !p.outcome : status === 'closed' ? !!p.outcome : true
+			const needle = q.trim().toLowerCase();
+			const all = proposalsOf(id).filter(
+				(p) =>
+					(status === 'open' ? !p.outcome : status === 'closed' ? !!p.outcome : true) &&
+					(!needle || p.title.toLowerCase().includes(needle) || matches(q)(p.proposer))
 			);
 			return page(all, offset, limit);
 		})
@@ -437,16 +447,23 @@ export const proposalBallots = query.live(
 		})
 );
 
-/** Comments, oldest first, with who wrote them. */
-export const proposalComments = query.live(contractId, (id) =>
-	live(ledger.keys.proposal(id), () => {
-		const p = proposalOf(id);
-		const me = proposalReader(p);
-		return [...(ledger.comments.get(id)?.values() ?? [])]
-			.filter((c) => c.daoId === p.daoId)
-			.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-			.map((c) => ({ ...c, who: who(c.author), mine: c.author === (me?.party ?? p.proposer) }));
-	})
+/** The last `limit` comments, oldest first, with who wrote them; earlier ones on request. */
+export const proposalComments = query.live(
+	v.object({ id: contractId, limit: paging.limit }),
+	({ id, limit }) =>
+		live(ledger.keys.proposal(id), () => {
+			const p = proposalOf(id);
+			const me = proposalReader(p);
+			const all = [...(ledger.comments.get(id)?.values() ?? [])]
+				.filter((c) => c.daoId === p.daoId)
+				.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+			return {
+				total: all.length,
+				items: all
+					.slice(Math.max(0, all.length - limit))
+					.map((c) => ({ ...c, who: who(c.author), mine: c.author === (me?.party ?? p.proposer) }))
+			};
+		})
 );
 
 /** The DAO's account: paid in, charged, what a byte costs it, and where to pay in. */

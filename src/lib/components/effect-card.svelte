@@ -3,6 +3,7 @@
 	import PartyId from './party-id.svelte';
 	import Markdown from './markdown.svelte';
 	import LoadMore from './load-more.svelte';
+	import SearchInput from './search-input.svelte';
 	import { fmt } from '$lib/format';
 	import type { Settings } from '$lib/rules';
 	import SettingsSummary from './settings-summary.svelte';
@@ -50,6 +51,7 @@
 	});
 	const now = $derived(new Map(current.map((m) => [m.party, m.share])));
 	let shown = $state(30);
+	let q = $state('');
 	const rows = $derived(
 		effect.kind === 'shares'
 			? effect.changes.map((c, i) => ({
@@ -59,6 +61,9 @@
 					done: i < executed
 				}))
 			: []
+	);
+	const found = $derived(
+		q ? rows.filter((r) => r.party.toLowerCase().includes(q.toLowerCase())) : rows
 	);
 </script>
 
@@ -71,8 +76,11 @@
 				: ''}
 	</h2>
 	{#if effect.kind === 'shares'}
+		{#if rows.length > 30}
+			<SearchInput bind:value={q} placeholder="Filter by party id" />
+		{/if}
 		<ul class="divide-y divide-border">
-			{#each rows.slice(0, shown) as d (d.party)}
+			{#each found.slice(0, shown) as d (d.party)}
 				<li class="flex items-center gap-3 py-1.5 font-mono text-xs">
 					<PartyId party={d.party} class="min-w-0 flex-1" />
 					{#if d.to === 0}
@@ -93,10 +101,11 @@
 			{/each}
 		</ul>
 		<LoadMore
-			shown={Math.min(shown, rows.length)}
-			total={rows.length}
+			shown={Math.min(shown, found.length)}
+			total={found.length}
 			noun="entries"
-			onmore={() => (shown += 100)}
+			all={2000}
+			onmore={(n) => (shown = n)}
 		/>
 		{#if executedAt}<p class="font-mono text-xs text-ink-dim">This is the table now.</p>{/if}
 	{:else if effect.kind === 'info'}

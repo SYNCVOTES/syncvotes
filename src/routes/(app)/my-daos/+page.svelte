@@ -12,10 +12,18 @@
 	import EmptyState from '$lib/components/empty-state.svelte';
 	import Plus from '@lucide/svelte/icons/plus';
 	import PartyId from '$lib/components/party-id.svelte';
+	import SearchInput from '$lib/components/search-input.svelte';
+	import LoadMore from '$lib/components/load-more.svelte';
 
 	const who = $derived(store.who);
 	const daos = $derived(who ? remote.myDaos(who.party) : null);
 	const created = $derived(daos?.current?.filter((d) => d.creator === who?.party).length ?? 0);
+	// A member of hundreds of DAOs finds one by name; the grid grows on request.
+	let q = $state('');
+	let shown = $state(30);
+	const found = $derived(
+		(daos?.current ?? []).filter((d) => !q || d.name.toLowerCase().includes(q.toLowerCase()))
+	);
 </script>
 
 <svelte:head><title>My DAOs — SyncVotes</title></svelte:head>
@@ -56,8 +64,13 @@
 				<span class="inline-block"><PartyId party={who.party} /></span>
 			</EmptyState>
 		{:else}
+			{#if daos.current.length > 12}
+				<div class="mb-4 w-full max-w-sm">
+					<SearchInput bind:value={q} placeholder="Filter by name" />
+				</div>
+			{/if}
 			<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-				{#each daos.current as dao (dao.contractId)}
+				{#each found.slice(0, shown) as dao (dao.contractId)}
 					<DaoCard
 						id={dao.id}
 						name={dao.name}
@@ -72,6 +85,14 @@
 					/>
 				{/each}
 			</div>
+			{#if found.length > shown || daos.current.length > 12}
+				<LoadMore
+					shown={Math.min(shown, found.length)}
+					total={found.length}
+					noun="DAOs"
+					onmore={(n) => (shown = n)}
+				/>
+			{/if}
 		{/if}
 	{/if}
 </Page>
