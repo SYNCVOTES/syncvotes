@@ -1,9 +1,14 @@
 <script lang="ts">
 	import { page } from '$app/state';
 
-	/** A pill in the header nav; lit when the path is under it. */
+	/**
+	 * A pill in the header nav; lit on its own page. A DAO's page is under /daos too, but it
+	 * is not the public list, so only the list itself lights that pill.
+	 */
 	let { href, label, size = 'md' }: { href: string; label: string; size?: 'md' | 'sm' } = $props();
-	const active = $derived(page.url.pathname.startsWith(href));
+	const active = $derived(
+		href === '/daos' ? page.url.pathname === '/daos' : page.url.pathname.startsWith(href)
+	);
 </script>
 
 <a

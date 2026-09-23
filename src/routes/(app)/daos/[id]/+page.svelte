@@ -53,7 +53,12 @@
 
 <svelte:head><title>{dao?.current?.name ?? 'DAO'} — SyncVotes</title></svelte:head>
 
-<Page width="wide" back={{ href: '/my-daos', label: 'My DAOs' }}>
+<Page
+	width="wide"
+	back={dao?.current && !dao.current.me.membership
+		? { href: '/daos', label: 'Public DAOs' }
+		: { href: '/my-daos', label: 'My DAOs' }}
+>
 	{#if store.screen.at === 'loading'}
 		<Skeleton />
 	{:else if !dao}
