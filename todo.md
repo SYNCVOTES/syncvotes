@@ -130,7 +130,9 @@
 - [x] `Comment_Remove` — not wanted: a member who may propose may comment, and nobody moderates
       a DAO run by nobody; a comment is its author's alone (built, then taken out the same
       day; removing a choice is no upgrade, so the package is `syncvotes-quorum` 0.18.0).
-      Proposals paced like comments (thirty writes an hour)
+      Proposals paced like comments (thirty writes an hour). Then editing and deleting one's
+      own comments went too: a comment is on the record, like a ballot (`syncvotes-record`
+      0.19.0)
 - [x] the provider's pre-approval is renewed twenty days before it runs out, checked daily
 - [x] `ParticipantAdmin` on the web process stays: allocating a party at sign-up needs the same
       right the DAR upload does, and sign-up is the web process's job; a setup job would move

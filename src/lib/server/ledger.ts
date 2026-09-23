@@ -91,7 +91,6 @@ export type Comment = {
 	author: string;
 	body: string;
 	createdAt: string;
-	editedAt: string | null;
 };
 export type Profile = {
 	contractId: string;
@@ -376,8 +375,7 @@ function created({ contractId, templateId, createArgument: a }: Created) {
 				proposalId: text(a.proposalId),
 				author: text(a.author),
 				body: text(a.body),
-				createdAt: text(a.createdAt),
-				editedAt: optional(a.editedAt)
+				createdAt: text(a.createdAt)
 			};
 			track(
 				contractId,

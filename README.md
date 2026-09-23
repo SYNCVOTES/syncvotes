@@ -48,7 +48,7 @@ the token standard's packages are on every validator, so a balance can be paid i
 
 ### The model
 
-`daml/src/Main.daml`, package `syncvotes-quorum`, one idea: every contract a user acts on
+`daml/src/Main.daml`, package `syncvotes-record`, one idea: every contract a user acts on
 already carries the provider's signature, so the provider is a **confirmer** of every
 transaction — which is what CIP-0104 pays traffic rewards for — while the user's key is the
 only one that ever signs a submission. One constraint: a DAO may have thousands of members and
@@ -102,8 +102,8 @@ proposal carried out) are controlled by both, and neither has the other's key.
   share has not changed since the proposal was made — so a share moved during a vote never
   votes twice — not counted before. The provider can delay a result, never change it.
 - `Comment` — a member's words on a proposal, signed by the author, the provider and the
-  creator; the author edits or removes it, nobody else. Comments and proposals are paced by
-  the app (thirty writes an hour per party), since the DAO pays for them.
+  creator; said once and kept as said: nobody edits or removes it. Comments and proposals are
+  paced by the app (thirty writes an hour per party), since the DAO pays for them.
 - `Meter` — the provider's statement of a DAO's account: what was paid in for it, and what
   its traffic has cost.
 
@@ -112,7 +112,7 @@ in the DAR build stage, so a failing claim fails the build): a decoy ballot nami
 deadline is refused at the count, as is one cast after the deadline or a second one where
 votes cannot change; nobody creates a member alone; a share change names each party once;
 a dissolution archives the DAO and nothing is proposed on it after; settings the ledger
-refuses; a comment only its author edits or deletes, the provider included.
+refuses; a comment stays as it was said, and an empty one is refused.
 
 ### The balance
 
@@ -201,7 +201,7 @@ Codegen names its output `@daml.js/<name>-<version>` from `daml/daml.yaml` — n
 `@daml.js/model`, and everything else uses the alias or a glob. Bumping the version means editing
 `daml/daml.yaml` and that one alias line.
 
-`Main.Proposal.templateId` is `#syncvotes-quorum:Main:Proposal` — the package-name-scoped id the
+`Main.Proposal.templateId` is `#syncvotes-record:Main:Proposal` — the package-name-scoped id the
 ledger accepts in commands and ACS filters, which is what keeps a package upgrade from breaking
 submissions. `verify.ts` takes the package name from the same place.
 
@@ -344,7 +344,7 @@ idempotent by package id — so the code and the package it needs always land to
 - A package name and version can be uploaded once, and a later version under the same name must
   be a compatible upgrade (fields can only be added, and as `Optional`). A change that is not —
   a template dropped, a field made mandatory — needs a new package name, which is why the model
-  has changed name with every incompatible step and is `syncvotes-quorum` now.
+  has changed name with every incompatible step and is `syncvotes-record` now.
 - A `.remote.ts` module may export nothing but remote functions — a shared constant next to
   them fails the build, which is why the batch size lives in `schemas.ts`.
 - The kit's `form.fields.value()` knows only the fields the user touched; `forms.ts` reads the

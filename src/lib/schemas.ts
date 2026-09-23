@@ -280,5 +280,4 @@ export const createProposalForm = v.pipe(
 );
 
 export const commentForm = v.object({ proposal: id, body: commentBody });
-export const editCommentForm = v.object({ comment: id, body: commentBody });
 export const profileForm = v.object({ name: profileName, avatar: imageUrl, bio: profileBio });

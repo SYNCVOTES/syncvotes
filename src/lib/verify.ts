@@ -43,9 +43,7 @@ const CHOICES: Record<string, Home> = {
 	Account_SetProfile: { template: 'Main:Account', pkg: PACKAGE_NAME },
 	Member_Propose: { template: 'Main:Member', pkg: PACKAGE_NAME },
 	Member_Vote: { template: 'Main:Member', pkg: PACKAGE_NAME },
-	Member_Comment: { template: 'Main:Member', pkg: PACKAGE_NAME },
-	Comment_Edit: { template: 'Main:Comment', pkg: PACKAGE_NAME },
-	Comment_Delete: { template: 'Main:Comment', pkg: PACKAGE_NAME }
+	Member_Comment: { template: 'Main:Member', pkg: PACKAGE_NAME }
 };
 
 // ---- Sign-up: the party topology --------------------------------------------------------

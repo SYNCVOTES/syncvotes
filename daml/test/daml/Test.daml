@@ -148,7 +148,7 @@ dissolution = do
   pure ()
 
 -- | Settings the ledger refuses: early settlement with changeable votes, a quorum past a
--- hundred, a vote open for no days. And a comment only its author touches.
+-- hundred, a vote open for no days. And a comment that stays as it was said.
 rules : Script ()
 rules = do
   s <- setup
@@ -166,13 +166,12 @@ rules = do
     exerciseCmd s.aliceM Member_Propose with
       dao = s.dao; pid = "bad"; title = "bad"; description = ""
       action = SetSettings (Settings (Rule OfAll Majority 0 True True) 7) (Settings sensitiveRule 14)
-  -- A comment: its author edits and deletes it; nobody else does, the provider included.
+  -- A comment is said once: it has no choice to edit or remove it, and an empty one is refused.
   p <- propose s s.aliceM s.alice "talk" Signal
   c <- submit s.bob do
     exerciseCmd s.bobM Member_Comment with proposalId = "talk"; cid = "c1"; body = "hello"
-  submitMustFail s.alice do exerciseCmd c Comment_Edit with newBody = "hijacked"
-  submitMustFail s.provider do exerciseCmd c Comment_Delete
-  submit s.bob do exerciseCmd c Comment_Delete
-  left <- queryContractId s.bob c
-  assertMsg "The comment is gone" (left == None)
+  Some said <- queryContractId s.bob c
+  assertMsg "The comment stands as said" (said.body == "hello" && said.author == s.bob)
+  submitMustFail s.bob do
+    exerciseCmd s.bobM Member_Comment with proposalId = "talk"; cid = "c2"; body = ""
   pure ()

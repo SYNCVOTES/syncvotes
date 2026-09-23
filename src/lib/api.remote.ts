@@ -675,41 +675,6 @@ export const commentForm = form(schemas.commentForm, async ({ proposal, body }) 
 	};
 });
 
-/** The caller's own comment, by its contract; 403 for someone else's. */
-const myComment = (contractId: string): ledger.Comment => {
-	const me = session.required();
-	for (const thread of ledger.comments.values()) {
-		for (const c of thread.values()) {
-			if (c.contractId !== contractId) continue;
-			if (c.author !== me) error(403, 'Not your comment');
-			return c;
-		}
-	}
-	error(404, 'No such comment');
-};
-
-export const editCommentForm = form(schemas.editCommentForm, async ({ comment, body }) => {
-	const c = myComment(comment);
-	paced(c.author);
-	return {
-		comment: c.contractId,
-		body,
-		prepared: await prepare(
-			c.author,
-			Main.Comment,
-			c.contractId,
-			'Comment_Edit',
-			{ newBody: body },
-			c.daoId
-		)
-	};
-});
-
-export const prepareDeleteComment = command(v.object({ comment: contractId }), ({ comment }) => {
-	const c = myComment(comment);
-	return prepare(c.author, Main.Comment, c.contractId, 'Comment_Delete', {}, c.daoId);
-});
-
 /** The caller's profile: created or replaced from their Account. Their own cost, not a DAO's. */
 export const profileForm = form(schemas.profileForm, async ({ name, avatar, bio }) => {
 	const party = session.required();

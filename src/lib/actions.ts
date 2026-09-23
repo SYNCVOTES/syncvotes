@@ -116,21 +116,6 @@ export async function comment(
 	await sign(s, who, intent, tx);
 }
 
-export async function editComment(
-	s: Signer,
-	who: Identity,
-	prepared: Prepared & { comment: string; body: string }
-) {
-	const { comment, body, ...tx } = prepared;
-	await sign(s, who, { choice: 'Comment_Edit', contractId: comment, args: { newBody: body } }, tx);
-}
-
-export async function deleteComment(s: Signer, who: Identity, comment: string) {
-	preparing();
-	const prepared = await remote.prepareDeleteComment({ comment });
-	await sign(s, who, { choice: 'Comment_Delete', contractId: comment, args: {} }, prepared);
-}
-
 // ---- Profile ------------------------------------------------------------------------------
 
 export async function setProfile(

@@ -33,19 +33,19 @@
 			num: '01',
 			tag: 'Propose',
 			title: 'A contract, not a post',
-			body: 'A proposal is a Daml contract on Canton with a deadline of one to thirty days. Who may vote, until when, and what counts as passed are checked by the ledger, not by a moderator.'
+			body: 'A proposal is a Daml contract on Canton that says what it does: a decision, who is in and with what share, the name, the settings, dissolution. What it takes to pass and how long the vote is open come from the DAO’s own settings, set at the founding and changed only by vote — not by the proposer, not by a moderator.'
 		},
 		{
 			num: '02',
 			tag: 'Vote',
 			title: 'One key, one ballot',
-			body: 'Your ballot is signed by a key only you hold, once. The DAO is private to its members: nobody else on the network can see it exists.'
+			body: 'Your ballot weighs your share of the vote and is signed by a key only you hold. Where the DAO allows it, you may change it until the deadline. The DAO is private to its members: nobody else on the network can see it exists.'
 		},
 		{
 			num: '03',
 			tag: 'Settle',
 			title: 'Settled by the ledger',
-			body: 'More than half of all members say yes — the proposal passes, on-chain, in the very transaction that cast the deciding ballot. No tally in a spreadsheet.'
+			body: 'The ledger checks every ballot it is handed: right DAO, cast in time, by a member of the moment. A proposal settles the moment its outcome can no longer change, or at the deadline, and what it decided is carried out with the DAO’s own authority. No tally in a spreadsheet.'
 		}
 	];
 
@@ -102,8 +102,8 @@
 		},
 		{
 			tag: 'Rules',
-			title: 'Majority, deadline, done',
-			body: 'A proposal passes when more than half of all members say yes, fails once that can no longer happen, and can be closed by any member after its deadline.'
+			title: 'Yours, set at the founding',
+			body: 'Routine and sensitive proposals each pass by a rule the DAO chose — a majority or two thirds, of the whole vote or of votes cast, a quorum, early settlement or changeable votes — for one to ninety days. Changing them is itself a sensitive proposal.'
 		},
 		{
 			tag: 'Live',
@@ -295,8 +295,8 @@
 			<p
 				class="{body} mt-[26px] max-w-[540px] animate-fade-in text-[15px] opacity-0 [animation-delay:0.6s] motion-reduce:animate-none motion-reduce:opacity-100 max-sm:max-w-none max-sm:text-sm"
 			>
-				Private DAOs. One key, one ballot. Proposals that are contracts and outcomes the ledger
-				settles — no Snapshot, no Telegram polls, no spreadsheets.
+				Private DAOs, by membership or by shares. One key, one ballot. Proposals that are contracts
+				and outcomes the ledger settles — no Snapshot, no Telegram polls, no spreadsheets.
 			</p>
 			<div
 				class="mt-7 flex animate-fade-in gap-3.5 opacity-0 [animation-delay:0.8s] motion-reduce:animate-none motion-reduce:opacity-100 max-sm:flex-wrap max-sm:gap-2.5"
@@ -317,14 +317,17 @@
 		<div class="{reveal} {body} space-y-5 text-[15px] lg:pt-2">
 			<p>
 				SyncVotes is a governance app on the Canton Network. A DAO is a Daml contract signed by its
-				admin and this app; a proposal is another, with a deadline; a ballot is a choice on it,
-				signed by the member's own key. When more than half of all members have said yes — or no has
-				made that impossible — the outcome is written to the ledger by the very ballot that settled
-				it.
+				creator and this app, run by nobody: everything it changes about itself it decides by vote.
+				A proposal is another contract, under the DAO's own settings; a ballot is a member's choice
+				on it, weighing their share of the vote, signed by their own key. This app counts the
+				ballots in batches, the ledger checks every one, and once the rule is met — or the deadline
+				comes — the outcome is written to the ledger and carried out.
 			</p>
 			<p>
 				There is no database of DAOs and no server that votes for anyone. This app hosts your party,
-				prepares transactions and forwards what you signed; the ledger checks the rest.
+				prepares transactions and forwards what you signed; the ledger checks the rest. A DAO holds
+				no coin: what it does costs network traffic, paid from a balance anyone tops up by sending
+				Canton Coin to the app with the DAO's memo.
 			</p>
 		</div>
 	</LandingSection>
