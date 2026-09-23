@@ -77,18 +77,33 @@
 				<div class="min-w-0">
 					<h1 class="display text-3xl md:text-4xl">{d.name}</h1>
 					<div class="mt-3 flex flex-wrap items-center gap-2">
-						<Badge variant="accent" class="overflow-visible pr-1.5">
-							Private
-							<Hint
-								text="Only its members and the app see this DAO, its proposals, votes and comments; nothing about it is public on the network."
-							/>
-						</Badge>
+						{#if d.public}
+							<Badge variant="green" class="overflow-visible pr-1.5">
+								Public
+								<Hint
+									text="Anyone signed in to the app can read this DAO — its proposals, outcomes, members and comments — and pay in to its balance. Only members act, and who voted how stays with the members. Nothing about it is public on the Canton network itself."
+								/>
+							</Badge>
+						{:else}
+							<Badge variant="accent" class="overflow-visible pr-1.5">
+								Private
+								<Hint
+									text="Only its members and the app see this DAO, its proposals, votes and comments; nothing about it is public on the network."
+								/>
+							</Badge>
+						{/if}
 						<Badge>{d.equal ? 'By membership' : 'By shares'}</Badge>
-						{#if d.me.creator}<Badge variant="amber">You created it</Badge>{:else}<Badge
-								variant="green">Member</Badge
+						{#if d.me.creator}<Badge variant="amber">You created it</Badge
+							>{:else if d.me.membership}<Badge variant="green">Member</Badge>{:else}<Badge
+								>Reading</Badge
 							>{/if}
 					</div>
-					{#if d.balance <= 0 && !d.actorPays}
+					{#if !d.me.membership}
+						<p class="mt-3 font-mono text-xs text-ink-dim">
+							You are not a member: this DAO is public, so you can read it. How to join, if at all,
+							is for its description to say.
+						</p>
+					{:else if d.balance <= 0 && !d.actorPays}
 						<p class="mt-3 font-mono text-xs text-red">
 							Nothing can be signed for this DAO until someone pays in.
 						</p>
@@ -96,7 +111,7 @@
 				</div>
 			</div>
 			<div class="flex shrink-0 items-center gap-2">
-				{#if d.balance <= 0 && !d.actorPays}
+				{#if !d.me.membership || (d.balance <= 0 && !d.actorPays)}
 					<!-- Nothing to press: the line under the badges says why. -->
 				{:else}
 					<Button href="/daos/{d.id}/proposals/create"
@@ -132,10 +147,12 @@
 				d.actorPays
 					? { label: 'Who pays', value: 'members', accent: false }
 					: { label: 'Balance', value: coin(d.balance), accent: d.balance <= 0 },
-				{
-					label: 'Your vote',
-					value: d.equal ? '1 of ' + fmt(d.units) : `${pct(d.me.share, d.units)}%`
-				}
+				d.me.membership
+					? {
+							label: 'Your vote',
+							value: d.equal ? '1 of ' + fmt(d.units) : `${pct(d.me.share, d.units)}%`
+						}
+					: { label: 'Visibility', value: 'public' }
 			]}
 		/>
 
