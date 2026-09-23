@@ -114,6 +114,16 @@ proposal carried out) are controlled by both, and neither has the other's key.
   its traffic has cost. `Purse` — the same for a party, by its key's fingerprint, opened when
   the party is allocated.
 
+### Invites, visibility
+
+Sign-up is by invitation while `INVITE_CODES` names any codes (comma-separated); a code is asked
+for before anyone pays for a party, and checked again when the party is made. With the variable
+empty the door is open. A DAO is private unless founded public, or made so by a sensitive
+`SetPublic` proposal: public DAOs are listed at `/daos` for anyone signed in to read — proposals,
+outcomes, members, comments, the balance to pay in to — while only members act, and who voted how
+stays with the members. Nothing about a public DAO is public on the Canton network itself;
+"public" is the app reading it as operator for whoever asks.
+
 ### The balances
 
 The sending validator pays the network for every byte of traffic, in coin at a published price
@@ -329,6 +339,11 @@ Building on the server is deliberate: it is amd64, the laptop is not, and the la
 has its own `start.sh`, which does more than `compose up`, so a deploy must never recreate its
 containers. Caddy binds the public IP because the validator's nginx already holds `:80` on
 loopback. The app reaches the participant directly at `participant:7575` on that network.
+
+One image runs everywhere; what differs between networks and deployments is in the env file
+(`testnet.env`, `mainnet.env`, `devnet.env`, never in git): the participant, the parties, the
+identity provider, `SCAN_URL`, `NETWORK`, `BILLING_FACTOR`, `INVITE_CODES`. Turning invites or
+billing on or off is a change to the env file and `compose up -d`.
 
 The DAR is built inside the image, and the app uploads it on startup (`src/hooks.server.ts`) —
 idempotent by package id — so the code and the package it needs always land together.

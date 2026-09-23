@@ -166,6 +166,7 @@ export const createDaoForm = v.pipe(
 		image: imageUrl,
 		equal: yesNo,
 		actorPays: v.optional(yesNo, 'no'),
+		public: v.optional(yesNo, 'no'),
 		shares: shareChanges,
 		...routineFields,
 		...sensitiveFields
@@ -205,6 +206,7 @@ export const createDaoForm = v.pipe(
 export const effectKind = v.picklist([
 	'signal',
 	'choose',
+	'visibility',
 	'shares',
 	'info',
 	'dissolve',
@@ -243,6 +245,8 @@ export const createProposalForm = v.pipe(
 		newImage: imageUrl,
 		/** A choice's options, one per line. */
 		options: v.optional(v.string(), ''),
+		/** A visibility proposal: readable by anyone signed in, or members only. */
+		newPublic: v.optional(yesNo, 'no'),
 		// The DAO's next settings, for a proposal that changes them.
 		...newRoutineFields,
 		...newSensitiveFields

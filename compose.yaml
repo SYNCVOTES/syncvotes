@@ -27,6 +27,8 @@ services:
       LEDGER_AUTH_SCOPE: daml_ledger_api
       SCAN_URL: ${SCAN_URL:?set in the env file}
       BILLING_FACTOR: ${BILLING_FACTOR:-1}
+      # Comma-separated invite codes; while any are set, sign-up needs one. Empty opens the door.
+      INVITE_CODES: ${INVITE_CODES:-}
       # Shown to users; the ledger does not care.
       NETWORK: ${NETWORK:-TestNet}
       # A signed transaction that issues a hundred voting rights comes back as a ~1 MB request.
@@ -129,8 +131,12 @@ configs:
           reverse_proxy keycloak:8080
         }
         handle {
+          # A deploy replaces the app container: requests wait for the new one (it serves once
+          # its ledger copy is built) instead of failing while it starts.
           reverse_proxy app:3000 {
             header_up X-Client-Ip {client_ip}
+            lb_try_duration 60s
+            lb_try_interval 1s
           }
         }
       }

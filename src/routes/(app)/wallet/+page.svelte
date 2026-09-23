@@ -24,6 +24,8 @@
 
 	let phraseInput = $state('');
 	let hintInput = $state('');
+	let inviteInput = $state('');
+	const setup = remote.config();
 	let password = $state('');
 
 	const screen = $derived(store.screen);
@@ -160,7 +162,7 @@
 		<form
 			onsubmit={(e) => {
 				e.preventDefault();
-				flow.confirmHint(chosenHint);
+				flow.confirmHint(chosenHint, inviteInput.trim());
 			}}
 		>
 			<Panel padding="lg" class="space-y-5">
@@ -170,12 +172,29 @@
 					label is how people recognise you; the fingerprint is what makes you you. It cannot be
 					changed later.
 				</p>
+				{#await setup then c}
+					{#if c.invitesRequired}
+						<div class="space-y-1">
+							<Input
+								placeholder="Invite code"
+								class="font-mono"
+								maxlength={80}
+								autocomplete="off"
+								bind:value={inviteInput}
+							/>
+							<p class="font-mono text-xs text-ink-dim">
+								SyncVotes is by invitation for now. Ask whoever brought you here for a code.
+							</p>
+						</div>
+					{/if}
+				{/await}
 				<div class="flex gap-3">
 					<Input placeholder="e.g. alice" class="flex-1" maxlength={40} bind:value={hintInput} />
 					<Button type="submit" disabled={store.busy || !hintInput.trim() || hintIssue !== null}>
-						{store.busy ? 'Creating party…' : 'Create party'}
+						{store.busy ? 'Checking…' : 'Create party'}
 					</Button>
 				</div>
+				<Problem message={store.problem} />
 				{#if hintInput.trim()}
 					<p class="font-mono text-xs {hintIssue ? 'text-red' : 'text-ink-dim'}">
 						{#if hintIssue}{hintIssue}{:else}

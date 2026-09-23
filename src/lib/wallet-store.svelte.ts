@@ -1,5 +1,6 @@
 import * as wallet from './wallet';
 import * as actions from './actions';
+import * as remote from './api.remote';
 import * as autoLock from './auto-lock';
 
 /**
@@ -15,7 +16,7 @@ export type Screen =
 	| { at: 'create'; phrase: string }
 	| { at: 'restore' }
 	| { at: 'hint'; signer: wallet.Signer; fingerprint: string }
-	| { at: 'fund'; signer: wallet.Signer; fingerprint: string; hint: string }
+	| { at: 'fund'; signer: wallet.Signer; fingerprint: string; hint: string; invite: string }
 	| { at: 'protect'; signer: wallet.Signer; who: actions.Identity }
 	| { at: 'locked'; lock: 'passkey' | 'password' }
 	| { at: 'home'; signer: wallet.Signer; who: actions.Identity };
@@ -207,20 +208,26 @@ export const flow = {
 	 * The hint is the label in the party id. Before the party is made, its cost has to have
 	 * arrived for the key: the page shows where to pay and waits.
 	 */
-	confirmHint(hint: string) {
+	confirmHint(hint: string, invite = '') {
 		if (screen.at !== 'hint') return;
 		const { signer, fingerprint } = screen;
-		screen = { at: 'fund', signer, fingerprint, hint };
+		return run(async () => {
+			// Checked before anyone pays for a party: a wrong code costs nothing.
+			if (!(await remote.checkInvite(invite))) {
+				throw new Error('This app is by invitation for now; the code is missing or wrong');
+			}
+			screen = { at: 'fund', signer, fingerprint, hint, invite };
+		});
 	},
 
 	/** What arrived covers a party: the key signs the topology that names it. */
 	enrolNow() {
 		if (screen.at !== 'fund' || busy) return;
-		const { signer, hint } = screen;
+		const { signer, hint, invite } = screen;
 		return run(async () => {
 			working('Creating your party on the ledger');
 			const topology = await actions.topology(signer, hint);
-			const who = await actions.enrol(signer, hint, topology);
+			const who = await actions.enrol(signer, hint, topology, invite);
 			screen = { at: 'protect', signer, who };
 		});
 	},

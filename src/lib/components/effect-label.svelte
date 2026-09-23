@@ -5,6 +5,7 @@
 	import Power from '@lucide/svelte/icons/power';
 	import MessageSquare from '@lucide/svelte/icons/message-square';
 	import ListChecks from '@lucide/svelte/icons/list-checks';
+	import Eye from '@lucide/svelte/icons/eye';
 	import Scale from '@lucide/svelte/icons/scale';
 	import { fmt } from '$lib/format';
 	import type { Effect } from './effect-card.svelte';
@@ -27,6 +28,8 @@
 				return `rename to ${effect.name}`;
 			case 'dissolve':
 				return 'dissolve';
+			case 'visibility':
+				return effect.public ? 'go public' : 'go private';
 			case 'settings':
 				return 'settings';
 			default:
@@ -42,11 +45,13 @@
 				? ListChecks
 				: effect.kind === 'info'
 					? Pencil
-					: effect.kind === 'dissolve'
-						? Power
-						: effect.kind === 'settings'
-							? Scale
-							: MessageSquare
+					: effect.kind === 'visibility'
+						? Eye
+						: effect.kind === 'dissolve'
+							? Power
+							: effect.kind === 'settings'
+								? Scale
+								: MessageSquare
 	);
 </script>
 

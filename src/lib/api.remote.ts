@@ -10,6 +10,7 @@ import * as billing from './server/billing';
 import * as splice from './server/splice';
 import * as tally from './server/tally';
 import { fingerprintOf } from './verify';
+import { INVITE_CODES } from '$app/env/private';
 import { normaliseHint, hintProblem } from './hint';
 import * as schemas from './schemas';
 import { settingsToLedger, type Rule, type Settings } from './rules';
@@ -83,8 +84,25 @@ export const config = query(async () => ({
 	operator: participant.operatorParty(),
 	prices: await splice.prices(),
 	batch: schemas.BATCH,
-	maxChanges: schemas.MAX_CHANGES
+	maxChanges: schemas.MAX_CHANGES,
+	/** A new party needs an invite code while any are set. */
+	invitesRequired: inviteCodes().length > 0
 }));
+
+// ---- Invites -------------------------------------------------------------------------------
+
+/** The codes that open sign-up, from the environment; none set means open to all. */
+const inviteCodes = () =>
+	(INVITE_CODES ?? '')
+		.split(',')
+		.map((c) => c.trim())
+		.filter(Boolean);
+const inviteOk = (code: string) => {
+	const codes = inviteCodes();
+	return codes.length === 0 || codes.includes(code.trim());
+};
+/** Whether this code opens sign-up; asked before anyone pays for a party. */
+export const checkInvite = query(v.optional(v.string(), ''), (code) => inviteOk(code));
 
 // ---- Identity ----------------------------------------------------------------------------
 
@@ -159,8 +177,16 @@ export const topology = query(
  * The allocation is charged to the party's purse, opened here.
  */
 export const enrol = command(
-	v.object({ publicKey: base64, hint: v.string(), multiHash: base64, signature: base64 }),
-	async ({ publicKey, hint, multiHash, signature }) => {
+	v.object({
+		publicKey: base64,
+		hint: v.string(),
+		multiHash: base64,
+		signature: base64,
+		invite: v.optional(v.string(), '')
+	}),
+	async ({ publicKey, hint, multiHash, signature, invite }) => {
+		if (!inviteOk(invite))
+			error(403, 'This app is by invitation for now; the code is missing or wrong');
 		// The ledger verifies this signature when it allocates a new party; for a party that
 		// already exists it never looks, so check here too.
 		const valid = ed25519.verify(
@@ -219,8 +245,11 @@ export const stats = query.live(() =>
 		for (const b of ledger.ballots.values()) votes += b.size;
 		let open = 0;
 		for (const p of ledger.proposals.values()) if (!p.outcome) open++;
+		let publicDaos = 0;
+		for (const d of ledger.daos.values()) if (d.public) publicDaos++;
 		return {
 			daos: ledger.daos.size,
+			publicDaos,
 			openProposals: open,
 			votesCast: votes,
 			members: ledger.accounts.size
@@ -243,6 +272,13 @@ const openProposals = (daoId: string) => proposalsOf(daoId).filter((p) => !p.out
 const memberOnly = (daoId: string): ledger.Member => {
 	const membership = ledger.members.get(daoId)?.get(session.required());
 	if (!membership) error(403, 'Only members can see this DAO');
+	return membership;
+};
+/** The caller's membership, or null for a signed-in reader of a public DAO; 403 otherwise. */
+const readerOf = (daoId: string): ledger.Member | null => {
+	const me = session.required();
+	const membership = ledger.members.get(daoId)?.get(me) ?? null;
+	if (!membership && !ledger.daos.get(daoId)?.public) error(403, 'Only members can see this DAO');
 	return membership;
 };
 
@@ -275,7 +311,7 @@ export const myDaos = query.live(partyId, (party) =>
 /** A DAO with its counts and the caller's standing in it. The lists are paged separately. */
 export const dao = query.live(contractId, (id) =>
 	live(ledger.keys.dao(id), async () => {
-		const membership = memberOnly(id);
+		const membership = readerOf(id);
 		const d = daoOf(id);
 		return {
 			...summarise(d),
@@ -285,12 +321,42 @@ export const dao = query.live(contractId, (id) =>
 				!!ledger.proposals.get(`${id}-founding`) &&
 				!ledger.proposals.get(`${id}-founding`)?.executedAt,
 			me: {
-				creator: d.creator === membership.party,
-				membership: membership.contractId,
-				share: membership.share
+				creator: d.creator === session.required(),
+				/** Null for a reader of a public DAO who is not in it. */
+				membership: membership?.contractId ?? null,
+				share: membership?.share ?? 0
 			}
 		};
 	})
+);
+
+/** Public DAOs, for anyone signed in: by name or description, biggest first or newest. */
+export const publicDaos = query.live(
+	v.object({
+		...paging,
+		q: filter,
+		sort: v.optional(v.picklist(['members', 'newest']), 'members')
+	}),
+	({ offset, limit, q, sort }) =>
+		live(ledger.keys.all, () => {
+			session.required();
+			const needle = q.trim().toLowerCase();
+			const all = [...ledger.daos.values()]
+				.filter(
+					(d) =>
+						d.public &&
+						(!needle ||
+							d.name.toLowerCase().includes(needle) ||
+							d.description.toLowerCase().includes(needle))
+				)
+				.map(summarise)
+				.sort((a, b) =>
+					sort === 'newest'
+						? b.createdAt.localeCompare(a.createdAt)
+						: b.members - a.members || b.createdAt.localeCompare(a.createdAt)
+				);
+			return page(all, offset, limit);
+		})
 );
 
 /** Members, by name or party id, filtered by a substring of either; biggest share first. */
@@ -298,7 +364,7 @@ export const daoMembers = query.live(
 	v.object({ id: contractId, ...paging, q: filter }),
 	({ id, offset, limit, q }) =>
 		live(ledger.keys.dao(id), () => {
-			memberOnly(id);
+			readerOf(id);
 			const all = membersOf(id)
 				.filter((m) => matches(q)(m.party))
 				.sort((a, b) => b.share - a.share || a.party.localeCompare(b.party))
@@ -325,7 +391,7 @@ export const daoProposals = query.live(
 	}),
 	({ id, offset, limit, status, q }) =>
 		live(ledger.keys.dao(id), () => {
-			memberOnly(id);
+			readerOf(id);
 			const needle = q.trim().toLowerCase();
 			const all = proposalsOf(id).filter(
 				(p) =>
@@ -366,11 +432,16 @@ const proposalOf = (id: string): ledger.Proposal => {
 	return p;
 };
 
-/** The caller's membership of the proposal's DAO, or null for a proposer who left; 403 otherwise. */
+/**
+ * The caller's membership of the proposal's DAO, or null for a proposer who left or a reader
+ * of a public DAO; 403 otherwise.
+ */
 const proposalReader = (p: ledger.Proposal): ledger.Member | null => {
 	const me = session.required();
 	const membership = ledger.members.get(p.daoId)?.get(me);
-	if (!membership && p.proposer !== me) error(403, 'Only members can see this proposal');
+	if (!membership && p.proposer !== me && !ledger.daos.get(p.daoId)?.public) {
+		error(403, 'Only members can see this proposal');
+	}
 	return membership ?? null;
 };
 
@@ -456,7 +527,10 @@ export const proposalBallots = query.live(
 	({ id, offset, limit, q }) =>
 		live(ledger.keys.proposal(id), () => {
 			const p = proposalOf(id);
-			proposalReader(p);
+			// Who voted how is the members' business, public DAO or not.
+			if (!proposalReader(p) && p.proposer !== session.required()) {
+				error(403, 'Only members see the ballots');
+			}
 			const all = [...(ledger.ballots.get(id)?.values() ?? [])]
 				.filter((b) => b.daoId === p.daoId && matches(q)(b.voter))
 				.sort((a, b) => b.castAt.localeCompare(a.castAt))
@@ -487,7 +561,7 @@ export const proposalComments = query.live(
 /** The DAO's account: paid in, charged, what a byte costs it, and where to pay in. */
 export const daoBilling = query.live(contractId, (id) =>
 	live(ledger.keys.dao(id), () => {
-		memberOnly(id);
+		readerOf(id);
 		return billing.statement(billing.daoAccount(id));
 	})
 );
@@ -565,6 +639,7 @@ const nullable = (s: string) => (s === '' ? null : s);
  */
 export const createDaoForm = form(schemas.createDaoForm, async (f) => {
 	const { daoName, description, image, equal, actorPays, shares } = f;
+	const isPublic = f.public === 'yes';
 	const party = session.required();
 	const account = accountOf(party).contractId;
 	if (!shares.some((r) => r.party === party)) error(400, 'You have to hold a share yourself');
@@ -587,7 +662,8 @@ export const createDaoForm = form(schemas.createDaoForm, async (f) => {
 		sensitive: settingsToLedger(settingsOf(f, 'sensitive')),
 		shares: shareRows(ordered.slice(0, schemas.BATCH)),
 		more: shareRows(ordered.slice(schemas.BATCH)),
-		actorPays: actorPays === 'yes'
+		actorPays: actorPays === 'yes',
+		public: isPublic
 	};
 	return {
 		id,
@@ -638,6 +714,9 @@ export const createProposalForm = form(schemas.createProposalForm, async (f) => 
 			action = { tag: 'Choose', value: { options } };
 			break;
 		}
+		case 'visibility':
+			action = { tag: 'SetPublic', value: { public: f.newPublic === 'yes' } };
+			break;
 		case 'dissolve':
 			action = { tag: 'Dissolve', value: {} };
 			break;

@@ -28,7 +28,8 @@ export type Effect =
 	| { kind: 'shares'; changes: { party: string; share: number }[] }
 	| { kind: 'info'; name: string; description: string; image: string | null }
 	| { kind: 'dissolve' }
-	| { kind: 'settings'; routine: Settings; sensitive: Settings };
+	| { kind: 'settings'; routine: Settings; sensitive: Settings }
+	| { kind: 'visibility'; public: boolean };
 
 export type Account = { contractId: string; party: string };
 export type Dao = {
@@ -51,6 +52,8 @@ export type Dao = {
 	units: number;
 	/** Each member pays the traffic of what they sign; otherwise the DAO's balance does. */
 	actorPays: boolean;
+	/** Readable by anyone signed in, through the app; only members act. */
+	public: boolean;
 };
 export type Member = {
 	contractId: string;
@@ -310,6 +313,8 @@ const effect = (v: unknown): Effect => {
 			};
 		case 'Dissolve':
 			return { kind: 'dissolve' };
+		case 'SetPublic':
+			return { kind: 'visibility', public: (t.value as { public?: unknown }).public === true };
 		case 'SetSettings':
 			return {
 				kind: 'settings',
@@ -342,7 +347,8 @@ function created({ contractId, templateId, createArgument: a }: Created) {
 				createdAt: text(a.createdAt),
 				members: num(a.members),
 				units: num(a.units),
-				actorPays: a.actorPays === true
+				actorPays: a.actorPays === true,
+				public: a.public === true
 			};
 			track(contractId, [keys.dao(row.id), keys.party(row.creator)], put(daos, row.id, row));
 			break;

@@ -26,6 +26,7 @@
 	import Users from '@lucide/svelte/icons/users';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import Power from '@lucide/svelte/icons/power';
+	import Eye from '@lucide/svelte/icons/eye';
 	import Scale from '@lucide/svelte/icons/scale';
 	import MessageSquare from '@lucide/svelte/icons/message-square';
 	import ListChecks from '@lucide/svelte/icons/list-checks';
@@ -43,7 +44,7 @@
 	 * from the truth — and before signing the page says in one sentence what the ledger will
 	 * do: the same sentence the voters will read.
 	 */
-	type Kind = 'signal' | 'choose' | 'shares' | 'info' | 'dissolve' | 'settings';
+	type Kind = 'signal' | 'choose' | 'shares' | 'info' | 'dissolve' | 'settings' | 'visibility';
 	let kind = $state<Kind>('signal');
 	const kinds = $derived([
 		{
@@ -88,6 +89,15 @@
 			text: 'What proposals take to pass, and for how long they are open.',
 			more: "Changes the DAO's settings for routine and for sensitive proposals: the rule each passes by and how long its vote is open. This proposal is itself sensitive, so it passes under the sensitive settings as they stand today.",
 			icon: Scale
+		},
+		{
+			value: 'visibility',
+			title: 'Visibility',
+			text: d?.public
+				? 'Make the DAO private again.'
+				: 'Make the DAO public: listed, readable by anyone signed in.',
+			more: 'Public: listed among the public DAOs, readable by anyone signed in — proposals, outcomes, members, comments — and open to pay-ins; only members act, and who voted how stays with the members. Private: only members see it exists. Sensitive, so it passes under the sensitive settings.',
+			icon: Eye
 		},
 		{
 			value: 'dissolve',
@@ -218,6 +228,10 @@
 						? 'Give at least two options below.'
 						: 'Two to ten distinct options, eighty characters each at most.';
 				return `Members pick one of ${fmt(optionList.length)} options; the one with the most votes wins if it reaches what a yes would need, and stands alone at the top.`;
+			case 'visibility':
+				return d?.public
+					? 'The DAO becomes private: it leaves the public list, and only its members can read it from then on.'
+					: 'The DAO becomes public: listed for anyone signed in to read — proposals, outcomes, members, comments. Only members act; who voted how stays with the members.';
 			case 'dissolve':
 				return 'The DAO is archived the moment this passes: nothing more can be proposed or voted on, what was paid in for it is spent, and its record stays readable.';
 			case 'settings':
@@ -239,6 +253,8 @@
 				return optionList.length >= 2
 					? `Choose: ${optionList.slice(0, 3).join(' / ')}`
 					: 'A choice';
+			case 'visibility':
+				return d?.public ? 'Make the DAO private' : 'Make the DAO public';
 			case 'dissolve':
 				return 'Dissolve the DAO';
 			case 'settings':
@@ -364,6 +380,7 @@
 			<input type="hidden" name="kind" value={kind} />
 			<input type="hidden" name="title" value={title.trim() || suggested} />
 			<input type="hidden" name="options" value={optionList.join('\n')} />
+			<input type="hidden" name="newPublic" value={d.public ? 'no' : 'yes'} />
 
 			<FormSection title="What happens when it passes">
 				<div class="grid gap-3 sm:grid-cols-2">

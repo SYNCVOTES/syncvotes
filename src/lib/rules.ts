@@ -190,8 +190,9 @@ export const CATEGORIES: { value: Category; title: string; text: string; covers:
 	{
 		value: 'sensitive',
 		title: 'Sensitive',
-		text: 'Members and shares, these settings, dissolution.',
-		covers: 'Who is in the DAO and with what share, these very settings, and winding the DAO up.'
+		text: 'Members and shares, these settings, visibility, dissolution.',
+		covers:
+			'Who is in the DAO and with what share, these very settings, whether the DAO is public, and winding it up.'
 	}
 ];
 

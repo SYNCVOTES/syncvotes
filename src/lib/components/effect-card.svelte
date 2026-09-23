@@ -18,6 +18,7 @@
 		| { kind: 'shares'; changes: { party: string; share: number }[] }
 		| { kind: 'info'; name: string; description: string; image: string | null }
 		| { kind: 'dissolve' }
+		| { kind: 'visibility'; public: boolean }
 		| { kind: 'settings'; routine: Settings; sensitive: Settings };
 	let {
 		effect,
@@ -43,6 +44,8 @@
 				return 'Name and description';
 			case 'dissolve':
 				return 'Dissolution';
+			case 'visibility':
+				return 'Visibility';
 			case 'settings':
 				return 'Settings';
 			default:
@@ -133,6 +136,12 @@
 		<ol class="list-decimal space-y-1 pl-5 text-[13px] text-ink">
 			{#each effect.options as o, i (i)}<li>{o}</li>{/each}
 		</ol>
+	{:else if effect.kind === 'visibility'}
+		<p class="text-[13px] text-ink-mid">
+			{#if effect.public}The DAO becomes public: listed, and readable by anyone signed in —
+				proposals, outcomes, members, comments. Only members act; who voted how stays with the
+				members.{:else}The DAO becomes private: only its members see it exists.{/if}
+		</p>
 	{:else if effect.kind === 'settings'}
 		<p class="text-[13px] text-ink-mid">From then on:</p>
 		<SettingsSummary routine={effect.routine} sensitive={effect.sensitive} />

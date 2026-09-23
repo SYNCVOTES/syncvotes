@@ -33,7 +33,12 @@ export const topology = (s: Signer, hint: string): Promise<Topology> =>
 	remote.topology({ publicKey: toBase64(s.publicKey), hint });
 
 /** Creates the party for a new key. The key signs its own topology; the server only forwards. */
-export async function enrol(s: Signer, hint: string, topology: Topology): Promise<Identity> {
+export async function enrol(
+	s: Signer,
+	hint: string,
+	topology: Topology,
+	invite = ''
+): Promise<Identity> {
 	working('Checking the party the ledger would create');
 	await verifyTopology(topology, s.publicKey, hint);
 	working('Signing the party into existence');
@@ -41,7 +46,8 @@ export async function enrol(s: Signer, hint: string, topology: Topology): Promis
 		publicKey: toBase64(s.publicKey),
 		hint,
 		multiHash: topology.multiHash,
-		signature: s.sign(topology.multiHash)
+		signature: s.sign(topology.multiHash),
+		invite
 	});
 }
 

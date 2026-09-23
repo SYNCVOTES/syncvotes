@@ -55,6 +55,11 @@ export const variables = defineEnvVars({
 		description: 'What a DAO pays per byte of traffic, as a multiple of the network price',
 		schema: v.optional(v.string(), '1')
 	},
+	INVITE_CODES: {
+		description:
+			'Invite codes, comma-separated; while any are set, a new party needs one. Empty: open to all',
+		schema: v.optional(v.string(), '')
+	},
 	NETWORK: {
 		description: 'The Canton network this deployment is on, as shown to users: TestNet or MainNet',
 		public: true,

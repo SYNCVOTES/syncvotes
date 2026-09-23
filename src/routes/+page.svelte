@@ -39,7 +39,7 @@
 			num: '02',
 			tag: 'Vote',
 			title: 'One key, one ballot',
-			body: 'Your ballot weighs your share of the vote and is signed by a key only you hold. Where the DAO allows it, you may change it until the deadline. The DAO is private to its members: nobody else on the network can see it exists.'
+			body: 'Your ballot weighs your share of the vote and is signed by a key only you hold. Where the DAO allows it, you may change it until the deadline. A DAO is private to its members unless it chose to be public — then anyone signed in can read it, and only members act.'
 		},
 		{
 			num: '03',
@@ -75,7 +75,7 @@
 		{
 			tag: 'Members',
 			title: 'See everything',
-			body: 'The DAO, its proposals, every ballot and the outcome — as contracts on their own party, not rows in a database.'
+			body: 'The DAO, its proposals, every ballot and the outcome — as contracts on their own party, not rows in a database. A DAO that chose to be public is readable by anyone signed in, through this app; who voted how stays with the members.'
 		},
 		{
 			tag: 'This validator',
@@ -116,6 +116,7 @@
 	const counts = $derived(stats.error ? null : (stats.current ?? null));
 	const ticker = $derived([
 		{ k: 'DAOS', v: counts ? String(counts.daos) : 'SYNCING' },
+		{ k: 'PUBLIC', v: counts ? String(counts.publicDaos) : 'SYNCING' },
 		{ k: 'OPEN PROPOSALS', v: counts ? String(counts.openProposals) : 'SYNCING' },
 		{ k: 'VOTES CAST', v: counts ? counts.votesCast.toLocaleString('en-US') : 'SYNCING' },
 		{ k: 'MEMBERS', v: counts ? String(counts.members) : 'SYNCING' },
@@ -351,12 +352,13 @@
 			<div>
 				<LandingKicker text="Privacy" />
 				<LandingHeading class="max-sm:text-[clamp(28px,8.6vw,44px)]">
-					Every DAO here <span class="whitespace-nowrap">is private</span>
+					Private by default, <span class="whitespace-nowrap">public by choice</span>
 				</LandingHeading>
 			</div>
 			<p class="{reveal} {body} mt-2 max-w-[460px] text-[14.5px]">
 				Canton delivers a transaction only to the parties in it. A DAO's name, proposals, ballots
-				and members reach the members and the validator that hosts them — nobody else.
+				and members reach the members and the validator that hosts them — nobody else, unless the
+				DAO chose to be public, and then only readers of this app.
 			</p>
 		</div>
 		<div class="border-t border-border">

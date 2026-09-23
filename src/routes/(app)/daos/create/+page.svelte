@@ -33,6 +33,22 @@
 	let mode = $state<Mode>('equal');
 	/** Who pays the traffic: the DAO's own balance, or each member for what they sign. */
 	let payer = $state<'dao' | 'members'>('dao');
+	/** Who may read it: its members, or anyone signed in to the app. */
+	let visibility = $state<'private' | 'public'>('private');
+	const visibilities = [
+		{
+			value: 'private',
+			title: 'Private',
+			text: 'Only its members see it exists.',
+			more: 'The DAO, its proposals, votes and comments reach its members and the app that hosts them; nothing about it is listed anywhere or readable by anyone else.'
+		},
+		{
+			value: 'public',
+			title: 'Public',
+			text: 'Listed for anyone signed in to read; only members act.',
+			more: 'Listed among the public DAOs: anyone signed in to the app can read its proposals, outcomes, members and comments, and pay in to its balance. Only members propose, vote and comment; who voted how stays with the members. Say in the description how one joins. Changed later by a sensitive proposal.'
+		}
+	] as const;
 	const payers = [
 		{
 			value: 'dao',
@@ -129,6 +145,7 @@
 					image: image || null,
 					equal: equal === 'yes',
 					actorPays: payer === 'members',
+					public: visibility === 'public',
 					routine: settingsToLedger(settingsOf('routine')),
 					sensitive: settingsToLedger(settingsOf('sensitive')),
 					shares: ordered.slice(0, BATCH).map(tuple),
@@ -146,7 +163,7 @@
 	<PageHeader
 		eyebrow="New organisation"
 		title="Create DAO"
-		description="A DAO is private to its members: only they, and the app as provider, ever see it. Everything it does costs network traffic, paid from a balance anyone can top up by sending Canton Coin to the app with the DAO's memo. From here on, everything about it changes by vote."
+		description="A DAO is private to its members unless it chooses to be public, in which case anyone signed in can read it and only members act. Everything it does costs network traffic, paid from a balance topped up by sending Canton Coin to the app with a memo. From here on, everything about it changes by vote."
 	/>
 
 	{#if store.screen.at === 'loading'}
@@ -157,6 +174,7 @@
 		<form {...enhanced} class="space-y-8">
 			<input type="hidden" name="equal" value={mode === 'equal' ? 'yes' : 'no'} />
 			<input type="hidden" name="actorPays" value={payer === 'members' ? 'yes' : 'no'} />
+			<input type="hidden" name="public" value={visibility === 'public' ? 'yes' : 'no'} />
 
 			<FormSection title="Basic information">
 				<Field label="Name" id="daoName" issues={f.fields.daoName.issues()}>
@@ -212,6 +230,28 @@
 					This cannot be changed later: a DAO by membership stays one, and so does one by shares.
 					Who is in it, and with how many units, changes by vote.
 				</Note>
+			</FormSection>
+
+			<FormSection title="Who can see it">
+				<div class="grid gap-3 sm:grid-cols-2">
+					{#each visibilities as o (o.value)}
+						<label
+							class="flex cursor-pointer items-start gap-3 border p-4 transition-colors {visibility ===
+							o.value
+								? 'border-orange bg-orange/5'
+								: 'border-border hover:border-border-hover'}"
+						>
+							<input type="radio" class="sr-only" value={o.value} bind:group={visibility} />
+							<span class="min-w-0">
+								<span class="flex items-center gap-1.5 font-display text-[15px] font-bold"
+									>{o.title}
+									<Hint text={o.more} align={o.value === 'public' ? 'end' : 'start'} /></span
+								>
+								<span class="mt-1 block text-xs leading-relaxed text-ink-mid">{o.text}</span>
+							</span>
+						</label>
+					{/each}
+				</div>
 			</FormSection>
 
 			<FormSection title="Who pays">

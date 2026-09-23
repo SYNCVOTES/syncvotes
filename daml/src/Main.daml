@@ -64,6 +64,8 @@ data Effect
   | SetSettings with
       routine : Settings
       sensitive : Settings
+  | SetPublic with
+      public : Bool
   deriving (Eq, Show)
 
 -- | What a proposal does decides which of the DAO's two settings it runs under: the routine
@@ -174,6 +176,8 @@ template Account
         -- Who pays the traffic of the DAO's transactions: its own balance (the default), or
         -- each member for what they sign, from their own balance. Set at the founding.
         actorPays : Optional Bool
+        -- Readable by anyone signed in to the app, not only its members; changed by vote.
+        public : Optional Bool
       controller user
       do
         now <- getTime
@@ -199,7 +203,7 @@ template Account
         create DAO with
           provider; operator; creator = user; id; name = daoName; description; image
           equal; routine; sensitive; createdAt = now
-          members = length shares; units = sum (map snd shares); actorPays
+          members = length shares; units = sum (map snd shares); actorPays; public
 
     -- How a party presents itself: a name, a picture, a few words. One per party; replacing
     -- it hands in the old one.
@@ -246,6 +250,9 @@ template DAO
     -- DAO's balance pays for everything. Absent means the DAO pays (a DAO from before this
     -- field existed).
     actorPays : Optional Bool
+    -- Anyone signed in to the app may read it — its proposals, outcomes, members and
+    -- comments — through the app; only members act. Absent means private.
+    public : Optional Bool
   where
     signatory creator, provider
     observer operator
@@ -284,6 +291,9 @@ template DAO
           SetSettings routine sensitive -> do
             exercise proposal Proposal_Advance with upTo = 1
             Some <$> create this with routine; sensitive
+          SetPublic p -> do
+            exercise proposal Proposal_Advance with upTo = 1
+            Some <$> create this with public = Some p
           SetShares changes -> do
             let from = p.executed
                 slice = take (upTo - from) (drop from changes)
@@ -377,6 +387,7 @@ template Member
           Dissolve -> pure ()
           SetSettings routine sensitive ->
             assertMsg "The settings' numbers are out of range" (validSettings routine && validSettings sensitive)
+          SetPublic _ -> pure ()
           SetInfo daoName _ _ -> assertMsg "A DAO needs a name" (daoName /= "")
           SetShares changes ->
             assertMsg "The share change must be whole" (validChanges found.equal changes)

@@ -128,6 +128,10 @@
 - [x] Daml Script tests — written (decoy ballot, late ballot, invented member, dissolution,
       refused settings), then removed at the user's word: the e2e runs against TestNet are the
       tests (2026-09-23)
+- [x] invites by env (`INVITE_CODES`, empty opens the door); public DAOs: a flag at the founding
+      or by a sensitive `SetPublic` vote, a Public DAOs page with search and paging, read-only
+      pages for non-members (ballots stay with members), landing stats and copy
+      (`syncvotes-options` 0.22.0)
 - [x] a party pays for itself: a `Purse` per key, paid in by memo of the fingerprint; the party
       is allocated only once what a party costs today has arrived; profile and founding come
       out of it; a DAO is founded with "the DAO pays" or "each member pays" (signer pays what

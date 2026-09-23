@@ -18,7 +18,8 @@
 		description: string;
 		members: number;
 		openProposals: number;
-		role: 'creator' | 'member';
+		/** The viewer's part in it; null for a DAO they only read. */
+		role: 'creator' | 'member' | null;
 		image?: string | null;
 		/** What the DAO can still spend; meaningless where each member pays. */
 		balance?: number | null;
@@ -48,11 +49,13 @@
 				{monogram}
 			</div>
 		{/if}
-		<span
-			class="pt-1 font-mono text-xs font-bold tracking-[0.18em] uppercase {role === 'creator'
-				? 'text-amber'
-				: 'text-orange'}">{role}</span
-		>
+		{#if role}
+			<span
+				class="pt-1 font-mono text-xs font-bold tracking-[0.18em] uppercase {role === 'creator'
+					? 'text-amber'
+					: 'text-orange'}">{role}</span
+			>
+		{/if}
 	</div>
 
 	<div
