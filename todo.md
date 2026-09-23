@@ -114,7 +114,17 @@
 - [x] audit round 3 (`tmp/audit-3.md`) → one command id per payment (duplicates count as sent),
       remainder waits to land, write-offs against balance, sign-up paced per visitor, failed
       share changes unblock their parties
-- [ ] audit round 4: confirm the money-moving paths, then stop the logic audit
+- [x] audit round 4 (`tmp/audit-4.md`) → the participant's error code reaches the message, so
+      a resent payment that went is seen as a duplicate; a refusal is told from a lost reply
+      (nothing went vs. resend under the same id); the attempt number survives `sending`;
+      collection keyed on what was collected before; locks left alone while their instruction
+      stands. The logic audit stops here; what it left is below
+- [ ] `cf-connecting-ip` is trusted as it comes: reach the origin directly and the pacing is
+      yours to name (bind the origin to the proxy, or check the proxy's address)
+- [ ] a withdrawal that fails and a lock that expires leave an instruction nobody can close;
+      one live 1 CC payout to the bank party is in that state — close it by hand
+- [ ] a remainder's lowered attempts (`-0..-3`) and a receiver swapped for the same address:
+      dust guard (below 0.01 CC, write off), and `known` keyed on the instruction, not the receiver
 - [ ] Daml Script tests for the model's claims (decoy ballot, duplicate member, dissolve order)
 - [ ] a DAO-authority `Comment_Remove`; pace proposals as comments are paced
 - [ ] a treasury pre-approval is created once for a year and never renewed (`TransferPreapproval`
