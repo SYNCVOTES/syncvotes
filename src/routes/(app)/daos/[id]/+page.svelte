@@ -74,16 +74,23 @@
 				<div class="min-w-0">
 					<h1 class="display text-3xl md:text-4xl">{d.name}</h1>
 					<div class="mt-3 flex flex-wrap items-center gap-2">
-						<Badge variant="accent">Private</Badge>
-						<Hint
-							text="Only its members and the app see this DAO, its proposals, votes and comments; nothing about it is public on the network."
-						/>
+						<Badge variant="accent" class="overflow-visible pr-1.5">
+							Private
+							<Hint
+								text="Only its members and the app see this DAO, its proposals, votes and comments; nothing about it is public on the network."
+							/>
+						</Badge>
 						<Badge>{d.equal ? 'By membership' : 'By shares'}</Badge>
 						{#if d.dissolving}<Badge variant="red">Dissolving</Badge>{/if}
 						{#if d.me.creator}<Badge variant="amber">You created it</Badge>{:else}<Badge
 								variant="green">Member</Badge
 							>{/if}
 					</div>
+					{#if !d.dissolving && d.balance <= 0}
+						<p class="mt-3 font-mono text-xs text-red">
+							Nothing can be signed for this DAO until someone pays in.
+						</p>
+					{/if}
 				</div>
 			</div>
 			<div class="flex shrink-0 items-center gap-2">
@@ -92,9 +99,7 @@
 						>Being dissolved; nothing new is proposed.</span
 					>
 				{:else if d.balance <= 0}
-					<span class="max-w-[16rem] text-right font-mono text-xs text-red"
-						>Nothing can be signed for this DAO until someone pays in.</span
-					>
+					<!-- Nothing to press: the line under the badges says why. -->
 				{:else}
 					<Button href="/daos/{d.id}/proposals/create"
 						><Plus strokeWidth={2.5} /> New proposal</Button

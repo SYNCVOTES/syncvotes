@@ -15,6 +15,7 @@
 	import Phrase from '$lib/components/phrase.svelte';
 	import WalletSources from '$lib/components/wallet-sources.svelte';
 	import ProfileForm from '$lib/components/profile-form.svelte';
+	import ArrowRight from '@lucide/svelte/icons/arrow-right';
 	import { normaliseHint, hintProblem } from '$lib/hint';
 	import { hintOf, label } from '$lib/format';
 
@@ -248,7 +249,14 @@
 				The key is disposed after fifteen quiet minutes and whenever you leave the page; the
 				encrypted copy stays on this device.
 			</p>
-			<Panel><ProfileForm party={screen.who.party} /></Panel>
+			<Panel class="space-y-4">
+				<ProfileForm party={screen.who.party} />
+				<a
+					href="/people/{encodeURIComponent(screen.who.party)}"
+					class="inline-flex items-center gap-1 font-mono text-xs text-ink-dim transition-colors hover:text-orange"
+					>See it as others do <ArrowRight size={12} /></a
+				>
+			</Panel>
 		</section>
 		<div class="mt-6"><WalletSources /></div>
 	{/if}

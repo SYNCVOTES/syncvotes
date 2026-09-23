@@ -22,7 +22,7 @@
 >
 	<Info
 		size={13}
-		class="text-ink-dim transition-colors group-hover:text-orange group-focus:text-orange"
+		class="text-current opacity-60 transition-opacity group-hover:opacity-100 group-focus:opacity-100"
 		aria-hidden="true"
 	/>
 	<span

@@ -3,8 +3,8 @@
 	import PartyId from './party-id.svelte';
 
 	/**
-	 * A party in a list: face, the name it gave itself, and its id. Without a profile the id
-	 * is all there is, as before.
+	 * A party in a list: face, the name it gave itself, and its id, the face and the name leading
+	 * to its page. Without a profile the id is all there is, as before.
 	 */
 	let {
 		who,
@@ -17,14 +17,20 @@
 		size?: 'sm' | 'md';
 		class?: string;
 	} = $props();
+	const href = $derived(`/people/${encodeURIComponent(who.party)}`);
 </script>
 
 <span class="flex min-w-0 items-center gap-2.5 {className}">
-	<Avatar {who} size={size === 'md' ? 'md' : 'sm'} />
+	<a {href} class="shrink-0" aria-label="Profile of {who.name ?? who.party}">
+		<Avatar {who} size={size === 'md' ? 'md' : 'sm'} />
+	</a>
 	<span class="min-w-0">
 		{#if who.name}
-			<span class="block truncate font-display text-[13px] font-bold {me ? 'text-orange' : ''}"
-				>{who.name}</span
+			<a
+				{href}
+				class="block truncate font-display text-[13px] font-bold transition-colors hover:text-orange {me
+					? 'text-orange'
+					: ''}">{who.name}</a
 			>
 			<PartyId party={who.party} class="block" />
 		{:else}
