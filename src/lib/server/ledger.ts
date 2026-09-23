@@ -458,7 +458,7 @@ const RECENT = 1000;
 
 /**
  * Resolves once the transaction `updateId` is in the maps — how a write that just committed
- * hands the pages an up-to-date view. Gives up quietly after a few seconds: the stream lagging
+ * hands the pages an up-to-date view. Gives up quietly after fifteen seconds: the stream lagging
  * is not a failed write.
  */
 export async function applied(updateId: string): Promise<boolean> {

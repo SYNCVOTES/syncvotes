@@ -135,7 +135,7 @@
 		/>
 
 		<div class="grid gap-10 lg:grid-cols-[1fr_320px]">
-			<section>
+			<section class="min-w-0">
 				<div class="mb-4 flex items-center justify-between gap-4">
 					<h2 class="eyebrow">Proposals</h2>
 					<div class="flex gap-1">
@@ -201,7 +201,7 @@
 				{/if}
 			</section>
 
-			<aside class="space-y-6">
+			<aside class="min-w-0 space-y-6">
 				<TreasuryPanel dao={d.id} />
 
 				<div>

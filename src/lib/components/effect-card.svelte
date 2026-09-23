@@ -70,11 +70,13 @@
 
 <Panel padding="sm" class="space-y-3">
 	<h2 class="eyebrow">
-		{title}{executedAt
-			? ' · carried out'
-			: executed > 0
-				? ` · ${fmt(executed)} of ${fmt(rows.length)} carried out`
-				: ''}
+		{title}{payout?.state === 'unpaid'
+			? ' · written off'
+			: executedAt
+				? ' · carried out'
+				: executed > 0
+					? ` · ${fmt(executed)} of ${fmt(rows.length)} carried out`
+					: ''}
 	</h2>
 	{#if effect.kind === 'shares'}
 		<ul class="divide-y divide-border">
@@ -131,10 +133,6 @@
 				<p class="font-mono text-xs text-amber">
 					Sent; waiting to be accepted at the receiving address. Not accepted within a day, the coin
 					stays locked until the app releases it back to the treasury.
-				</p>
-			{:else if payout?.state === 'locked'}
-				<p class="font-mono text-xs text-amber">
-					Not accepted in time; the coin is locked and comes back to the treasury shortly.
 				</p>
 			{:else if payout?.state === 'returned'}
 				<p class="font-mono text-xs text-red">

@@ -208,11 +208,15 @@ export async function releaseExpired(treasury: string): Promise<Locked[]> {
  * has a pre-approval, otherwise waits for the receiver to accept. Resolves with the
  * transaction's id.
  */
+export class Duplicate extends Error {}
+
 export async function transfer(
 	treasury: string,
 	to: string,
 	amount: number,
-	memo: string
+	memo: string,
+	/** One id per payment, so a resend after a commit is refused rather than paid again. */
+	commandId = `transfer-${treasury.split('::')[0]}-${Date.now()}`
 ): Promise<string> {
 	if (amount <= 0) throw error(400, 'Nothing to transfer');
 	const token = (await sdk()).token;
@@ -224,12 +228,18 @@ export async function transfer(
 		registryUrl: splice.scanUrl(),
 		memo
 	});
-	const updateId = await submitAs(
-		[treasury],
-		[command] as Commands,
-		`transfer-${treasury.split('::')[0]}-${Date.now()}`,
-		disclosed as DisclosedContract[]
-	);
+	let updateId: string;
+	try {
+		updateId = await submitAs(
+			[treasury],
+			[command] as Commands,
+			commandId,
+			disclosed as DisclosedContract[]
+		);
+	} catch (e) {
+		if (/DUPLICATE_COMMAND/.test(message(e))) throw new Duplicate(message(e));
+		throw e;
+	}
 	forget(treasury);
 	return updateId;
 }
@@ -239,14 +249,20 @@ export async function transfer(
  * network's fees out of the same coin, so the amount is what is left after them; a refused
  * attempt is retried a little lower.
  */
-export async function transferAll(treasury: string, to: string, memo: string): Promise<string> {
+export async function transferAll(
+	treasury: string,
+	to: string,
+	memo: string,
+	commandId: string
+): Promise<string> {
 	const held = await holdings(treasury, true);
 	let amount = Math.floor((held - 0.05) * 0.99 * 10_000) / 10_000;
 	let last: unknown;
 	for (let i = 0; i < 4 && amount > 0; i++) {
 		try {
-			return await transfer(treasury, to, amount, memo);
+			return await transfer(treasury, to, amount, memo, `${commandId}-${i}`);
 		} catch (e) {
+			if (e instanceof Duplicate) throw e;
 			last = e;
 			amount = Math.floor(amount * 0.98 * 10_000) / 10_000;
 		}
@@ -254,29 +270,92 @@ export async function transferAll(treasury: string, to: string, memo: string): P
 	throw last ?? error(400, 'The treasury holds nothing to move');
 }
 
-type Instruction = { receiver: string; sender: string; amount: number };
-const view = (p: { interfaceViewValue: { transfer?: unknown } }): Instruction => {
+export type Instruction = {
+	cid: string;
+	receiver: string;
+	sender: string;
+	amount: number;
+	/** After this, the receiver can no longer accept; the sender takes it back. */
+	executeBefore: string;
+};
+const view = (p: {
+	contractId: string;
+	interfaceViewValue: { transfer?: unknown };
+}): Instruction => {
 	const t = (p.interfaceViewValue.transfer ?? {}) as {
 		receiver?: string;
 		sender?: string;
 		amount?: string;
+		executeBefore?: string;
 	};
-	return { receiver: t.receiver ?? '', sender: t.sender ?? '', amount: Number(t.amount ?? 0) };
+	return {
+		cid: p.contractId,
+		receiver: t.receiver ?? '',
+		sender: t.sender ?? '',
+		amount: Number(t.amount ?? 0),
+		executeBefore: t.executeBefore ?? ''
+	};
 };
+/** Called when an outgoing instruction of a treasury is gone: accepted, or taken back. */
+let onOutgoingGone: (treasury: string, cids: string[]) => void = () => {};
+export const watchOutgoing = (fn: typeof onOutgoingGone) => (onOutgoingGone = fn);
+function setOutgoing(treasury: string, now: Instruction[]) {
+	const before = outgoingCache.get(treasury) ?? [];
+	const gone = before.filter((b) => !now.some((n) => n.cid === b.cid)).map((b) => b.cid);
+	outgoingCache.set(treasury, now);
+	if (gone.length) onOutgoingGone(treasury, gone);
+}
 
 /** Transfers the treasury sent that still wait for their receiver; read with `refreshOutgoing`. */
 const outgoingCache = new Map<string, Instruction[]>();
 export const outgoing = (treasury: string): Instruction[] => outgoingCache.get(treasury) ?? [];
 
 /** Reads what the treasury sent and still waits for, and what of it sits locked. */
-export async function refreshOutgoing(treasury: string): Promise<void> {
+export async function refreshOutgoing(treasury: string): Promise<Instruction[]> {
 	const token = (await sdk()).token;
 	const all = (await token.transfer.pending(treasury)).map(view);
-	outgoingCache.set(
-		treasury,
-		all.filter((p) => p.sender === treasury && p.receiver !== treasury)
-	);
+	const out = all.filter((p) => p.sender === treasury && p.receiver !== treasury);
+	setOutgoing(treasury, out);
 	await readLocked(treasury);
+	return out;
+}
+
+/**
+ * Transfers the treasury sent that nobody accepted in time: taken back through the token
+ * standard, which unlocks the coin and closes the instruction. Resolves with what came back.
+ */
+export async function withdrawExpired(treasury: string): Promise<Instruction[]> {
+	const token = (await sdk()).token;
+	const out = await refreshOutgoing(treasury);
+	const expired = out.filter(
+		(p) => p.executeBefore && new Date(p.executeBefore).getTime() < Date.now() - 60_000
+	);
+	const back: Instruction[] = [];
+	for (const p of expired) {
+		try {
+			const [command, disclosed] = await token.transfer.withdraw({
+				transferInstructionCid: p.cid,
+				registryUrl: splice.scanUrl()
+			});
+			await submitAs(
+				[treasury],
+				[command] as Commands,
+				`withdraw-${p.cid.slice(0, 16)}`,
+				disclosed as DisclosedContract[]
+			);
+			back.push(p);
+		} catch (e) {
+			console.warn(
+				`Transfer ${p.cid.slice(0, 12)} of ${treasury.slice(0, 20)} not taken back:`,
+				message(e)
+			);
+		}
+	}
+	if (back.length) {
+		forget(treasury);
+		await refreshOutgoing(treasury);
+	}
+	return back;
 }
 
 /**
@@ -286,11 +365,8 @@ export async function refreshOutgoing(treasury: string): Promise<void> {
  */
 export async function acceptIncoming(treasury: string): Promise<string[]> {
 	const token = (await sdk()).token;
-	const all = (await token.transfer.pending(treasury)).map((p) => ({
-		cid: p.contractId,
-		...view(p)
-	}));
-	outgoingCache.set(
+	const all = (await token.transfer.pending(treasury)).map(view);
+	setOutgoing(
 		treasury,
 		all.filter((p) => p.sender === treasury && p.receiver !== treasury)
 	);

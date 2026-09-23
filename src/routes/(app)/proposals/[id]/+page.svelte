@@ -119,7 +119,7 @@
 		</div>
 
 		<div class="grid gap-8 lg:grid-cols-[1fr_320px]">
-			<section class="space-y-8">
+			<section class="min-w-0 space-y-8">
 				<Panel>
 					<Markdown text={p.description} fallback="No description." />
 				</Panel>
@@ -137,7 +137,9 @@
 					{#if p.stuck}
 						<Note mono={false}>
 							<span class="text-red">Could not be carried out yet:</span>
-							{p.stuck}. The provider keeps trying.
+							{p.stuck}. The provider keeps trying{p.effect.kind === 'payout'
+								? '; if the DAO dissolves first, the payout is written off'
+								: ''}.
 						</Note>
 					{:else if p.waiting && !p.executedAt}
 						<Note mono={false}>Passed; waiting for {p.waiting}.</Note>
@@ -197,7 +199,7 @@
 				<Comments proposal={id} member={!!p.me.membership} />
 			</section>
 
-			<aside class="order-first space-y-6 lg:order-none">
+			<aside class="order-first min-w-0 space-y-6 lg:order-none">
 				<Tally
 					yes={p.yes}
 					no={p.no}

@@ -133,7 +133,7 @@ export const enrol = command(
 			Buffer.from(publicKey, 'base64')
 		);
 		if (!valid) error(403, 'The signature does not match the key');
-		pacedEnrol();
+		const count = pacedEnrol();
 		const { partyId: party } = await participant.allocateParty(
 			hintOf(hint),
 			publicKey,
@@ -158,6 +158,7 @@ export const enrol = command(
 			);
 			await ledger.applied(updateId);
 		}
+		count();
 		return { party, account: accountOf(party).contractId };
 	}
 );
@@ -596,7 +597,7 @@ export const createProposalForm = form(schemas.createProposalForm, async (f) => 
 			// Two open changes naming the same party would each be applied whole; one at a time.
 			const touched = new Set(rows.map((r) => r.party));
 			for (const o of ledger.proposalsOf.get(f.dao)?.values() ?? []) {
-				if (o.outcome && o.executedAt) continue;
+				if (o.outcome === 'Failed' || o.executedAt) continue;
 				if (o.effect.kind !== 'shares') continue;
 				const clash = o.effect.changes.find((c) => touched.has(c.party));
 				if (clash) {
@@ -652,20 +653,32 @@ export const prepareVote = command(
 
 /** Parties made lately from one address: the provider pays for each, so a flood is refused. */
 const recentEnrols = new Map<string, number[]>();
-const ENROLS_PER_HOUR = 20;
-function pacedEnrol() {
-	let address = 'unknown';
+const ENROLS_PER_HOUR = 60;
+/** The visitor's address as the proxies in front report it, or the socket's as a last resort. */
+function clientAddress(): string {
 	try {
-		address = getRequestEvent().getClientAddress();
+		const event = getRequestEvent();
+		const h = event.request.headers;
+		return (
+			h.get('cf-connecting-ip') ??
+			h.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+			event.getClientAddress()
+		);
 	} catch {
-		// No request event: a test harness; one bucket.
+		return 'unknown';
 	}
+}
+function pacedEnrol(): () => void {
+	const address = clientAddress();
 	const now = Date.now();
 	const mine = (recentEnrols.get(address) ?? []).filter((t) => now - t < 3_600_000);
 	if (mine.length >= ENROLS_PER_HOUR)
 		error(429, 'That is a lot of new parties for one hour; try later');
-	mine.push(now);
-	recentEnrols.set(address, mine);
+	// Counted once the party exists: a failed attempt costs nothing.
+	return () => {
+		mine.push(Date.now());
+		recentEnrols.set(address, mine);
+	};
 }
 
 /** Writes a party made lately: a member's words cost the DAO, so a flood is refused. */

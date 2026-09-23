@@ -207,14 +207,18 @@ export async function collectFrom(daoId: string): Promise<void> {
 	await write(daoId, charged, collected + due);
 	collectedAt.set(daoId, Date.now());
 	try {
+		// One command id per collection: the meter's contract is new each time it is written, so
+		// a resend of the same collection is refused by the participant rather than paid twice.
 		const updateId = await treasury.transfer(
 			dao.treasury,
 			providerParty(),
 			due,
-			`syncvotes traffic ${daoId}`
+			`syncvotes traffic ${daoId}`,
+			`collect-${daoId}-${meter?.contractId.slice(0, 16) ?? 'first'}`
 		);
 		void settle(daoId, updateId, dao.treasury);
 	} catch (e) {
+		if (e instanceof treasury.Duplicate) return; // sent before: the meter already says so
 		console.warn(
 			`Collecting from ${daoId} failed; the meter is written back:`,
 			e instanceof Error ? e.message : e
