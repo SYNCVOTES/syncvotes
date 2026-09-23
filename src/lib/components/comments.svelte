@@ -168,7 +168,7 @@
 						{store.busy ? 'Signing…' : 'Comment'}
 					</Button>
 					<span class="font-mono text-[0.6875rem] text-ink-dim"
-						>Signed with your key; the DAO pays the traffic, about 0.2 CC a comment.</span
+						>Signed with your key; the DAO pays the traffic — a few CC per write at TestNet prices.</span
 					>
 				</div>
 			</form>

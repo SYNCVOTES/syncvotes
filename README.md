@@ -106,8 +106,8 @@ proposal carried out) are controlled by both, and neither has the other's key.
   share has not changed since the proposal was made — so a share moved during a vote never
   votes twice — not counted before. The provider can delay a result, never change it.
 - `Comment` — a member's words on a proposal, signed by the author, the provider and the
-  creator; the author edits or removes it. A member's writes are paced by the app (thirty an
-  hour), since the DAO pays for them.
+  creator; the author edits or removes it. Comments are paced by the app (thirty writes an
+  hour per party), since the DAO pays for them.
 - `Meter` — the provider's statement of a DAO's account: traffic charged, and what of it the
   treasury has paid.
 
@@ -120,8 +120,11 @@ and accepts, as the treasury, whatever arrives as a transfer instruction meanwhi
 it in three ways only: what the DAO owes for traffic is collected to the provider once it adds
 up (ten coin, or weekly); a passed `Payout` is sent to its party through the token standard,
 then recorded on the ledger (the record of what was paid is also kept on disk, so a restart
-cannot pay twice; a payout whose receiver has yet to accept it shows as sent, not paid); and
-when the DAO dissolves, what is left goes where the vote said. Receivers are addresses outside
+cannot pay twice; a transfer interrupted by a restart is never sent again, only pointed at; a
+payout whose receiver has yet to accept it shows as sent, not paid, and one not accepted within
+a day is locked until the app releases it back, then shows as returned); and when the DAO
+dissolves, what is left goes where the vote said, once every other proposal has settled and
+been carried out and any payout the treasury cannot cover has been written off as unpaid. Receivers are addresses outside
 the app — a validator wallet, an exchange — never a party registered here, which has no wallet
 to accept coin with.
 
@@ -131,7 +134,7 @@ is what does it. What the provider cannot do: invent a member, a ballot or a pro
 creator's signature is on each), change a count (the ledger checks every ballot it is handed)
 or pass anything measured against the whole vote by leaving ballots out. What it can do: delay,
 and — where a rule is measured against the votes cast, or has a quorum — fail or flip a result
-by omitting ballots at the final count; the rule hints say so. A treasury the provider cannot touch — a party owned by signers' keys, m of n,
+by omitting ballots at the final count; the hints on those two settings say so. A treasury the provider cannot touch — a party owned by signers' keys, m of n,
 with live signing sessions — was measured to work (git history at `bb62260`) and can come back
 as an option; only who signs the transfer would change.
 

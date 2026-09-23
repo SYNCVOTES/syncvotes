@@ -16,7 +16,7 @@
 <!-- A button so the keyboard reaches it; it does nothing on click, which suits a label that is a radio. -->
 <button
 	type="button"
-	class="group relative inline-flex shrink-0 cursor-help align-middle outline-none {className}"
+	class="group relative inline-flex shrink-0 cursor-help flex-wrap align-middle outline-none max-sm:basis-full {className}"
 	aria-label={text}
 	onclick={(e) => e.preventDefault()}
 >
@@ -26,10 +26,10 @@
 		aria-hidden="true"
 	/>
 	<span
-		class="pointer-events-none absolute top-full z-30 mt-1.5 hidden w-72 border border-border bg-surface p-3 text-left font-sans text-xs leading-relaxed font-normal tracking-normal text-ink-mid normal-case shadow-lg group-hover:block group-focus:block {align ===
+		class="pointer-events-none z-30 mt-1.5 hidden w-full border border-border bg-surface p-3 text-left font-sans text-xs leading-relaxed font-normal tracking-normal text-ink-mid normal-case shadow-lg group-hover:block group-focus:block sm:absolute sm:top-full sm:w-72 {align ===
 		'end'
-			? 'right-0'
-			: 'left-0'}"
+			? 'sm:right-0'
+			: 'sm:left-0'}"
 	>
 		{text}
 	</span>

@@ -50,7 +50,7 @@
 			{rule.basis === 'all'
 				? `${w(s.needed)} to pass`
 				: yes + no === 0
-					? 'more yes than no to pass'
+					? `${describe(rule).replace(/ say yes.*$/, '')} to pass`
 					: `${w(s.needed)} of ${w(s.denominator)} cast to pass`}
 		</span>
 		<span class="text-red">{w(no)} no</span>

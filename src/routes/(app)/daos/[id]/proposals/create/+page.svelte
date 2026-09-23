@@ -22,7 +22,7 @@
 	import Note from '$lib/components/note.svelte';
 	import RuleSettings from '$lib/components/rule-settings.svelte';
 	import Hint from '$lib/components/hint.svelte';
-	import { categoryOf, describe, settingsToLedger, type Settings } from '$lib/rules';
+	import { categoryOf, describe, settingsToLedger, validRule, type Settings } from '$lib/rules';
 	import PieChart from '@lucide/svelte/icons/pie-chart';
 	import Users from '@lucide/svelte/icons/users';
 	import Pencil from '@lucide/svelte/icons/pencil';
@@ -79,8 +79,8 @@
 		{
 			value: 'payout',
 			title: 'Payout',
-			text: 'Coin from the treasury to a party.',
-			more: "Sends Canton Coin from the DAO's treasury to a party, a member or anyone else on the network. Paid the moment the vote passes if the treasury can cover it, otherwise the moment it can. Where the party accepts transfers automatically the coin lands at once; a SyncVotes member accepts it on their Wallet page, with their key.",
+			text: 'Coin from the treasury to an address outside the app.',
+			more: "Sends Canton Coin from the DAO's treasury to an address outside SyncVotes: a validator wallet, an exchange, any party on the network that can hold coin. Paid the moment the vote passes if the treasury can cover it, otherwise the moment it can. Where the address accepts transfers automatically the coin lands at once; otherwise it waits a day to be accepted there, and comes back if it is not.",
 			icon: Coins
 		},
 		{
@@ -218,7 +218,7 @@
 				if (!payoutTo[0] || !payoutAmount) return 'Say who is paid, and how much.';
 				return `${coin(payoutAmount)} leaves the treasury for ${payoutTo[0].split('::')[0]} the moment this passes${holdings !== null && payoutAmount > holdings ? ' — more than the treasury holds today; it waits until it can be paid' : ''}.`;
 			case 'dissolve':
-				return `The DAO is dissolved once every other vote has settled; whatever the treasury holds goes to ${remainderTo[0]?.split('::')[0] ?? 'the party named below'}. Its record stays readable; nothing new can be proposed.`;
+				return `Nothing new can be proposed once this passes. When every other proposal has settled and been carried out and what is owed for traffic is collected, whatever the treasury holds goes to ${remainderTo[0]?.split('::')[0] ?? 'the party named below'}. Its record stays readable; nothing new can be proposed.`;
 			case 'settings':
 				return `From then on routine proposals pass when ${describe(newRoutine.rule)}, open ${newRoutine.votingDays} days; sensitive ones when ${describe(newSensitive.rule)}, open ${newSensitive.votingDays} days.`;
 			default:
@@ -333,6 +333,8 @@
 				return !!payoutTo[0] && !!payoutAmount && payoutAmount > 0;
 			case 'dissolve':
 				return !!remainderTo[0];
+			case 'settings':
+				return validRule(newRoutine.rule) && validRule(newSensitive.rule);
 			default:
 				return true;
 		}

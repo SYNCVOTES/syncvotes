@@ -461,11 +461,12 @@ const RECENT = 1000;
  * hands the pages an up-to-date view. Gives up quietly after a few seconds: the stream lagging
  * is not a failed write.
  */
-export async function applied(updateId: string): Promise<void> {
-	const deadline = Date.now() + 5000;
+export async function applied(updateId: string): Promise<boolean> {
+	const deadline = Date.now() + 15_000;
 	while (!recent.includes(updateId) && Date.now() < deadline) {
 		await Promise.race([nextChange(keys.all), new Promise((r) => setTimeout(r, 500))]);
 	}
+	return recent.includes(updateId);
 }
 
 async function loadActiveContracts(): Promise<number> {

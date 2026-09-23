@@ -18,7 +18,7 @@
 	import Note from '$lib/components/note.svelte';
 	import Hint from '$lib/components/hint.svelte';
 	import RuleSettings from '$lib/components/rule-settings.svelte';
-	import { CATEGORIES, DEFAULTS, settingsToLedger, type Settings } from '$lib/rules';
+	import { CATEGORIES, DEFAULTS, settingsToLedger, validRule, type Settings } from '$lib/rules';
 	import Users from '@lucide/svelte/icons/users';
 	import PieChart from '@lucide/svelte/icons/pie-chart';
 	import { fmt } from '$lib/format';
@@ -258,7 +258,7 @@
 			<FormActions
 				label="Create DAO"
 				busy={store.busy || f.pending > 0}
-				disabled={!summary.valid}
+				disabled={!summary.valid || !validRule(routine.rule) || !validRule(sensitive.rule)}
 				cancelHref="/my-daos"
 				problem={store.problem}
 			/>

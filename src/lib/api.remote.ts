@@ -1,6 +1,6 @@
 import { error } from '@sveltejs/kit';
 import { ed25519 } from '@noble/curves/ed25519.js';
-import { command, form, query } from '$app/server';
+import { command, form, query, getRequestEvent } from '$app/server';
 import * as v from 'valibot';
 import { Main } from '@daml.js/model';
 import * as participant from './server/participant';
@@ -133,6 +133,7 @@ export const enrol = command(
 			Buffer.from(publicKey, 'base64')
 		);
 		if (!valid) error(403, 'The signature does not match the key');
+		pacedEnrol();
 		const { partyId: party } = await participant.allocateParty(
 			hintOf(hint),
 			publicKey,
@@ -248,7 +249,9 @@ export const dao = query.live(contractId, (id) =>
 			...summarise(d),
 			balance: await billing.balance(id),
 			// A founding table still being carried out: the DAO is not whole yet.
-			founding: !!ledger.proposals.get(id) && !ledger.proposals.get(id)?.executedAt,
+			founding:
+				!!ledger.proposals.get(`${id}-founding`) &&
+				!ledger.proposals.get(`${id}-founding`)?.executedAt,
 			me: {
 				creator: d.creator === membership.party,
 				membership: membership.contractId,
@@ -378,7 +381,8 @@ export const proposal = query.live(contractId, (id) =>
 			proposedBy: who(p.proposer),
 			paidBy: tally.paid.get(id) ?? null,
 			/** For a payout that went out: whether the receiver still has to accept it. */
-			awaiting: tally.paid.has(id) && p.effect.kind === 'payout' ? tally.awaiting(p) : false,
+			payout: p.effect.kind === 'payout' ? tally.payoutState(p) : null,
+			waiting: tally.waiting.get(id) ?? null,
 			/** Why the provider could not carry it out, after repeated attempts. */
 			stuck: tally.stuck.get(id) ?? null,
 			me: {
@@ -399,9 +403,10 @@ export const proposalBallots = query.live(
 	v.object({ id: contractId, ...paging, q: filter }),
 	({ id, offset, limit, q }) =>
 		live(ledger.keys.proposal(id), () => {
-			proposalReader(proposalOf(id));
+			const p = proposalOf(id);
+			proposalReader(p);
 			const all = [...(ledger.ballots.get(id)?.values() ?? [])]
-				.filter((b) => matches(q)(b.voter))
+				.filter((b) => b.daoId === p.daoId && matches(q)(b.voter))
 				.sort((a, b) => b.castAt.localeCompare(a.castAt))
 				.map((b) => ({ ...b, who: who(b.voter) }));
 			return page(all, offset, limit);
@@ -414,6 +419,7 @@ export const proposalComments = query.live(contractId, (id) =>
 		const p = proposalOf(id);
 		const me = proposalReader(p);
 		return [...(ledger.comments.get(id)?.values() ?? [])]
+			.filter((c) => c.daoId === p.daoId)
 			.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
 			.map((c) => ({ ...c, who: who(c.author), mine: c.author === (me?.party ?? p.proposer) }));
 	})
@@ -505,10 +511,22 @@ export const createDaoForm = form(schemas.createDaoForm, async (f) => {
 	};
 });
 
-/** Coin leaves the app: a receiver is an address outside it, never a party registered here. */
-const outside = (party: string) => {
+/**
+ * Coin leaves the app: a receiver is an address outside it — never a party registered here,
+ * a DAO's treasury or the provider — and one the network knows.
+ */
+const outside = async (party: string) => {
 	if (ledger.accounts.has(party)) {
 		error(400, 'Payouts go to addresses outside SyncVotes, not to a party registered here');
+	}
+	if (party === participant.providerParty() || party === participant.operatorParty()) {
+		error(400, "That is the app's own party");
+	}
+	for (const d of ledger.daos.values()) {
+		if (d.treasury === party) error(400, "That is a DAO's treasury, not an outside address");
+	}
+	if (!(await participant.partyExists(party))) {
+		error(400, 'The network knows no such party; check the id');
 	}
 };
 
@@ -548,7 +566,7 @@ export const createProposalForm = form(schemas.createProposalForm, async (f) => 
 			};
 			break;
 		case 'dissolve':
-			outside(f.remainderTo.trim());
+			await outside(f.remainderTo.trim());
 			action = { tag: 'Dissolve', value: { remainderTo: f.remainderTo.trim() } };
 			break;
 		case 'settings':
@@ -561,7 +579,7 @@ export const createProposalForm = form(schemas.createProposalForm, async (f) => 
 			};
 			break;
 		case 'payout':
-			outside(f.payoutTo.trim());
+			await outside(f.payoutTo.trim());
 			action = {
 				tag: 'Payout',
 				value: { to: f.payoutTo.trim(), amount: decimal(f.payoutAmount), reason: f.payoutReason }
@@ -574,6 +592,19 @@ export const createProposalForm = form(schemas.createProposalForm, async (f) => 
 				if (!ledger.accounts.has(r.party)) error(404, `${r.party} is not registered with the app`);
 				if (d.equal && r.share > 1) error(400, 'By membership, a member holds one unit');
 				if (r.share === 0 && !members?.has(r.party)) error(400, `${r.party} is not a member`);
+			}
+			// Two open changes naming the same party would each be applied whole; one at a time.
+			const touched = new Set(rows.map((r) => r.party));
+			for (const o of ledger.proposalsOf.get(f.dao)?.values() ?? []) {
+				if (o.outcome && o.executedAt) continue;
+				if (o.effect.kind !== 'shares') continue;
+				const clash = o.effect.changes.find((c) => touched.has(c.party));
+				if (clash) {
+					error(
+						409,
+						`“${o.title}” already changes ${clash.party.split('::')[0]}; wait until it is settled and carried out`
+					);
+				}
 			}
 			// A change that leaves nobody, or no units, is refused before it is signed.
 			let units = d.units;
@@ -618,6 +649,24 @@ export const prepareVote = command(
 		return prepare(me.party, Main.Member, me.contractId, 'Member_Vote', args, p.daoId);
 	}
 );
+
+/** Parties made lately from one address: the provider pays for each, so a flood is refused. */
+const recentEnrols = new Map<string, number[]>();
+const ENROLS_PER_HOUR = 20;
+function pacedEnrol() {
+	let address = 'unknown';
+	try {
+		address = getRequestEvent().getClientAddress();
+	} catch {
+		// No request event: a test harness; one bucket.
+	}
+	const now = Date.now();
+	const mine = (recentEnrols.get(address) ?? []).filter((t) => now - t < 3_600_000);
+	if (mine.length >= ENROLS_PER_HOUR)
+		error(429, 'That is a lot of new parties for one hour; try later');
+	mine.push(now);
+	recentEnrols.set(address, mine);
+}
 
 /** Writes a party made lately: a member's words cost the DAO, so a flood is refused. */
 const recentWrites = new Map<string, number[]>();

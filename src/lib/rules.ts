@@ -48,7 +48,7 @@ export const PRESETS: { value: Preset; title: string; text: string; rule?: Rule 
 	{
 		value: 'twoThirds',
 		title: 'Two thirds of the vote',
-		text: 'At least 67% of the whole vote says yes.',
+		text: 'At least two thirds of the whole vote say yes — two of three, rounded up.',
 		rule: {
 			basis: 'all',
 			threshold: { kind: 'fraction', num: 2, den: 3 },
@@ -160,6 +160,15 @@ export function standing(
 		: `quorum not met: ${pct(cast)}% of the vote took part, ${r.quorum}% needed`;
 	return { needed, denominator, quorumMet, note };
 }
+
+/** Whether a rule's numbers are ones the ledger accepts. */
+export const validRule = (r: Rule) =>
+	r.quorum >= 0 &&
+	r.quorum <= 100 &&
+	!(r.early && r.changeable) &&
+	(r.threshold.kind !== 'fraction' ||
+		(r.threshold.num >= 1 && r.threshold.num <= r.threshold.den && r.threshold.den <= 100)) &&
+	(r.threshold.kind !== 'percent' || (r.threshold.percent >= 1 && r.threshold.percent <= 100));
 
 /** What proposals of a category run under: the rule they pass by, and how long the vote is open. */
 export type Settings = { rule: Rule; votingDays: number };

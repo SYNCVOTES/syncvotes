@@ -4,6 +4,7 @@ import { BILLING_FACTOR } from '$app/env/private';
 import * as ledger from './ledger';
 import * as splice from './splice';
 import * as treasury from './treasury';
+import * as tally from './tally';
 import { operatorParty, paidTraffic, providerParty, submitAsProvider } from './participant';
 
 /**
@@ -44,6 +45,8 @@ export type Statement = {
 	treasury: string;
 	/** What the treasury holds. */
 	holdings: number;
+	/** Coin sent and not accepted yet: locked until it lands or comes back. */
+	locked: number;
 	charged: number;
 	collected: number;
 	/** Charged and not yet collected. */
@@ -76,6 +79,7 @@ export async function statement(daoId: string): Promise<Statement> {
 	return {
 		treasury: dao.treasury,
 		holdings,
+		locked: treasury.lockedOf(dao.treasury).reduce((s, l) => s + l.amount, 0),
 		charged,
 		collected,
 		due: charged - collected,
@@ -272,6 +276,7 @@ async function acceptIncoming(): Promise<void> {
 
 export function start(): void {
 	setInterval(() => void acceptIncoming(), 30_000);
+	setInterval(() => void tally.releaseReturns(), 10 * 60_000);
 	setInterval(() => void collect(), 10 * 60_000);
 	setInterval(() => void flush(), 60 * 60_000);
 	for (const signal of ['SIGTERM', 'SIGINT'] as const) {

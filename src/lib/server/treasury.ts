@@ -21,6 +21,7 @@ import * as splice from './splice';
  */
 
 const AMULET = '#splice-amulet:Splice.Amulet:Amulet';
+const LOCKED = '#splice-amulet:Splice.Amulet:LockedAmulet';
 const AMULET_RULES = '#splice-amulet:Splice.AmuletRules:AmuletRules';
 
 /** Submits as parties this app's user acts for: the provider, or a treasury. */
@@ -135,7 +136,70 @@ export function holdings(treasury: string, fresh = false): Promise<number> {
 	return promise;
 }
 
-export const forget = (treasury: string) => holdingsCache.delete(treasury);
+export const forget = (treasury: string) => {
+	holdingsCache.delete(treasury);
+	lockedCache.delete(treasury);
+};
+
+export type Locked = { contractId: string; amount: number; expiresAt: string };
+const lockedCache = new Map<string, Locked[]>();
+
+/** Coin the treasury sent that waits, locked, for its receiver: read with `refreshOutgoing`. */
+export const lockedOf = (treasury: string): Locked[] => lockedCache.get(treasury) ?? [];
+
+async function readLocked(treasury: string): Promise<Locked[]> {
+	const found = await activeContracts(treasury, [LOCKED]);
+	const locked = found.map((c) => {
+		const a = c.createArgument as {
+			amulet?: { amount?: { initialAmount?: string } };
+			lock?: { expiresAt?: string };
+		};
+		return {
+			contractId: c.contractId,
+			amount: Number(a.amulet?.amount?.initialAmount ?? 0),
+			expiresAt: a.lock?.expiresAt ?? ''
+		};
+	});
+	lockedCache.set(treasury, locked);
+	return locked;
+}
+
+/**
+ * Locks that have run out — a payout nobody accepted in time — released back to the
+ * treasury, as its owner. Resolves with what came back.
+ */
+export async function releaseExpired(treasury: string): Promise<Locked[]> {
+	const expired = (await readLocked(treasury)).filter(
+		(l) => l.expiresAt && new Date(l.expiresAt).getTime() < Date.now() - 60_000
+	);
+	const released: Locked[] = [];
+	for (const l of expired) {
+		try {
+			await submitAs(
+				[treasury],
+				[
+					{
+						ExerciseCommand: {
+							templateId: LOCKED,
+							contractId: l.contractId,
+							choice: 'LockedAmulet_OwnerExpireLockV2',
+							choiceArgument: {}
+						}
+					}
+				],
+				`release-${l.contractId.slice(0, 16)}`
+			);
+			released.push(l);
+		} catch (e) {
+			console.warn(
+				`Lock ${l.contractId.slice(0, 12)} of ${treasury.slice(0, 20)} not released:`,
+				message(e)
+			);
+		}
+	}
+	if (released.length) forget(treasury);
+	return released;
+}
 
 // ---- Moving coin -------------------------------------------------------------------------
 
@@ -200,9 +264,20 @@ const view = (p: { interfaceViewValue: { transfer?: unknown } }): Instruction =>
 	return { receiver: t.receiver ?? '', sender: t.sender ?? '', amount: Number(t.amount ?? 0) };
 };
 
-/** Transfers the treasury sent that still wait for their receiver; read with `acceptIncoming`. */
+/** Transfers the treasury sent that still wait for their receiver; read with `refreshOutgoing`. */
 const outgoingCache = new Map<string, Instruction[]>();
 export const outgoing = (treasury: string): Instruction[] => outgoingCache.get(treasury) ?? [];
+
+/** Reads what the treasury sent and still waits for, and what of it sits locked. */
+export async function refreshOutgoing(treasury: string): Promise<void> {
+	const token = (await sdk()).token;
+	const all = (await token.transfer.pending(treasury)).map(view);
+	outgoingCache.set(
+		treasury,
+		all.filter((p) => p.sender === treasury && p.receiver !== treasury)
+	);
+	await readLocked(treasury);
+}
 
 /**
  * Coin sent to the treasury that waits for its acceptance: accepted, as the treasury. What

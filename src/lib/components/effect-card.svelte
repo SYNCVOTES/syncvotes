@@ -25,7 +25,7 @@
 		equal = false,
 		current,
 		paid = null,
-		awaiting = false
+		payout = null
 	}: {
 		effect: Effect;
 		executed: number;
@@ -35,8 +35,8 @@
 		current: { party: string; share: number }[];
 		/** The transaction that paid a payout or the remainder, once it went out. */
 		paid?: string | null;
-		/** The payout went out and waits for the receiver to accept it. */
-		awaiting?: boolean;
+		/** Where a payout stands, from the server. */
+		payout?: { state: string; note: string | null } | null;
 	} = $props();
 	const title = $derived.by(() => {
 		switch (effect.kind) {
@@ -127,16 +127,30 @@
 				treasury to <PartyId party={effect.to} class="align-middle" />
 			</p>
 			{#if effect.reason}<Markdown text={effect.reason} />{/if}
-			{#if awaiting}
+			{#if payout?.state === 'awaiting'}
 				<p class="font-mono text-xs text-amber">
-					Sent; waiting to be accepted at the receiving address. Unaccepted, it returns to the
-					treasury.
+					Sent; waiting to be accepted at the receiving address. Not accepted within a day, the coin
+					stays locked until the app releases it back to the treasury.
 				</p>
+			{:else if payout?.state === 'locked'}
+				<p class="font-mono text-xs text-amber">
+					Not accepted in time; the coin is locked and comes back to the treasury shortly.
+				</p>
+			{:else if payout?.state === 'returned'}
+				<p class="font-mono text-xs text-red">
+					Not accepted in time; the coin came back to the treasury. Propose again if it is still
+					owed.
+				</p>
+			{:else if payout?.state === 'unpaid'}
+				<p class="font-mono text-xs text-red">Not paid: {payout.note}.</p>
+			{:else if payout?.state === 'sending'}
+				<p class="font-mono text-xs text-amber">{payout.note}</p>
 			{:else if paid || executedAt}<p class="font-mono text-xs text-green">Paid.</p>{/if}
 		</div>
 	{:else if effect.kind === 'dissolve'}
 		<p class="flex flex-wrap items-center gap-x-2 text-[13px] text-ink-mid">
-			Dissolves the DAO once every other vote has settled; whatever the treasury holds goes to
+			Once this passes nothing new is proposed; when every other proposal has settled and been
+			carried out, what is owed for traffic is collected and whatever the treasury holds goes to
 			<PartyId party={effect.remainderTo} class="align-middle" />. Its settled proposals stay
 			readable; nothing new can be proposed.
 		</p>

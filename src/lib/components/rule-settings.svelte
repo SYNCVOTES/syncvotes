@@ -63,11 +63,11 @@
 		preset:
 			'A starting point for the three settings below. Majority of the vote: more than half of everyone who could vote. Majority of votes cast: more yes than no among those who vote, a quarter taking part. Two thirds and unanimous: of the whole vote. Change any setting and it reads custom.',
 		basis:
-			'The whole vote: yes is compared with everyone who could vote, so a member who stays silent counts as a no. The votes cast: yes is compared with the yes and no actually cast, so a few voters can decide unless a quorum says how many must take part.',
+			'The whole vote: yes is compared with everyone who could vote, so a member who stays silent counts as a no, and the count cannot be gamed by leaving ballots out. The votes cast: yes is compared with the yes and no actually cast, so a few voters can decide unless a quorum says how many must take part — and the app, which hands the ballots to the ledger, could sway it by leaving some out.',
 		threshold:
 			'More than half: strictly over 50% of what yes is compared with; 50 of 100 is not enough, 51 is. A fraction, say two thirds: at least that much, rounded up — two of three. A percentage: at least that share; 100% means everyone.',
 		quorum:
-			'How much of the whole vote must take part, yes, no or abstain, for the result to count at all. Below it the proposal fails at the deadline whatever the yes count. 0 means no minimum. Matters most with "the votes cast".',
+			'How much of the whole vote must take part, yes, no or abstain, for the result to count at all. Below it the proposal fails at the deadline whatever the yes count. 0 means no minimum. Matters most with "the votes cast"; note that a quorum is met or not by the ballots the app hands in.',
 		early:
 			'The proposal settles the moment its outcome can no longer change: yes has enough even if everyone still silent said no, or yes can no longer reach enough even if they all said yes. Otherwise it waits for the deadline.',
 		changeable:
@@ -133,7 +133,7 @@
 				}}
 			>
 				<option value="majority">more than half</option>
-				<option value="fraction">at least a fraction</option>
+				<option value="fraction">at least a fraction of it (two thirds…)</option>
 				<option value="percent">at least a percentage</option>
 			</select>
 			{#if rule.threshold.kind === 'percent'}
@@ -265,11 +265,17 @@
 			<span class="font-mono text-xs text-ink-dim">days</span>
 		</div>
 	</div>
-	<p class="px-4 py-3 font-mono text-xs text-ink">
-		Passes when {describe(rule)}; {rule.early
-			? 'settles early once sure'
-			: rule.changeable
-				? 'votes may change, decided at the deadline'
-				: 'decided at the deadline'}. {here}
-	</p>
+	{#if rule.threshold.kind === 'fraction' && rule.threshold.num > rule.threshold.den}
+		<p class="px-4 py-3 font-mono text-xs text-red">
+			A fraction is at most one: the top number no more than the bottom.
+		</p>
+	{:else}
+		<p class="px-4 py-3 font-mono text-xs text-ink">
+			Passes when {describe(rule)}; {rule.early
+				? 'settles early once sure'
+				: rule.changeable
+					? 'votes may change, decided at the deadline'
+					: 'decided at the deadline'}. {here}
+		</p>
+	{/if}
 </div>

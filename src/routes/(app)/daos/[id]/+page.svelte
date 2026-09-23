@@ -163,7 +163,7 @@
 				{:else}
 					<List>
 						{#each proposals.current.items as p (p.id)}
-							<ListItem href="/proposals/{p.id}" padding="md">
+							<ListItem href="/proposals/{p.id}" padding="md" class="min-w-0">
 								<div class="min-w-0 flex-1">
 									<div class="truncate font-display text-[15px] font-bold">{p.title}</div>
 									<div

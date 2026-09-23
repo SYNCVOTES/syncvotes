@@ -401,6 +401,9 @@ template Member
                 old <- fetch cid
                 assertMsg "Not this member's ballot on this proposal"
                   (old.voter == party && old.proposalId == proposalId && old.daoId == daoId)
+                -- The ballot on record is the one cast against this deadline; any other of the
+                -- voter's, cast against a made-up one, is not a vote and does not buy another.
+                assertMsg "Not the ballot on record" (old.closesAt == closesAt && old.changeable)
                 exercise cid Ballot_Withdraw
             void (create this with voted = open)
           else void (create this with voted = (proposalId, closesAt) :: open)
@@ -514,6 +517,9 @@ template Proposal
               Dissolve _ -> 2
               _ -> 1
         assertMsg "Progress only goes forward" (upTo > executed && upTo <= size)
+        case action of
+          Dissolve _ -> assertMsg "A dissolution goes one step at a time" (upTo == executed + 1)
+          _ -> pure ()
         now <- getTime
         create this with
           executed = upTo

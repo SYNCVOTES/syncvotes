@@ -6,7 +6,6 @@
 	import Coins from '@lucide/svelte/icons/coins';
 	import MessageSquare from '@lucide/svelte/icons/message-square';
 	import Scale from '@lucide/svelte/icons/scale';
-	import { short } from '$lib/rules';
 	import { coin, fmt } from '$lib/format';
 	import type { Effect } from './effect-card.svelte';
 
@@ -29,7 +28,7 @@
 			case 'dissolve':
 				return 'dissolve';
 			case 'settings':
-				return `settings: ${short(effect.routine.rule)} / ${short(effect.sensitive.rule)}`;
+				return 'settings';
 			default:
 				return 'decision';
 		}

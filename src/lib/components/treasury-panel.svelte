@@ -32,6 +32,10 @@
 		<dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 font-mono text-xs">
 			<dt class="text-ink-dim">Holds</dt>
 			<dd class="text-ink">{coin(b.holdings)}</dd>
+			{#if b.locked > 0}
+				<dt class="text-ink-dim">Sent, not accepted yet</dt>
+				<dd class="text-amber">{coin(b.locked)}</dd>
+			{/if}
 			<dt class="text-ink-dim">Owed for traffic</dt>
 			<dd class="text-ink">{coin(b.due)}</dd>
 			<dt class="text-ink-dim">Spent so far</dt>

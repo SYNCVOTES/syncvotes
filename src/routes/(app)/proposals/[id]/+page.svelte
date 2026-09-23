@@ -61,6 +61,12 @@
 	const tone = (v: string) =>
 		v === 'Yes' ? 'text-green' : v === 'No' ? 'text-red' : 'text-ink-dim';
 	const pct = (units: number, of: number) => (of > 0 ? Math.round((units / of) * 1000) / 10 : 0);
+	// Time moves without a ledger event: the deadline and the signing margin are re-read each minute.
+	let now = $state(Date.now());
+	$effect(() => {
+		const t = setInterval(() => (now = Date.now()), 30_000);
+		return () => clearInterval(t);
+	});
 </script>
 
 <svelte:head><title>{proposal?.current?.title ?? 'Proposal'} — SyncVotes</title></svelte:head>
@@ -80,8 +86,9 @@
 		<Skeleton />
 	{:else}
 		{@const p = proposal.current}
-		{@const ended = new Date(p.closesAt).getTime() < Date.now()}
-		{@const canVote = !p.outcome && !ended && p.me.mayVote}
+		{@const ended = new Date(p.closesAt).getTime() < now}
+		{@const tooLate = new Date(p.closesAt).getTime() - now < 90_000}
+		{@const canVote = !p.outcome && !ended && !tooLate && p.me.mayVote}
 		{@const showBox = canVote && (!p.me.vote || changing)}
 
 		<div class="mb-8">
@@ -125,17 +132,20 @@
 						equal={p.daoEqual}
 						current={holders?.current ?? []}
 						paid={p.paidBy}
-						awaiting={p.awaiting}
+						payout={p.payout}
 					/>
 					{#if p.stuck}
 						<Note mono={false}>
 							<span class="text-red">Could not be carried out yet:</span>
 							{p.stuck}. The provider keeps trying.
 						</Note>
+					{:else if p.waiting && !p.executedAt}
+						<Note mono={false}>Passed; waiting for {p.waiting}.</Note>
 					{:else if p.outcome === 'Passed' && !p.executedAt}
 						<Note mono={false}>
 							{#if p.effect.kind === 'payout'}Passed; paid the moment the treasury can cover it.{:else if p.effect.kind === 'dissolve'}Passed;
-								carried out once every other vote has settled.{:else}Passed; being carried out.{/if}
+								nothing new is proposed; carried out once every other proposal is done.{:else}Passed;
+								being carried out.{/if}
 						</Note>
 					{/if}
 				{/if}
@@ -261,7 +271,7 @@
 								<span class="block text-ink-dim">Counted; it can no longer change.</span>
 							{/if}</Note
 						>
-					{:else if p.me.membership && new Date(p.closesAt).getTime() - Date.now() < 90_000}
+					{:else if p.me.membership && tooLate}
 						<Note mono={false}>Too close to the deadline to sign a ballot in time.</Note>
 					{:else if p.me.membership}
 						<Note mono={false}
