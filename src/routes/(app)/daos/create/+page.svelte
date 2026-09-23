@@ -17,8 +17,8 @@
 	import ImageField from '$lib/components/image-field.svelte';
 	import Note from '$lib/components/note.svelte';
 	import Hint from '$lib/components/hint.svelte';
-	import RuleSettings from '$lib/components/rule-settings.svelte';
-	import { CATEGORIES, DEFAULTS, settingsToLedger, validRule, type Settings } from '$lib/rules';
+	import SettingsTabs from '$lib/components/settings-tabs.svelte';
+	import { DEFAULTS, settingsToLedger, validRule, type Settings } from '$lib/rules';
 	import Users from '@lucide/svelte/icons/users';
 	import PieChart from '@lucide/svelte/icons/pie-chart';
 	import { fmt } from '$lib/format';
@@ -201,30 +201,13 @@
 					Two kinds of proposal, two settings: what a vote takes to pass, and how long it is open.
 					Nobody who proposes chooses either; changing them later is itself a sensitive proposal.
 				</p>
-				{#each CATEGORIES as c (c.value)}
-					<div class="space-y-2">
-						<div class="flex items-center gap-1.5">
-							<span class="font-display text-[15px] font-bold">{c.title}</span>
-							<Hint text={c.covers} />
-							<span class="text-xs text-ink-dim">{c.text}</span>
-						</div>
-						{#if c.value === 'routine'}
-							<RuleSettings
-								bind:settings={routine}
-								prefix="routine"
-								eligible={summary.units}
-								equal={mode === 'equal'}
-							/>
-						{:else}
-							<RuleSettings
-								bind:settings={sensitive}
-								prefix="sensitive"
-								eligible={summary.units}
-								equal={mode === 'equal'}
-							/>
-						{/if}
-					</div>
-				{/each}
+				<SettingsTabs
+					bind:routine
+					bind:sensitive
+					prefixes={{ routine: 'routine', sensitive: 'sensitive' }}
+					eligible={summary.units}
+					equal={mode === 'equal'}
+				/>
 			</FormSection>
 
 			<FormSection title={mode === 'equal' ? 'Founding members' : 'Founding shares'}>

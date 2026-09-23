@@ -19,7 +19,7 @@
 	import MarkdownEditor from '$lib/components/markdown-editor.svelte';
 	import ImageField from '$lib/components/image-field.svelte';
 	import Note from '$lib/components/note.svelte';
-	import RuleSettings from '$lib/components/rule-settings.svelte';
+	import SettingsTabs from '$lib/components/settings-tabs.svelte';
 	import Hint from '$lib/components/hint.svelte';
 	import { categoryOf, describe, settingsToLedger, validRule, type Settings } from '$lib/rules';
 	import PieChart from '@lucide/svelte/icons/pie-chart';
@@ -402,28 +402,13 @@
 						<ImageField name="newImage" id="newImage" bind:value={newImage} disabled={store.busy} />
 					</Field>
 				{:else if kind === 'settings'}
-					<div class="space-y-4">
-						{#each [['Routine', 'routine'], ['Sensitive', 'sensitive']] as [title, c] (c)}
-							<div class="space-y-2">
-								<div class="font-display text-[15px] font-bold">{title}</div>
-								{#if c === 'routine'}
-									<RuleSettings
-										bind:settings={newRoutine}
-										prefix="newRoutine"
-										eligible={d.units}
-										equal={d.equal}
-									/>
-								{:else}
-									<RuleSettings
-										bind:settings={newSensitive}
-										prefix="newSensitive"
-										eligible={d.units}
-										equal={d.equal}
-									/>
-								{/if}
-							</div>
-						{/each}
-					</div>
+					<SettingsTabs
+						bind:routine={newRoutine}
+						bind:sensitive={newSensitive}
+						prefixes={{ routine: 'newRoutine', sensitive: 'newSensitive' }}
+						eligible={d.units}
+						equal={d.equal}
+					/>
 				{/if}
 
 				<Note mono={false}>
