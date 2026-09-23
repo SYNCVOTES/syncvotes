@@ -271,7 +271,9 @@ export async function allocateParty(
 	// The app's ledger user gets no rights on the party itself: reading and executing come from
 	// the participant-wide rights it was set up with, and a CanActAs it does not hold is one it
 	// cannot misuse.
-	return creation.execute(signature, { grantUserRights: false });
+	const made = await creation.execute(signature, { grantUserRights: false });
+	hostedNow(made.partyId);
+	return made;
 }
 
 export type Signature = { fingerprint: string; signature: string };
@@ -290,23 +292,81 @@ export async function allocateMultiKeyParty(
 }
 
 /**
+ * The parties this participant hosts, by the fingerprint in their namespace. The participant
+ * lists every party the network knows — 1.35 million on MainNet in September 2026, a page of
+ * ten thousand every two seconds, five minutes in all — so the list is read once, in the
+ * background from startup, and kept: a party this app makes is added as it is made, and nothing
+ * else allocates parties here. The Admin API could answer with the hosted parties alone
+ * (ListPartyToParticipant filtered by this participant); the SDK has no client for it.
+ */
+let hosted: Map<string, string> | null = null;
+let hostedRead: Promise<Map<string, string>> | null = null;
+
+export function readHostedParties(): Promise<Map<string, string>> {
+	if (hostedRead) return hostedRead;
+	hostedRead = (async () => {
+		const started = Date.now();
+		const map = new Map<string, string>();
+		let known = 0;
+		let token: string | undefined;
+		do {
+			const page = await api<{
+				partyDetails: { party: string; isLocal: boolean }[];
+				nextPageToken?: string;
+			}>(`/v2/parties?pageSize=10000${token ? `&pageToken=${encodeURIComponent(token)}` : ''}`);
+			for (const p of page.partyDetails) {
+				known++;
+				// A key may have several parties; the first in the participant's order is the one a
+				// returning key gets, as it was when the list was searched on every visit.
+				const namespace = p.party.split('::')[1];
+				if (p.isLocal && !map.has(namespace)) map.set(namespace, p.party);
+			}
+			token = page.nextPageToken || undefined;
+		} while (token);
+		hosted = map;
+		console.log(
+			`Hosted parties: ${map.size} of the ${known} the participant knows, read in ${Math.round((Date.now() - started) / 1000)} s`
+		);
+		return map;
+	})();
+	// A read that failed is tried again by the next lookup.
+	hostedRead.catch(() => (hostedRead = null));
+	return hostedRead;
+}
+
+/** A party this app has just made is hosted from now on. */
+function hostedNow(party: string): void {
+	const namespace = party.split('::')[1];
+	if (hosted && !hosted.has(namespace)) hosted.set(namespace, party);
+}
+
+/** How long a lookup waits for the first read after a restart: under the minute and a half the
+ * proxy in front allows, so the answer is a plain "try again" rather than a gateway timeout. */
+const HOSTED_WAIT = 60_000;
+
+/** The index — or, right after a restart, a 503 if the first read is still running. */
+async function hostedParties(): Promise<Map<string, string>> {
+	if (hosted) return hosted;
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const gaveUp = new Promise<null>(
+		(resolve) => (timer = setTimeout(() => resolve(null), HOSTED_WAIT))
+	);
+	const map = await Promise.race([readHostedParties(), gaveUp]).finally(() => clearTimeout(timer));
+	if (!map) {
+		throw error(
+			503,
+			'Still reading the participant’s party list after a restart — try again in a few minutes'
+		);
+	}
+	return map;
+}
+
+/**
  * A party this participant hosts whose namespace is this fingerprint: the party a key made,
  * found without its Account — for a key that comes back after the app's package changed.
  */
 export async function partyByFingerprint(fingerprint: string): Promise<string | null> {
-	let token: string | undefined;
-	do {
-		const page = await api<{
-			partyDetails: { party: string; isLocal: boolean }[];
-			nextPageToken?: string;
-		}>(`/v2/parties?pageSize=1000${token ? `&pageToken=${encodeURIComponent(token)}` : ''}`);
-		const found = page.partyDetails.find(
-			(p) => p.isLocal && p.party.split('::')[1] === fingerprint
-		);
-		if (found) return found.party;
-		token = page.nextPageToken || undefined;
-	} while (token);
-	return null;
+	return (await hostedParties()).get(fingerprint) ?? null;
 }
 
 /** Whether the synchronizer knows this party yet. */

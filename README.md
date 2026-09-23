@@ -287,6 +287,9 @@ seconds.
 There is no login. The key is the identity: a party id is the hint the user chose plus the key's
 fingerprint, so a registered key is recognised by its fingerprint alone, and every write carries a
 signature the server cannot forge.
+A key that comes back without an Account is looked up in an index of the parties this participant
+hosts, read once in the background at startup: the participant's own list is the whole network's —
+hundreds of thousands of parties on MainNet — too long to search on every visit.
 
 ## Deployment
 

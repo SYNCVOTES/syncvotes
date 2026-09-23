@@ -1,6 +1,7 @@
 import * as wallet from './wallet';
 import * as actions from './actions';
 import * as autoLock from './auto-lock';
+import { fingerprintOf } from './verify';
 
 /**
  * The page's wallet, as one rune store: which screen the onboarding is on, the signer while a
@@ -189,10 +190,15 @@ export const flow = {
 		offer(id);
 	},
 
+	/** A phrase made just now has no party anywhere: the key goes straight to naming one. */
 	confirmCreate() {
 		if (screen.at !== 'create') return;
 		const { phrase } = screen;
-		return run(() => identify(wallet.signerFromPhrase(phrase), 'protect'));
+		return run(async () => {
+			const signer = wallet.signerFromPhrase(phrase);
+			autoLock.start(lock);
+			screen = { at: 'hint', signer, fingerprint: await fingerprintOf(signer.publicKey) };
+		});
 	},
 
 	confirmRestore(phrase: string) {

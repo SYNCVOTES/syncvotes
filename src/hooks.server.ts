@@ -2,7 +2,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { HandleServerError, ServerInit } from '@sveltejs/kit';
 import { packageId } from '@daml.js/model';
-import { api, sdk } from '$lib/server/participant';
+import { api, readHostedParties, sdk } from '$lib/server/participant';
 import * as ledger from '$lib/server/ledger';
 import * as tally from '$lib/server/tally';
 import * as billing from '$lib/server/billing';
@@ -33,6 +33,9 @@ export const init: ServerInit = async () => {
 	// would be told its DAO does not exist.
 	ledger.start();
 	await ledger.ready();
+	// The participant's party list is the whole network's: read once, in the background, so a key
+	// that comes back without an Account is found in the index rather than by a scan per visit.
+	void readHostedParties().catch((e) => console.error('The hosted parties could not be read:', e));
 	tally.start();
 	billing.start();
 };
