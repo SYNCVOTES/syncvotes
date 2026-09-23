@@ -208,7 +208,10 @@ export async function releaseExpired(treasury: string): Promise<Locked[]> {
  * has a pre-approval, otherwise waits for the receiver to accept. Resolves with the
  * transaction's id.
  */
+/** The participant refused a resend of a payment it already made: the coin went. */
 export class Duplicate extends Error {}
+/** The participant answered no, or the transfer never reached it: nothing went. */
+export class Rejected extends Error {}
 
 export async function transfer(
 	treasury: string,
@@ -220,24 +223,38 @@ export async function transfer(
 ): Promise<string> {
 	if (amount <= 0) throw error(400, 'Nothing to transfer');
 	const token = (await sdk()).token;
-	const [command, disclosed] = await token.transfer.create({
-		sender: treasury,
-		recipient: to,
-		amount: amount.toFixed(10),
-		instrumentId: 'Amulet',
-		registryUrl: splice.scanUrl(),
-		memo
-	});
+	let command: unknown;
+	let disclosed: DisclosedContract[];
+	try {
+		[command, disclosed] = (await token.transfer.create({
+			sender: treasury,
+			recipient: to,
+			amount: amount.toFixed(10),
+			instrumentId: 'Amulet',
+			registryUrl: splice.scanUrl(),
+			memo
+		})) as [unknown, DisclosedContract[]];
+	} catch (e) {
+		// Nothing was submitted: no holdings, no such receiver, Scan away.
+		throw new Rejected(message(e));
+	}
 	let updateId: string;
 	try {
-		updateId = await submitAs(
-			[treasury],
-			[command] as Commands,
-			commandId,
-			disclosed as DisclosedContract[]
-		);
+		updateId = await (
+			await sdk()
+		).ledger.internal
+			.submit({
+				commands: [command] as Commands,
+				actAs: [treasury],
+				commandId,
+				disclosedContracts: disclosed
+			})
+			.then((r) => r.updateId);
 	} catch (e) {
-		if (/DUPLICATE_COMMAND/.test(message(e))) throw new Duplicate(message(e));
+		const code = typeof e === 'object' && e !== null ? (e as { code?: unknown }).code : undefined;
+		if (code === 'DUPLICATE_COMMAND') throw new Duplicate(message(e));
+		// A code is the participant's answer: it said no. Anything else, the reply may be lost.
+		if (typeof code === 'string') throw new Rejected(`${code}: ${message(e)}`);
 		throw e;
 	}
 	forget(treasury);
@@ -262,7 +279,8 @@ export async function transferAll(
 		try {
 			return await transfer(treasury, to, amount, memo, `${commandId}-${i}`);
 		} catch (e) {
-			if (e instanceof Duplicate) throw e;
+			// Only an answer from the participant allows a lower attempt: a lost reply may have gone.
+			if (!(e instanceof Rejected)) throw e;
 			last = e;
 			amount = Math.floor(amount * 0.98 * 10_000) / 10_000;
 		}
@@ -357,6 +375,12 @@ export async function withdrawExpired(treasury: string): Promise<Instruction[]> 
 	}
 	return back;
 }
+
+/** Whether an outgoing instruction past its time still stands (a withdraw failed). */
+export const expiredStanding = (treasury: string) =>
+	outgoing(treasury).some(
+		(p) => p.executeBefore && new Date(p.executeBefore).getTime() < Date.now() - 60_000
+	);
 
 /**
  * Coin sent to the treasury that waits for its acceptance: accepted, as the treasury. What

@@ -79,11 +79,16 @@ function markPaid(proposalId: string, value: string) {
 }
 const wentOut = (id: string) => {
 	const v = paid.get(id);
-	return !!v && !v.startsWith('unpaid:') && !v.startsWith('returned:');
+	return !!v && !v.startsWith('unpaid:') && !v.startsWith('returned:') && !v.startsWith('sending');
 };
 /** The instruction a sent payout left waiting, if any. */
 const instructionOf = (id: string) => paid.get(id)?.split('|')[1] ?? null;
 const RETURNS_BEFORE_GIVING_UP = 3;
+/** A transfer under way, or one whose reply was lost: `sending:<attempt>`. */
+const sending = (id: string) => paid.get(id)?.startsWith('sending') ?? false;
+/** How many times a payment came back, from either marker. */
+const attemptOf = (id: string) =>
+	Number(paid.get(id)?.match(/^(?:returned|sending):(\d+)/)?.[1] ?? 0);
 
 export type PayoutState =
 	| 'pending' // passed, not sent yet
@@ -98,7 +103,7 @@ export function payoutState(p: ledger.Proposal): { state: PayoutState; note: str
 	if (p.effect.kind !== 'payout') return { state: 'pending', note: null };
 	const v = paid.get(p.id);
 	if (!v) return { state: 'pending', note: null };
-	if (v === 'sending') return { state: 'sending', note: null };
+	if (v.startsWith('sending')) return { state: 'sending', note: null };
 	if (v.startsWith('unpaid:')) return { state: 'unpaid', note: v.slice(7) };
 	if (v.startsWith('returned:')) return { state: 'returned', note: null };
 	const t = ledger.daos.get(p.daoId)?.treasury;
@@ -117,9 +122,10 @@ async function send(
 	amount: number | 'all',
 	memo: string
 ): Promise<void> {
-	const attempt = paid.get(proposalId)?.match(/^returned:(\d+)$/)?.[1] ?? '0';
+	const before = paid.get(proposalId);
+	const attempt = attemptOf(proposalId);
 	const commandId = `${amount === 'all' ? 'remainder' : 'payout'}-${proposalId}-${attempt}`;
-	markPaid(proposalId, 'sending');
+	markPaid(proposalId, `sending:${attempt}`);
 	let updateId: string;
 	try {
 		updateId =
@@ -128,7 +134,18 @@ async function send(
 				: await treasury.transfer(daoTreasury, to, amount, memo, commandId);
 	} catch (e) {
 		if (e instanceof treasury.Duplicate) updateId = 'sent-before';
-		else throw e;
+		else {
+			// The participant said no, or nothing reached it: nothing went, so the payment is
+			// where it was. Only a lost reply keeps it `sending`, to be resent under the same id.
+			if (e instanceof treasury.Rejected) {
+				if (before) markPaid(proposalId, before);
+				else {
+					paid.delete(proposalId);
+					save();
+				}
+			}
+			throw e;
+		}
 	}
 	const out = await treasury.refreshOutgoing(daoTreasury);
 	const known = new Set([...paid.values()].map((v) => v.split('|')[1]).filter(Boolean));
@@ -304,7 +321,7 @@ async function execute(p: ledger.Proposal) {
 				await billing.collectFrom(dao.id);
 				const balance = await billing.balance(dao.id);
 				for (const o of undone) {
-					if (o.effect.kind !== 'payout' || wentOut(o.id) || paid.get(o.id) === 'sending') continue;
+					if (o.effect.kind !== 'payout' || wentOut(o.id) || sending(o.id)) continue;
 					if (stuck.has(o.id)) markPaid(o.id, `unpaid:${stuck.get(o.id)}`);
 					else if (o.effect.amount + 0.5 > balance) {
 						markPaid(o.id, 'unpaid:the DAO dissolved before the treasury could cover it');
@@ -330,14 +347,14 @@ async function execute(p: ledger.Proposal) {
 				// The remainder: sent, then waited for like a payout; taken back and sent again if
 				// nobody accepts it, a few times; then the DAO is archived with what is left in it.
 				const v = paid.get(p.id);
-				if (v === 'sending' || !v || v.startsWith('returned:')) {
+				if (!v || sending(p.id) || v.startsWith('returned:')) {
 					if (ledger.accounts.has(p.effect.remainderTo)) {
 						throw new Error(
 							'the receiver of what is left joined SyncVotes after the vote; it cannot be sent to a party registered here'
 						);
 					}
-					const returns = Number(v?.match(/^returned:(\d+)$/)?.[1] ?? 0);
-					if (returns >= RETURNS_BEFORE_GIVING_UP) {
+					const returns = attemptOf(p.id);
+					if (returns >= RETURNS_BEFORE_GIVING_UP && !sending(p.id)) {
 						markPaid(
 							p.id,
 							'unpaid:what was left was not accepted three times; it stays in the treasury'
@@ -364,7 +381,7 @@ async function execute(p: ledger.Proposal) {
 			case 'payout': {
 				const v = paid.get(p.id);
 				if (v?.startsWith('unpaid:')) break; // written off: recorded as carried out, unpaid
-				if (!v || v === 'sending') {
+				if (!v || sending(p.id)) {
 					if (ledger.accounts.has(p.effect.to)) {
 						markPaid(
 							p.id,
@@ -375,7 +392,7 @@ async function execute(p: ledger.Proposal) {
 					// `sending`: a transfer was under way when the process last stopped, or the
 					// participant answered late; sent again under the same command id, which the
 					// participant refuses if the coin already went.
-					if (v !== 'sending') {
+					if (!sending(p.id)) {
 						const balance = await billing.balance(p.daoId);
 						if (balance < p.effect.amount + 0.5) {
 							waitFor(p.id, 'the treasury to cover it');
@@ -435,7 +452,12 @@ export async function releaseReturns(): Promise<void> {
 	for (const dao of ledger.daos.values()) {
 		try {
 			const back = await treasury.withdrawExpired(dao.treasury);
-			const released = await treasury.releaseExpired(dao.treasury);
+			// A lock is released on its own only once no instruction of its time still stands:
+			// withdrawing is what closes both, and a lock gone under a standing instruction
+			// leaves that instruction unclosable.
+			const released = treasury.expiredStanding(dao.treasury)
+				? []
+				: await treasury.releaseExpired(dao.treasury);
 			if (!back.length && !released.length) continue;
 			for (const p of ledger.proposalsOf.get(dao.id)?.values() ?? []) {
 				const cid = instructionOf(p.id);

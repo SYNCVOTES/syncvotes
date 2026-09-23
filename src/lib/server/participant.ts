@@ -418,7 +418,10 @@ export async function execute(
  */
 export function ledgerError(e: unknown): never {
 	if (typeof e === 'object' && e !== null && 'status' in e && 'body' in e) throw e;
-	const message =
+	// The participant's own errors are plain objects: a `code` (CONTRACT_NOT_ACTIVE,
+	// DUPLICATE_COMMAND…) and a `cause`; the code leads, so a caller can tell them apart.
+	const code = typeof e === 'object' && e !== null ? (e as { code?: unknown }).code : undefined;
+	const text =
 		e instanceof Error
 			? e.message
 			: typeof e === 'object' && e !== null
@@ -428,6 +431,7 @@ export function ledgerError(e: unknown): never {
 							JSON.stringify(e)
 					)
 				: String(e);
+	const message = typeof code === 'string' && !text.includes(code) ? `${code}: ${text}` : text;
 	if (/CONTRACT_NOT_ACTIVE|INACTIVE_CONTRACT|LOCKED_CONTRACT|CONTRACT_NOT_FOUND/.test(message)) {
 		error(409, 'This changed while you were looking at it — reload and try again');
 	}
