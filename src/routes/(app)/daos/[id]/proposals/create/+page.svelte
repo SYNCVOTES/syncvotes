@@ -84,10 +84,10 @@
 			icon: Coins
 		},
 		{
-			value: 'rule',
-			title: 'Rules',
-			text: 'What every proposal takes to pass, from then on.',
-			more: "Changes the DAO's own rule: the least any future proposal takes to pass. This proposal itself passes under the rule as it stands today, so a rule can be loosened only by first meeting the stricter one.",
+			value: 'settings',
+			title: 'Settings',
+			text: 'What proposals take to pass, and for how long they are open.',
+			more: "Changes the DAO's settings for routine and for sensitive proposals: the rule each passes by and how long its vote is open. This proposal is itself sensitive, so it passes under the sensitive settings as they stand today.",
 			icon: Scale
 		},
 		{
