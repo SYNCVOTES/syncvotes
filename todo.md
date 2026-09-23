@@ -127,8 +127,9 @@
       `X-Client-Ip` is what the app reads; a made-up header on a direct hit counts for nothing
 - [x] Daml Script tests (`daml/test`, run in the DAR build): decoy ballot, late ballot, second
       ballot, invented member, doubled share change, dissolution, refused settings, moderation
-- [x] `Comment_Remove` by the DAO's authority through `DAO_RemoveComment`, run by hand with
-      `scripts/remove-comment.mjs`; proposals paced like comments (thirty writes an hour)
+- [x] `Comment_Remove` — not wanted: a member who may propose may comment, and nobody moderates
+      a DAO run by nobody; a comment is its author's alone (built, then taken out the same
+      day). Proposals paced like comments (thirty writes an hour)
 - [x] the provider's pre-approval is renewed twenty days before it runs out, checked daily
 - [x] `ParticipantAdmin` on the web process stays: allocating a party at sign-up needs the same
       right the DAR upload does, and sign-up is the web process's job; a setup job would move

@@ -102,9 +102,8 @@ proposal carried out) are controlled by both, and neither has the other's key.
   share has not changed since the proposal was made — so a share moved during a vote never
   votes twice — not counted before. The provider can delay a result, never change it.
 - `Comment` — a member's words on a proposal, signed by the author, the provider and the
-  creator; the author edits or removes it, and the DAO's authority can take it down
-  (`DAO_RemoveComment`, run by hand: `scripts/remove-comment.mjs`). Comments and proposals
-  are paced by the app (thirty writes an hour per party), since the DAO pays for them.
+  creator; the author edits or removes it, nobody else. Comments and proposals are paced by
+  the app (thirty writes an hour per party), since the DAO pays for them.
 - `Meter` — the provider's statement of a DAO's account: what was paid in for it, and what
   its traffic has cost.
 
@@ -113,7 +112,7 @@ in the DAR build stage, so a failing claim fails the build): a decoy ballot nami
 deadline is refused at the count, as is one cast after the deadline or a second one where
 votes cannot change; nobody creates a member alone; a share change names each party once;
 a dissolution archives the DAO and nothing is proposed on it after; settings the ledger
-refuses; a comment only its author edits and only the DAO's authority takes down.
+refuses; a comment only its author edits or deletes, the provider included.
 
 ### The balance
 

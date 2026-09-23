@@ -12,8 +12,8 @@ importers:
         specifier: ^1.5.0
         version: 1.5.0
       '@daml.js/model':
-        specifier: workspace:@daml.js/syncvotes-books-0.17.1@*
-        version: link:daml.js/syncvotes-books-0.17.1
+        specifier: workspace:@daml.js/syncvotes-books-0.17.2@*
+        version: link:daml.js/syncvotes-books-0.17.2
       '@daml/types':
         specifier: 3.5.2
         version: 3.5.2
@@ -247,7 +247,7 @@ importers:
         specifier: ^3.1.0
         version: 3.1.0
 
-  daml.js/syncvotes-books-0.17.1:
+  daml.js/syncvotes-books-0.17.2:
     dependencies:
       '@daml.js/daml-prim-DA-Types-1.0.0':
         specifier: file:../daml-prim-DA-Types-1.0.0

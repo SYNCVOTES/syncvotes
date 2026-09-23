@@ -1,10 +1,10 @@
 sdk-version: 3.5.7
 name: syncvotes-books-test
 source: daml
-version: 0.17.1
+version: 0.17.2
 dependencies:
   - daml-prim
   - daml-stdlib
   - daml-script
 data-dependencies:
-  - ../.daml/dist/syncvotes-books-0.17.1.dar
+  - ../.daml/dist/syncvotes-books-0.17.2.dar
