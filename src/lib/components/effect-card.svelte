@@ -129,8 +129,8 @@
 			{#if effect.reason}<Markdown text={effect.reason} />{/if}
 			{#if awaiting}
 				<p class="font-mono text-xs text-amber">
-					Sent; waiting for the receiver to accept it (a SyncVotes member does so on their Wallet
-					page). Unaccepted, it returns to the treasury.
+					Sent; waiting to be accepted at the receiving address. Unaccepted, it returns to the
+					treasury.
 				</p>
 			{:else if paid || executedAt}<p class="font-mono text-xs text-green">Paid.</p>{/if}
 		</div>

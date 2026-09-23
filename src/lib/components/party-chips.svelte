@@ -20,7 +20,8 @@
 		busy = false,
 		placeholder = 'Party ids — type one, or paste a whole list',
 		parties = $bindable([]),
-		checking = $bindable(false)
+		checking = $bindable(false),
+		external = false
 	}: {
 		dao?: string;
 		name?: string;
@@ -28,7 +29,13 @@
 		placeholder?: string;
 		parties?: string[];
 		checking?: boolean;
+		/** Wanted: addresses outside the app (a payout's receiver), so a registered party is refused. */
+		external?: boolean;
 	} = $props();
+	const WELL_FORMED = /^[A-Za-z0-9_-]{1,255}::1220[0-9a-f]{64}$/;
+	/** What passes here: registered and not a member, or — outside — a well-formed unknown id. */
+	const passes = (t: string) =>
+		external ? status[t] === 'unknown' && WELL_FORMED.test(t) : status[t] === 'addable';
 
 	type Status = 'checking' | remote.PartyCheck;
 	// Parties handed in at the start (a field filled with what is there today) are chips already.
@@ -48,7 +55,7 @@
 	const by = (s: Status) => tokens.filter((t) => status[t] === s);
 	const shown = $derived(expanded || tokens.length <= FOLD ? tokens : tokens.slice(0, FOLD));
 	$effect(() => {
-		parties = by('addable');
+		parties = tokens.filter(passes);
 		checking = by('checking').length > 0;
 	});
 
@@ -82,23 +89,30 @@
 		tokens = tokens.filter((x) => x !== t);
 		delete status[t];
 	};
-	const clear = (s: Status) => (tokens = tokens.filter((t) => status[t] !== s));
 
 	/** Drops the chips that were taken care of, after a successful submit. */
-	export const settle = () => (tokens = tokens.filter((t) => status[t] !== 'addable'));
+	export const settle = () => (tokens = tokens.filter((t) => !passes(t)));
 
-	const look: Record<Status, string> = {
-		checking: 'border-border text-ink-dim',
-		addable: 'border-orange/40 bg-orange/10 text-orange',
-		unknown: 'border-red/40 bg-red/10 text-red',
-		already: 'border-border bg-surface-hover text-ink-dim'
-	};
-	const note: Record<Status, string> = {
-		checking: '',
-		addable: '',
-		unknown: 'not registered',
-		already: 'already a member'
-	};
+	const good = 'border-orange/40 bg-orange/10 text-orange';
+	const bad = 'border-red/40 bg-red/10 text-red';
+	const look = (t: string): string =>
+		status[t] === 'checking'
+			? 'border-border text-ink-dim'
+			: passes(t)
+				? good
+				: status[t] === 'already'
+					? 'border-border bg-surface-hover text-ink-dim'
+					: bad;
+	const note = (t: string): string =>
+		status[t] === 'checking' || passes(t)
+			? ''
+			: external
+				? status[t] === 'unknown'
+					? 'not a full party id'
+					: 'a SyncVotes party; payouts go outside the app'
+				: status[t] === 'already'
+					? 'already a member'
+					: 'not registered';
 </script>
 
 <div class="space-y-3">
@@ -135,16 +149,16 @@
 		<ul class="flex flex-wrap gap-2">
 			{#each shown as t (t)}
 				<li
-					class="inline-flex max-w-full items-center gap-1.5 rounded-full border px-3 py-1 font-mono text-xs {look[
-						status[t]
-					]}"
+					class="inline-flex max-w-full items-center gap-1.5 rounded-full border px-3 py-1 font-mono text-xs {look(
+						t
+					)}"
 					title={t}
 				>
 					{#if status[t] === 'checking'}<Loader size={12} class="animate-spin" />
-					{:else if status[t] === 'addable'}<Check size={12} />
+					{:else if passes(t)}<Check size={12} />
 					{:else}<X size={12} />{/if}
 					<PartyId party={t} class="[&_button]:hidden [&>span>span:first-child]:text-current" />
-					{#if note[status[t]]}<span class="opacity-70">{note[status[t]]}</span>{/if}
+					{#if note(t)}<span class="opacity-70">{note(t)}</span>{/if}
 					<button
 						type="button"
 						class="ml-0.5 hover:text-ink"
@@ -168,16 +182,18 @@
 		</ul>
 		<div class="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs text-ink-dim">
 			<span class="text-green">{fmt(parties.length)} ready</span>
-			{#if by('unknown').length}<span class="text-red"
-					>{fmt(by('unknown').length)} not registered</span
-				><button type="button" class="underline hover:text-ink" onclick={() => clear('unknown')}
-					>drop them</button
-				>{/if}
-			{#if by('already').length}<span>{fmt(by('already').length)} already members</span><button
+			{#if tokens.filter((t) => status[t] !== 'checking' && !passes(t)).length}
+				<span class="text-red"
+					>{fmt(tokens.filter((t) => status[t] !== 'checking' && !passes(t)).length)}
+					{external ? 'refused' : 'not addable'}</span
+				>
+				<button
 					type="button"
 					class="underline hover:text-ink"
-					onclick={() => clear('already')}>drop them</button
-				>{/if}
+					onclick={() => (tokens = tokens.filter((t) => status[t] === 'checking' || passes(t)))}
+					>drop them</button
+				>
+			{/if}
 			{#if by('checking').length}<span>checking {fmt(by('checking').length)}…</span>{/if}
 		</div>
 	{/if}

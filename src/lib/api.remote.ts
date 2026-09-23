@@ -505,6 +505,13 @@ export const createDaoForm = form(schemas.createDaoForm, async (f) => {
 	};
 });
 
+/** Coin leaves the app: a receiver is an address outside it, never a party registered here. */
+const outside = (party: string) => {
+	if (ledger.accounts.has(party)) {
+		error(400, 'Payouts go to addresses outside SyncVotes, not to a party registered here');
+	}
+};
+
 /** A category's settings from a form's fields under a prefix (`routineBasis`, `newSensitiveDays`…). */
 const settingsOf = (f: Record<string, unknown>, prefix: string): Settings => {
 	const field = (name: string) => f[prefix + name];
@@ -541,6 +548,7 @@ export const createProposalForm = form(schemas.createProposalForm, async (f) => 
 			};
 			break;
 		case 'dissolve':
+			outside(f.remainderTo.trim());
 			action = { tag: 'Dissolve', value: { remainderTo: f.remainderTo.trim() } };
 			break;
 		case 'settings':
@@ -553,6 +561,7 @@ export const createProposalForm = form(schemas.createProposalForm, async (f) => 
 			};
 			break;
 		case 'payout':
+			outside(f.payoutTo.trim());
 			action = {
 				tag: 'Payout',
 				value: { to: f.payoutTo.trim(), amount: decimal(f.payoutAmount), reason: f.payoutReason }
@@ -589,16 +598,6 @@ export const createProposalForm = form(schemas.createProposalForm, async (f) => 
 		args,
 		prepared: await prepare(party, Main.Member, membership, 'Member_Propose', args, f.dao)
 	};
-});
-
-/** Coin sent to the caller's party that waits for their acceptance, and what they hold. */
-export const incoming = query(async () => treasury.incoming(session.required()));
-
-/** The acceptance of one such transfer, prepared for the caller's signature. Their own cost. */
-export const prepareAccept = command(v.object({ cid: contractId }), async ({ cid }) => {
-	const party = session.required();
-	const { command: cmd, disclosed } = await treasury.acceptCommand(cid);
-	return participant.prepare(party, [cmd], { disclosedContracts: disclosed });
 });
 
 /** A ballot, cast from the voter's own membership contract; a replaced one is handed in. */

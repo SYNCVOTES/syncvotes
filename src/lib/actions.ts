@@ -131,15 +131,6 @@ export async function deleteComment(s: Signer, who: Identity, comment: string) {
 	await sign(s, who, { choice: 'Comment_Delete', contractId: comment, args: {} }, prepared);
 }
 
-// ---- Coin ---------------------------------------------------------------------------------
-
-/** Accepts coin sent to the party, through the token standard, with the party's own signature. */
-export async function acceptTransfer(s: Signer, who: Identity, cid: string) {
-	preparing();
-	const prepared = await remote.prepareAccept({ cid });
-	await sign(s, who, { choice: 'TransferInstruction_Accept', contractId: cid, args: {} }, prepared);
-}
-
 // ---- Profile ------------------------------------------------------------------------------
 
 export async function setProfile(

@@ -242,22 +242,3 @@ export async function acceptIncoming(treasury: string): Promise<string[]> {
 	if (accepted.length) forget(treasury);
 	return accepted;
 }
-
-/** Coin a party holds that waits for its acceptance, and what the party holds already. */
-export async function incoming(party: string) {
-	const token = (await sdk()).token;
-	const pending = (await token.transfer.pending(party))
-		.map((p) => ({ cid: p.contractId, ...view(p) }))
-		.filter((p) => p.receiver === party);
-	return { pending, held: await holdings(party, true) };
-}
-
-/** The command a party signs to accept a transfer sent to it, with what it discloses. */
-export async function acceptCommand(cid: string) {
-	const token = (await sdk()).token;
-	const [command, disclosed] = await token.transfer.accept({
-		transferInstructionCid: cid,
-		registryUrl: splice.scanUrl()
-	});
-	return { command, disclosed: disclosed as DisclosedContract[] };
-}

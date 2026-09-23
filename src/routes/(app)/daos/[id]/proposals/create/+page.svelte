@@ -440,10 +440,10 @@
 					<Field
 						label="Paid to"
 						id="payoutTo"
-						hint="Any party on the network; a member or not. Coin lands directly where the party accepts transfers, otherwise it waits for them to accept."
+						hint="An address outside SyncVotes: a validator wallet, an exchange, any party on the network that can hold coin. Coin lands directly where the address accepts transfers, otherwise it waits to be accepted there."
 						issues={f.fields.payoutTo.issues()}
 					>
-						<PartyChips busy={store.busy} placeholder="Party id" bind:parties={payoutTo} />
+						<PartyChips busy={store.busy} placeholder="Party id" external bind:parties={payoutTo} />
 					</Field>
 					<Field
 						label="Amount, CC"
@@ -496,10 +496,15 @@
 					<Field
 						label="What is left goes to"
 						id="remainderTo"
-						hint="Whatever the treasury holds when the DAO dissolves is sent here."
+						hint="An address outside SyncVotes. Whatever the treasury holds when the DAO dissolves is sent here."
 						issues={f.fields.remainderTo.issues()}
 					>
-						<PartyChips busy={store.busy} placeholder="Party id" bind:parties={remainderTo} />
+						<PartyChips
+							busy={store.busy}
+							placeholder="Party id"
+							external
+							bind:parties={remainderTo}
+						/>
 					</Field>
 				{/if}
 
