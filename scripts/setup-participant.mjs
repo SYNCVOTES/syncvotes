@@ -31,7 +31,9 @@ async function token(clientId, secret) {
 		throw new Error(`token for ${clientId}: ${r.status} ${(await r.text()).slice(0, 200)}`);
 	return (await r.json()).access_token;
 }
-const admin = await token('validator-app-backend', need('VALIDATOR_CLIENT_SECRET'));
+// Where the participant does not trust our realm yet (MainNet, HMAC for the validator's own
+// backend), an admin token minted elsewhere is passed in as ADMIN_TOKEN instead.
+const admin = env.ADMIN_TOKEN ?? (await token('validator-app-backend', need('VALIDATOR_CLIENT_SECRET')));
 async function api(path, body, method = body ? 'POST' : 'GET') {
 	const r = await fetch(LEDGER + path, {
 		method,
