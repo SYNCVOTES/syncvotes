@@ -301,17 +301,19 @@
 											.filter(Boolean)
 									}
 								}
-							: fields.kind === 'dissolve'
-								? { tag: 'Dissolve', value: {} }
-								: fields.kind === 'settings'
-									? {
-											tag: 'SetSettings',
-											value: {
-												routine: settingsToLedger(settingsOf(fields, 'newRoutine')),
-												sensitive: settingsToLedger(settingsOf(fields, 'newSensitive'))
+							: fields.kind === 'visibility'
+								? { tag: 'SetPublic', value: { public: fields.newPublic === 'yes' } }
+								: fields.kind === 'dissolve'
+									? { tag: 'Dissolve', value: {} }
+									: fields.kind === 'settings'
+										? {
+												tag: 'SetSettings',
+												value: {
+													routine: settingsToLedger(settingsOf(fields, 'newRoutine')),
+													sensitive: settingsToLedger(settingsOf(fields, 'newSensitive'))
+												}
 											}
-										}
-									: { tag: 'Signal', value: {} };
+										: { tag: 'Signal', value: {} };
 			return {
 				choice: 'Member_Propose',
 				contractId: membership,
