@@ -30,6 +30,7 @@
 	import Problem from '$lib/components/problem.svelte';
 	import BalancePanel from '$lib/components/balance-panel.svelte';
 	import Panel from '$lib/components/panel.svelte';
+	import CopyField from '$lib/components/copy-field.svelte';
 	import Plus from '@lucide/svelte/icons/plus';
 	import ArrowRight from '@lucide/svelte/icons/arrow-right';
 	import { relative, dateOf, fmt, coin } from '$lib/format';
@@ -134,6 +135,17 @@
 					class="align-middle"
 				/>
 			</p>
+			{#if d.public}
+				<!-- Nothing here vouches for who is behind a DAO: the organisation does, from outside. -->
+				<div class="mt-4 max-w-[720px]">
+					<CopyField label="DAO id" value={d.id} />
+					<p class="mt-2 text-xs leading-relaxed text-ink-dim">
+						Anyone can found a DAO under any name. The real DAO of an organisation is the one the
+						organisation itself points to — this id, or this page's address — from a site or channel
+						it controls. Nothing here vouches for it; that is for them to do.
+					</p>
+				</div>
+			{/if}
 		</div>
 
 		<div class="mt-8"><Problem message={store.problem} /></div>

@@ -28,7 +28,7 @@
 	<PageHeader
 		eyebrow="Open to read"
 		title="Public DAOs"
-		description="DAOs that chose to be readable by anyone signed in: their proposals, outcomes, members and comments. Only members act. How to join one, if at all, is for its description to say."
+		description="DAOs that chose to be readable by anyone signed in: their proposals, outcomes, members and comments. Only members act. How to join one, if at all, is for its description to say. Anyone can found a DAO under any name: the real DAO of an organisation is the one the organisation points to from a site or channel it controls."
 	/>
 
 	{#if store.screen.at === 'loading'}
