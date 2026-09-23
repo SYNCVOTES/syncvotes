@@ -171,6 +171,9 @@ template Account
         sensitive : Settings
         shares : [(Party, Int)]
         more : [(Party, Int)]
+        -- Who pays the traffic of the DAO's transactions: its own balance (the default), or
+        -- each member for what they sign, from their own balance. Set at the founding.
+        actorPays : Optional Bool
       controller user
       do
         now <- getTime
@@ -196,7 +199,7 @@ template Account
         create DAO with
           provider; operator; creator = user; id; name = daoName; description; image
           equal; routine; sensitive; createdAt = now
-          members = length shares; units = sum (map snd shares)
+          members = length shares; units = sum (map snd shares); actorPays
 
     -- How a party presents itself: a name, a picture, a few words. One per party; replacing
     -- it hands in the old one.
@@ -239,6 +242,10 @@ template DAO
     members : Int
     -- The whole vote: what every member's units add up to.
     units : Int
+    -- Each member pays the traffic of what they sign, from their own balance; otherwise the
+    -- DAO's balance pays for everything. Absent means the DAO pays (a DAO from before this
+    -- field existed).
+    actorPays : Optional Bool
   where
     signatory creator, provider
     observer operator
@@ -658,3 +665,30 @@ template Meter
       do
         now <- getTime
         create this with credited = newCredited; charged = newCharged; updatedAt = now
+
+-- | The provider's statement of a party's own account with it: coin sent to the provider with
+-- the memo of the key's fingerprint, less what the party's own transactions cost — the party
+-- itself, its profile, the DAOs it founds, and in a DAO where each member pays, what it
+-- signs there. Made when the party is allocated, which is paid from it; one per key.
+template Purse
+  with
+    provider : Party
+    operator : Party
+    fingerprint : Text
+    party : Optional Party
+    credited : Decimal
+    charged : Decimal
+    updatedAt : Time
+  where
+    signatory provider
+    observer operator
+
+    choice Purse_Update : ContractId Purse
+      with
+        newParty : Optional Party
+        newCredited : Decimal
+        newCharged : Decimal
+      controller provider
+      do
+        now <- getTime
+        create this with party = newParty; credited = newCredited; charged = newCharged; updatedAt = now

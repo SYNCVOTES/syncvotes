@@ -128,6 +128,11 @@
 - [x] Daml Script tests — written (decoy ballot, late ballot, invented member, dissolution,
       refused settings), then removed at the user's word: the e2e runs against TestNet are the
       tests (2026-09-23)
+- [x] a party pays for itself: a `Purse` per key, paid in by memo of the fingerprint; the party
+      is allocated only once what a party costs today has arrived; profile and founding come
+      out of it; a DAO is founded with "the DAO pays" or "each member pays" (signer pays what
+      they sign, proposer pays the count); the participant's cost estimate is checked before
+      signing (`syncvotes-options` 0.21.0)
 - [x] no more renames: `syncvotes-options` is the lineage, every release an SCU of the one
       before, gated by `upgrades:`; a key whose Account is on an old lineage gets its party
       back by fingerprint (its DAOs are not carried over) (2026-09-23)

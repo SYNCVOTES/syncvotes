@@ -1,11 +1,11 @@
 sdk-version: 3.5.7
 name: syncvotes-options
 source: src
-version: 0.20.1
+version: 0.21.0
 # The package is a lineage: the name never changes again, every release is a Smart Contract
 # Upgrade of the one before, and the compiler checks it against that release here. What live
 # contracts carry over is decided by this line, not by hope.
-upgrades: upgrades/syncvotes-options-0.20.0.dar
+upgrades: upgrades/syncvotes-options-0.20.1.dar
 dependencies:
   - daml-prim
   - daml-stdlib

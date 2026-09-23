@@ -95,9 +95,11 @@ const accountOf = (party: string): ledger.Account => {
 };
 
 /** The party's Account, created by the provider if it has none: its door to the app. */
-async function ensureAccount(party: string): Promise<ledger.Account> {
+async function ensureAccount(
+	party: string
+): Promise<{ account: ledger.Account; updateId: string | null }> {
 	const known = ledger.accounts.get(party);
-	if (known) return known;
+	if (known) return { account: known, updateId: null };
 	const updateId = await participant.submitAsProvider(
 		[
 			{
@@ -114,7 +116,7 @@ async function ensureAccount(party: string): Promise<ledger.Account> {
 		`register-${party.split('::')[1]}-${Date.now()}`
 	);
 	await ledger.applied(updateId);
-	return accountOf(party);
+	return { account: accountOf(party), updateId };
 }
 
 /**
@@ -132,7 +134,7 @@ export const lookup = query(base64, async (publicKey) => {
 	}
 	const hosted = await participant.partyByFingerprint(fingerprint);
 	if (hosted) {
-		const account = await ensureAccount(hosted);
+		const { account } = await ensureAccount(hosted);
 		return { exists: true as const, party: hosted, account: account.contractId };
 	}
 	return { exists: false as const, fingerprint };
@@ -151,7 +153,11 @@ export const topology = query(
 	({ publicKey, hint }) => participant.partyTopology(hintOf(hint), publicKey)
 );
 
-/** The key signed its topology: create the party, then its Account. */
+/**
+ * The key signed its topology: create the party, then its Account — once what arrived for
+ * the key covers what that costs, so nothing is spent for a party before its owner has paid.
+ * The allocation is charged to the party's purse, opened here.
+ */
 export const enrol = command(
 	v.object({ publicKey: base64, hint: v.string(), multiHash: base64, signature: base64 }),
 	async ({ publicKey, hint, multiHash, signature }) => {
@@ -163,6 +169,17 @@ export const enrol = command(
 			Buffer.from(publicKey, 'base64')
 		);
 		if (!valid) error(403, 'The signature does not match the key');
+		const fingerprint = await fingerprintOf(new Uint8Array(Buffer.from(publicKey, 'base64')));
+		const topology = await participant.partyTopology(hintOf(hint), publicKey);
+		const bytes = participant.topologyBytes(topology);
+		const needed = await billing.enrolCost(bytes);
+		const have = billing.credit(fingerprint);
+		if (have < needed) {
+			error(
+				402,
+				`A party costs ${needed.toFixed(2)} CC today; ${have.toFixed(2)} CC has arrived for this key`
+			);
+		}
 		const count = pacedEnrol();
 		const { partyId: party } = await participant.allocateParty(
 			hintOf(hint),
@@ -170,7 +187,8 @@ export const enrol = command(
 			multiHash,
 			signature
 		);
-		await ensureAccount(party);
+		const { updateId } = await ensureAccount(party);
+		await billing.openPurse(fingerprint, party, bytes, updateId);
 		count();
 		return { party, account: accountOf(party).contractId };
 	}
@@ -237,7 +255,7 @@ const summarise = (d: ledger.Dao) => ({
 /** A DAO as its card shows it: with what it can spend and the caller's share of its vote. */
 const card = async (d: ledger.Dao, party: string) => ({
 	...summarise(d),
-	balance: await billing.balance(d.id),
+	balance: billing.balance(billing.daoAccount(d.id)),
 	myShare: ledger.members.get(d.id)?.get(party)?.share ?? 0
 });
 
@@ -261,7 +279,7 @@ export const dao = query.live(contractId, (id) =>
 		const d = daoOf(id);
 		return {
 			...summarise(d),
-			balance: await billing.balance(id),
+			balance: billing.balance(billing.daoAccount(id)),
 			// A founding table still being carried out: the DAO is not whole yet.
 			founding:
 				!!ledger.proposals.get(`${id}-founding`) &&
@@ -470,7 +488,28 @@ export const proposalComments = query.live(
 export const daoBilling = query.live(contractId, (id) =>
 	live(ledger.keys.dao(id), () => {
 		memberOnly(id);
-		return billing.statement(id);
+		return billing.statement(billing.daoAccount(id));
+	})
+);
+
+/**
+ * A key's own account, before and after its party exists: what arrived for it, what a party
+ * costs today, and where to pay. Open to anyone with a fingerprint, since a key without a
+ * party has no session to show.
+ */
+export const purse = query.live(v.pipe(v.string(), v.regex(/^1220[0-9a-f]{64}$/)), (fingerprint) =>
+	live(ledger.keys.purse(fingerprint), async () => ({
+		...(await billing.statement(billing.purseAccount(fingerprint))),
+		needed: await billing.enrolCost(),
+		allocated: ledger.purses.get(fingerprint)?.party ?? null
+	}))
+);
+
+/** The signed-in party's own account. */
+export const myPurse = query.live(partyId, (party) =>
+	live(ledger.keys.purse(party.split('::')[1] ?? ''), () => {
+		session.required(party);
+		return billing.statement(billing.purseOfParty(party));
 	})
 );
 
@@ -490,6 +529,10 @@ export const profile = query.live(partyId, (party) =>
  * signs only if that is the contract it is looking at (`verify.ts`), so a change that landed
  * in between is caught before anything is signed. A DAO's writes need its balance.
  */
+/** Who pays a party's transaction: the DAO it is in, unless the DAO has each member pay, or there is none. */
+const payerFor = (party: string, dao: string | null): billing.Account =>
+	dao && !ledger.daos.get(dao)?.actorPays ? billing.daoAccount(dao) : billing.purseOfParty(party);
+
 const prepare = async (
 	party: string,
 	template: { templateId: string },
@@ -498,12 +541,16 @@ const prepare = async (
 	choiceArgument: unknown,
 	dao: string | null
 ) => {
-	if (dao) await billing.funded(dao);
-	return participant.prepare(
+	const payer = payerFor(party, dao);
+	await billing.funded(payer);
+	const prepared = await participant.prepare(
 		party,
 		[{ ExerciseCommand: { templateId: template.templateId, contractId, choice, choiceArgument } }],
-		{ dao }
+		{ payer }
 	);
+	// The participant has priced it: what the account holds has to cover that.
+	await billing.funded(payer, prepared.cost);
+	return prepared;
 };
 
 /** A share table as the ledger reads it: tuples of party and units, the Int as text. */
@@ -517,7 +564,7 @@ const nullable = (s: string) => (s === '' ? null : s);
  * prepared. The browser verifies it says what the form said, signs it and executes it.
  */
 export const createDaoForm = form(schemas.createDaoForm, async (f) => {
-	const { daoName, description, image, equal, shares } = f;
+	const { daoName, description, image, equal, actorPays, shares } = f;
 	const party = session.required();
 	const account = accountOf(party).contractId;
 	if (!shares.some((r) => r.party === party)) error(400, 'You have to hold a share yourself');
@@ -539,7 +586,8 @@ export const createDaoForm = form(schemas.createDaoForm, async (f) => {
 		routine: settingsToLedger(settingsOf(f, 'routine')),
 		sensitive: settingsToLedger(settingsOf(f, 'sensitive')),
 		shares: shareRows(ordered.slice(0, schemas.BATCH)),
-		more: shareRows(ordered.slice(schemas.BATCH))
+		more: shareRows(ordered.slice(schemas.BATCH)),
+		actorPays: actorPays === 'yes'
 	};
 	return {
 		id,
@@ -761,6 +809,6 @@ export const execute = command(
 			{ fingerprint: party.split('::')[1], signature }
 		]);
 		await ledger.applied(updateId);
-		if (known?.dao) void billing.settle(known.dao, updateId, party);
+		if (known?.payer) void billing.settle(known.payer as billing.Account, updateId, party);
 	}
 );

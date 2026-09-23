@@ -29,6 +29,7 @@
 	import SettingsSummary from '$lib/components/settings-summary.svelte';
 	import Problem from '$lib/components/problem.svelte';
 	import BalancePanel from '$lib/components/balance-panel.svelte';
+	import Panel from '$lib/components/panel.svelte';
 	import Plus from '@lucide/svelte/icons/plus';
 	import ArrowRight from '@lucide/svelte/icons/arrow-right';
 	import { relative, dateOf, fmt, coin } from '$lib/format';
@@ -87,7 +88,7 @@
 								variant="green">Member</Badge
 							>{/if}
 					</div>
-					{#if d.balance <= 0}
+					{#if d.balance <= 0 && !d.actorPays}
 						<p class="mt-3 font-mono text-xs text-red">
 							Nothing can be signed for this DAO until someone pays in.
 						</p>
@@ -95,7 +96,7 @@
 				</div>
 			</div>
 			<div class="flex shrink-0 items-center gap-2">
-				{#if d.balance <= 0}
+				{#if d.balance <= 0 && !d.actorPays}
 					<!-- Nothing to press: the line under the badges says why. -->
 				{:else}
 					<Button href="/daos/{d.id}/proposals/create"
@@ -128,7 +129,9 @@
 			items={[
 				{ label: 'Members', value: fmt(d.members) },
 				{ label: 'Open proposals', value: fmt(d.openProposals), accent: d.openProposals > 0 },
-				{ label: 'Balance', value: coin(d.balance), accent: d.balance <= 0 },
+				d.actorPays
+					? { label: 'Who pays', value: 'members', accent: false }
+					: { label: 'Balance', value: coin(d.balance), accent: d.balance <= 0 },
 				{
 					label: 'Your vote',
 					value: d.equal ? '1 of ' + fmt(d.units) : `${pct(d.me.share, d.units)}%`
@@ -209,7 +212,20 @@
 			</section>
 
 			<aside class="min-w-0 space-y-6">
-				<BalancePanel dao={d.id} />
+				{#if d.actorPays}
+					<Panel padding="sm" class="space-y-2">
+						<h2 class="eyebrow flex items-center gap-1.5">
+							Who pays <Hint
+								text="This DAO has no balance of its own: a proposal, a vote or a comment costs the member who signs it, from the balance on their Wallet page, and the counting and carrying out of a proposal cost its proposer."
+							/>
+						</h2>
+						<p class="text-[13px] text-ink-mid">
+							Each member pays for what they sign, from their own balance on their Wallet page.
+						</p>
+					</Panel>
+				{:else}
+					<BalancePanel dao={d.id} />
+				{/if}
 
 				<div>
 					<SectionTitle title="How proposals pass" />

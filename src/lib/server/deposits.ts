@@ -21,9 +21,13 @@ const AMULET = '#splice-amulet:Splice.Amulet:Amulet';
 const AMULET_RULES = '#splice-amulet:Splice.AmuletRules:AmuletRules';
 const PREAPPROVAL = '#splice-amulet:Splice.AmuletRules:TransferPreapproval';
 
-/** The memo a transfer carries to be credited to a DAO. */
-export const memoFor = (daoId: string) => `syncvotes:${daoId}`;
-const MEMO = /^syncvotes:([0-9a-f-]{36})$/;
+/**
+ * The memo a transfer carries to be credited to an account: `syncvotes:<dao id>` for a DAO,
+ * `syncvotes:<key fingerprint>` for a party (the fingerprint is the second half of its id).
+ */
+export const memoFor = (account: string) =>
+	`syncvotes:${account.startsWith('dao:') ? account.slice(4) : account.slice(6)}`;
+const MEMO = /^syncvotes:(?:([0-9a-f-]{36})|(1220[0-9a-f]{64}))$/;
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -111,7 +115,8 @@ export async function acceptIncoming(): Promise<number> {
 }
 
 export type Deposit = {
-	daoId: string;
+	/** `dao:<id>` or `purse:<fingerprint>`. */
+	account: `dao:${string}` | `purse:${string}`;
 	amount: number;
 	from: string;
 	updateId: string;
@@ -146,12 +151,13 @@ export async function deposits(
 		if (!oldest || tx.recordTime < oldest) oldest = tx.recordTime;
 		for (const e of tx.events) {
 			if (e.label.type !== 'TransferIn') continue;
-			const daoId = e.label.reason?.match(MEMO)?.[1];
-			if (!daoId) continue;
+			const m = e.label.reason?.match(MEMO);
+			if (!m) continue;
+			const account = m[1] ? (`dao:${m[1]}` as const) : (`purse:${m[2]}` as const);
 			const amount = Number(e.unlockedHoldingsChangeSummary?.amountChange ?? 0);
 			if (amount > 0) {
 				found.push({
-					daoId,
+					account,
 					amount,
 					from: e.label.sender,
 					updateId: tx.updateId,

@@ -49,6 +49,8 @@ export type Dao = {
 	members: number;
 	/** The whole vote, in units. */
 	units: number;
+	/** Each member pays the traffic of what they sign; otherwise the DAO's balance does. */
+	actorPays: boolean;
 };
 export type Member = {
 	contractId: string;
@@ -121,6 +123,15 @@ export type Meter = {
 	charged: number;
 	updatedAt: string;
 };
+/** A party's own account with the provider, by its key's fingerprint. */
+export type Purse = {
+	contractId: string;
+	fingerprint: string;
+	party: string | null;
+	credited: number;
+	charged: number;
+	updatedAt: string;
+};
 
 /** Timestamps arrive as ISO text of varying precision; compare them as numbers. */
 export const time = (iso: string) => new Date(iso).getTime();
@@ -154,6 +165,7 @@ export const comments = new Map<string, Map<string, Comment>>();
 export const profiles = new Map<string, Profile>();
 /** by DAO id */
 export const meters = new Map<string, Meter>();
+export const purses = new Map<string, Purse>();
 
 const inner = <V>(map: Map<string, Map<string, V>>, key: string): Map<string, V> => {
 	let found = map.get(key);
@@ -167,6 +179,7 @@ export const keys = {
 	dao: (id: string) => `dao:${id}`,
 	proposal: (id: string) => `proposal:${id}`,
 	party: (party: string) => `party:${party}`,
+	purse: (fingerprint: string) => `purse:${fingerprint}`,
 	all: 'all'
 };
 
@@ -328,7 +341,8 @@ function created({ contractId, templateId, createArgument: a }: Created) {
 				sensitive: settings(a.sensitive),
 				createdAt: text(a.createdAt),
 				members: num(a.members),
-				units: num(a.units)
+				units: num(a.units),
+				actorPays: a.actorPays === true
 			};
 			track(contractId, [keys.dao(row.id), keys.party(row.creator)], put(daos, row.id, row));
 			break;
@@ -442,6 +456,18 @@ function created({ contractId, templateId, createArgument: a }: Created) {
 			track(contractId, [keys.dao(row.daoId)], put(meters, row.daoId, row));
 			break;
 		}
+		case 'Purse': {
+			const row: Purse = {
+				contractId,
+				fingerprint: text(a.fingerprint),
+				party: optional(a.party),
+				credited: num(a.credited),
+				charged: num(a.charged),
+				updatedAt: text(a.updatedAt)
+			};
+			track(contractId, [keys.purse(row.fingerprint)], put(purses, row.fingerprint, row));
+			break;
+		}
 	}
 }
 
@@ -460,7 +486,8 @@ const TEMPLATES = [
 	Main.Ballot,
 	Main.Comment,
 	Main.Profile,
-	Main.Meter
+	Main.Meter,
+	Main.Purse
 ].map((t) => t.templateId);
 
 type Event =

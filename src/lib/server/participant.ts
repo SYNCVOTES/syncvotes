@@ -248,6 +248,10 @@ export async function partyTopology(hint: string, publicKey: string): Promise<To
 	return (await sdk()).party.external.create(publicKey, { partyHint: hint }).topology();
 }
 
+/** The bytes a party's topology puts on the wire: what its allocation costs in traffic. */
+export const topologyBytes = (topology: { topologyTransactions: string[] }) =>
+	topology.topologyTransactions.reduce((n, t) => n + Buffer.from(t, 'base64').length, 0) + 128;
+
 /**
  * Creates the party. The topology is a pure function of hint and key, so it is generated
  * again and its hash compared with the one the key signed: a signature can only ever commit
@@ -336,7 +340,7 @@ export type Prepared = {
  * hand in a transaction of their own making and skip the rules the prepare functions enforce.
  * The DAO named here is the one billed for the traffic.
  */
-const prepared = new Map<string, { party: string; dao: string | null; at: number }>();
+const prepared = new Map<string, { party: string; payer: string | null; at: number }>();
 const PREPARED_TTL = 10 * 60 * 1000;
 
 /**
@@ -348,7 +352,8 @@ export async function prepare(
 	party: string,
 	commands: unknown[],
 	options: {
-		dao?: string | null;
+		/** The account charged for it once it is executed: `dao:<id>` or `purse:<fingerprint>`. */
+		payer?: string | null;
 		disclosedContracts?: DisclosedContract[];
 		signatures?: number;
 	} = {}
@@ -379,7 +384,11 @@ export async function prepare(
 		});
 		const now = Date.now();
 		for (const [hash, p] of prepared) if (now - p.at > PREPARED_TTL) prepared.delete(hash);
-		prepared.set(response.preparedTransactionHash, { party, dao: options.dao ?? null, at: now });
+		prepared.set(response.preparedTransactionHash, {
+			party,
+			payer: options.payer ?? null,
+			at: now
+		});
 		return {
 			preparedTransaction: response.preparedTransaction,
 			preparedTransactionHash: response.preparedTransactionHash,

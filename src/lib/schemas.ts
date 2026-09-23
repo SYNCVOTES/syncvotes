@@ -165,6 +165,7 @@ export const createDaoForm = v.pipe(
 		description: daoDescription,
 		image: imageUrl,
 		equal: yesNo,
+		actorPays: v.optional(yesNo, 'no'),
 		shares: shareChanges,
 		...routineFields,
 		...sensitiveFields

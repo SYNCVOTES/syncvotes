@@ -15,6 +15,7 @@ export type Screen =
 	| { at: 'create'; phrase: string }
 	| { at: 'restore' }
 	| { at: 'hint'; signer: wallet.Signer; fingerprint: string }
+	| { at: 'fund'; signer: wallet.Signer; fingerprint: string; hint: string }
 	| { at: 'protect'; signer: wallet.Signer; who: actions.Identity }
 	| { at: 'locked'; lock: 'passkey' | 'password' }
 	| { at: 'home'; signer: wallet.Signer; who: actions.Identity };
@@ -202,10 +203,20 @@ export const flow = {
 		return run(() => identify(wallet.signerFromPhrase(phrase), 'protect'));
 	},
 
-	/** The hint is the label in the party id; the key signs the topology that names it. */
+	/**
+	 * The hint is the label in the party id. Before the party is made, its cost has to have
+	 * arrived for the key: the page shows where to pay and waits.
+	 */
 	confirmHint(hint: string) {
 		if (screen.at !== 'hint') return;
-		const { signer } = screen;
+		const { signer, fingerprint } = screen;
+		screen = { at: 'fund', signer, fingerprint, hint };
+	},
+
+	/** What arrived covers a party: the key signs the topology that names it. */
+	enrolNow() {
+		if (screen.at !== 'fund' || busy) return;
+		const { signer, hint } = screen;
 		return run(async () => {
 			working('Creating your party on the ledger');
 			const topology = await actions.topology(signer, hint);

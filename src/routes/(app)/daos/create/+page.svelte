@@ -31,6 +31,22 @@
 	 */
 	type Mode = 'equal' | 'shares';
 	let mode = $state<Mode>('equal');
+	/** Who pays the traffic: the DAO's own balance, or each member for what they sign. */
+	let payer = $state<'dao' | 'members'>('dao');
+	const payers = [
+		{
+			value: 'dao',
+			title: 'The DAO pays',
+			text: 'One balance, paid in by anyone; every transaction in the DAO comes out of it.',
+			more: 'The DAO gets a balance of its own with an address and a memo; anyone tops it up. Proposals, votes, comments and the counting are all paid from it, and when it is empty nothing can be signed until someone pays in.'
+		},
+		{
+			value: 'members',
+			title: 'Each member pays',
+			text: 'Everyone pays for what they sign, from their own balance on their Wallet page.',
+			more: 'No DAO balance: a proposal, a vote or a comment costs the member who signs it, and the counting and carrying out of a proposal cost its proposer. A member whose own balance is empty cannot act here until they pay in. Cannot be changed later.'
+		}
+	] as const;
 	const modes = [
 		{
 			value: 'equal',
@@ -112,6 +128,7 @@
 					description,
 					image: image || null,
 					equal: equal === 'yes',
+					actorPays: payer === 'members',
 					routine: settingsToLedger(settingsOf('routine')),
 					sensitive: settingsToLedger(settingsOf('sensitive')),
 					shares: ordered.slice(0, BATCH).map(tuple),
@@ -139,6 +156,7 @@
 	{:else}
 		<form {...enhanced} class="space-y-8">
 			<input type="hidden" name="equal" value={mode === 'equal' ? 'yes' : 'no'} />
+			<input type="hidden" name="actorPays" value={payer === 'members' ? 'yes' : 'no'} />
 
 			<FormSection title="Basic information">
 				<Field label="Name" id="daoName" issues={f.fields.daoName.issues()}>
@@ -193,6 +211,32 @@
 				<Note mono={false}>
 					This cannot be changed later: a DAO by membership stays one, and so does one by shares.
 					Who is in it, and with how many units, changes by vote.
+				</Note>
+			</FormSection>
+
+			<FormSection title="Who pays">
+				<div class="grid gap-3 sm:grid-cols-2">
+					{#each payers as p (p.value)}
+						<label
+							class="flex cursor-pointer items-start gap-3 border p-4 transition-colors {payer ===
+							p.value
+								? 'border-orange bg-orange/5'
+								: 'border-border hover:border-border-hover'}"
+						>
+							<input type="radio" class="sr-only" value={p.value} bind:group={payer} />
+							<span class="min-w-0">
+								<span class="flex items-center gap-1.5 font-display text-[15px] font-bold"
+									>{p.title}
+									<Hint text={p.more} align={p.value === 'members' ? 'end' : 'start'} /></span
+								>
+								<span class="mt-1 block text-xs leading-relaxed text-ink-mid">{p.text}</span>
+							</span>
+						</label>
+					{/each}
+				</div>
+				<Note mono={false}>
+					Every transaction costs network traffic; this decides whose balance it comes out of.
+					Founding the DAO itself comes out of yours. Cannot be changed later.
 				</Note>
 			</FormSection>
 

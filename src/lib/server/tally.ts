@@ -18,6 +18,11 @@ import * as billing from './billing';
  */
 
 const BATCH = 200;
+/** Who pays the provider's transactions on a proposal: the DAO, or its proposer where members pay. */
+const payer = (p: ledger.Proposal): billing.Account =>
+	ledger.daos.get(p.daoId)?.actorPays
+		? billing.purseOfParty(p.proposer)
+		: billing.daoAccount(p.daoId);
 /** How long after the deadline a ballot may still land: the signing window, and some. */
 export const GRACE = 3 * 60_000;
 const counting = new Set<string>();
@@ -141,7 +146,7 @@ async function count(id: string) {
 				consumedProposal.set(id, p.contractId);
 				// The next batch must see this one's result, or it would hand in ballots already counted.
 				await ledger.applied(updateId);
-				void billing.settle(p.daoId, updateId);
+				void billing.settle(payer(p), updateId);
 				succeeded(id);
 				again.add(id);
 				break;
@@ -214,7 +219,7 @@ async function execute(p: ledger.Proposal) {
 		);
 		consumedDao.set(p.daoId, dao.contractId);
 		ok = await ledger.applied(updateId);
-		void billing.settle(p.daoId, updateId);
+		void billing.settle(payer(p), updateId);
 		succeeded(p.id);
 		waitFor(p.id, null);
 	} catch (e) {

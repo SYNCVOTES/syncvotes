@@ -7,6 +7,7 @@
 	import Page from '$lib/components/page.svelte';
 	import PageHeader from '$lib/components/page-header.svelte';
 	import Problem from '$lib/components/problem.svelte';
+	import QueryError from '$lib/components/query-error.svelte';
 	import UnlockForm from '$lib/components/unlock-form.svelte';
 	import PartyId from '$lib/components/party-id.svelte';
 	import Panel from '$lib/components/panel.svelte';
@@ -15,6 +16,8 @@
 	import Phrase from '$lib/components/phrase.svelte';
 	import WalletSources from '$lib/components/wallet-sources.svelte';
 	import ProfileForm from '$lib/components/profile-form.svelte';
+	import PursePanel from '$lib/components/purse-panel.svelte';
+	import * as remote from '$lib/api.remote';
 	import ArrowRight from '@lucide/svelte/icons/arrow-right';
 	import { normaliseHint, hintProblem } from '$lib/hint';
 	import { hintOf, label } from '$lib/format';
@@ -24,6 +27,13 @@
 	let password = $state('');
 
 	const screen = $derived(store.screen);
+	// While a party is paid for, its key's account is watched; enough arrived, the party is made.
+	const funding = $derived(screen.at === 'fund' ? remote.purse(screen.fingerprint) : null);
+	$effect(() => {
+		const f = funding?.current;
+		if (screen.at === 'fund' && f && f.credited >= f.needed && !store.busy) void flow.enrolNow();
+	});
+	const purse = $derived(screen.at === 'home' ? remote.myPurse(screen.who.party) : null);
 	// Creating a key: the phrase is revealed on request, then one word of it is asked back.
 	let revealed = $state(false);
 	let checking = $state(false);
@@ -176,6 +186,25 @@
 				{/if}
 			</Panel>
 		</form>
+	{:else if screen.at === 'fund'}
+		<Panel padding="lg" class="space-y-5">
+			<h2 class="eyebrow">Pay for your party</h2>
+			<p class="text-sm text-ink-mid">
+				Your party will be <code class="break-all text-ink"
+					>{screen.hint}::{screen.fingerprint}</code
+				>. Creating it costs the network traffic, and nothing is created before that has arrived for
+				your key. This page waits; once enough is in, the party is made and you go on.
+			</p>
+			{#if funding?.error}
+				<QueryError error={funding.error} refresh={() => funding?.reconnect()} />
+			{:else if funding?.ready}
+				<PursePanel statement={funding.current} needed={funding.current.needed} />
+			{:else}
+				<Skeleton height="h-40" />
+			{/if}
+			<Problem message={store.problem} />
+			<Button variant="ghost" onclick={flow.back}>Back</Button>
+		</Panel>
 	{:else if screen.at === 'protect'}
 		<Panel padding="lg" class="space-y-5">
 			<h2 class="eyebrow">Keep the key on this device?</h2>
@@ -249,6 +278,13 @@
 				The key is disposed after fifteen quiet minutes and whenever you leave the page; the
 				encrypted copy stays on this device.
 			</p>
+			{#if purse?.ready}
+				<PursePanel statement={purse.current} />
+			{:else if purse?.error}
+				<QueryError error={purse.error} refresh={() => purse?.reconnect()} />
+			{:else}
+				<Skeleton height="h-40" />
+			{/if}
 			<Panel class="space-y-4">
 				<ProfileForm party={screen.who.party} />
 				<a

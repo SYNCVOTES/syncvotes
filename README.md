@@ -40,6 +40,9 @@ through the WebAuthn PRF extension) or a password (PBKDF2). A passkey cannot sig
 transaction itself — WebAuthn wraps what it signs, and Canton verifies a bare signature over the
 hash — which is why it guards the key instead of replacing it.
 
+Building the DAR locally needs Rosetta on Apple silicon (`dpm` is x86_64); `pnpm daml:codegen`
+builds it and the bindings on this machine.
+
 Why not a third-party wallet? It was measured rather than assumed: a dApp with its own Daml
 templates cannot serve a party hosted by another wallet's participant. The package has to be on
 the hosting participant, CIP-0103 exposes no method to upload one or to re-host a party, and
@@ -108,17 +111,28 @@ proposal carried out) are controlled by both, and neither has the other's key.
   creator; said once and kept as said: nobody edits or removes it. Comments and proposals are
   paced by the app (thirty writes an hour per party), since the DAO pays for them.
 - `Meter` — the provider's statement of a DAO's account: what was paid in for it, and what
-  its traffic has cost.
+  its traffic has cost. `Purse` — the same for a party, by its key's fingerprint, opened when
+  the party is allocated.
 
-### The balance
+### The balances
 
 The sending validator pays the network for every byte of traffic, in coin at a published price
 (\$60 per megabyte on TestNet; a governance transaction is a few kilobytes, about 20–30 cents;
 a coin transfer about 7.5 kilobytes). The participant reports what each transaction cost
 (`paidTrafficCost`), and the DAO it was for is charged that, times `BILLING_FACTOR` (one until
-the rewards this traffic earns are measured). The balance is paid in by sending Canton Coin to
-the provider's party from any wallet with the DAO's memo as the transfer's reason
-(`syncvotes:<dao id>`, shown on the DAO's page); the provider has a transfer pre-approval, so
+the rewards this traffic earns are measured). There are two kinds of account, paid in the same
+way: a DAO's balance (`Meter`), and a party's own (`Purse`, by its key's fingerprint). A DAO
+founded with "the DAO pays" pays for everything done in it; one founded with "each member pays"
+has no balance, and a proposal, a vote or a comment costs the member who signs it, the counting
+and carrying out of a proposal its proposer. A party pays for itself in any case: its allocation,
+its profile, the DAOs it founds. Nothing is spent for a new party before its owner has paid:
+after choosing a hint, the wallet page shows the memo of the key and what a party costs today
+(its topology's bytes and its Account, at the network's price), and the party is made once that
+much has arrived; what is over stays on the balance. Before signing anything, the participant's
+own estimate of the transaction's traffic is checked against the payer's balance. A balance is
+paid in by sending Canton Coin to the provider's party from any wallet with the account's memo as
+the transfer's reason (`syncvotes:<dao id>` or `syncvotes:<fingerprint>`, shown on the DAO's page
+and the wallet page); the provider has a transfer pre-approval, so
 coin lands in one step, and accepts what a wallet sends as a transfer instruction instead.
 What arrived with a memo is read off the provider's own transactions (the token standard's
 view of them) and credited to the DAO's `Meter`, so the figure is the ledger's, recomputed on

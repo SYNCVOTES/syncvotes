@@ -7,20 +7,32 @@ import * as deposits from './deposits';
 import { operatorParty, paidTraffic, providerParty, sdk, submitAsProvider } from './participant';
 
 /**
- * Who pays for what. Every transaction a DAO causes costs this validator traffic — bytes the
- * network charges in coin, at a price it publishes. The DAO pays that back into a balance:
- * coin anyone sends to the provider with the DAO's memo, found in the provider's own
- * transactions and credited at `factor` times the network's price (one to start with, less
- * once the rewards this traffic earns are known). The balance lives on the ledger as the
- * DAO's `Meter` — credited and charged, rewritten as the figures move; between writes the
- * charges are kept here. Reads are free; a write is refused when the balance is gone. What is
- * paid in is spent on traffic and is not paid back.
+ * Who pays for what. Every transaction costs this validator traffic — bytes the network
+ * charges in coin, at a price it publishes — and is charged to an account: a DAO's balance
+ * (its `Meter`) or a party's own (its `Purse`), at `factor` times the network's price. Both
+ * are paid in the same way: coin sent to the provider with the account's memo, found in the
+ * provider's own transactions and credited here. A DAO pays for everything done in it unless
+ * it was founded with each member paying for what they sign; a party pays for itself — its
+ * allocation, its profile, the DAOs it founds. The figures live on the ledger, rewritten as
+ * they move; between writes the charges are kept here. Reads are free; a write is refused
+ * when the balance is gone, or would not cover what the participant says it will cost. What
+ * is paid in is spent on traffic and is not paid back.
  */
 
-/** Charges not yet written to the meter, in coin, by DAO id. */
-const pending = new Map<string, number>();
-/** DAOs whose meter needs writing. */
-const dirty = new Set<string>();
+/** An account: `dao:<id>` or `purse:<fingerprint>`. */
+export type Account = `dao:${string}` | `purse:${string}`;
+export const daoAccount = (id: string): Account => `dao:${id}`;
+export const purseAccount = (fingerprint: string): Account => `purse:${fingerprint}`;
+export const purseOfParty = (party: string): Account => purseAccount(party.split('::')[1] ?? '');
+const split = (a: Account) =>
+	a.startsWith('dao:')
+		? { kind: 'dao' as const, key: a.slice(4) }
+		: { kind: 'purse' as const, key: a.slice(6) };
+
+/** Charges not yet written to the ledger, in coin, by account. */
+const pending = new Map<Account, number>();
+/** Accounts whose contract needs writing. */
+const dirty = new Set<Account>();
 let writing = false;
 
 const factor = () => Number(BILLING_FACTOR ?? '1');
@@ -30,100 +42,134 @@ async function coinPerByte(): Promise<number> {
 	const { usdPerMb, usdPerCoin } = await splice.prices();
 	return (usdPerMb / 1_000_000 / usdPerCoin) * factor();
 }
+/** What this many bytes cost, in coin. */
+export const coinFor = async (bytes: number) => bytes * (await coinPerByte());
+
+/** The bytes a party's allocation costs beyond its topology: the Account it gets. Measured. */
+let accountBytes = 1500;
+/** What the last party's topology came to, in bytes; the estimate before one is measured. */
+let topologyBytes = 1600;
+
+/** The ledger's figures for an account: credited and charged, or nothing yet. */
+const figures = (a: Account): { credited: number; charged: number; exists: boolean } => {
+	const { kind, key } = split(a);
+	const row = kind === 'dao' ? ledger.meters.get(key) : ledger.purses.get(key);
+	return { credited: row?.credited ?? 0, charged: row?.charged ?? 0, exists: !!row };
+};
+
+/** What an account can still spend: paid in, less charged, less what is not written yet. */
+export const balance = (a: Account): number => {
+	const f = figures(a);
+	// A purse not yet on the ledger holds what arrived for its key in the meantime.
+	const credited = f.exists ? f.credited : (deposited.get(a) ?? 0);
+	return credited - f.charged - (pending.get(a) ?? 0);
+};
+
+const emptyMessage = (a: Account) =>
+	split(a).kind === 'dao'
+		? "This DAO's balance is empty — someone has to pay in first"
+		: 'Your balance is empty — pay in on your Wallet page first';
+
+/** Refuses a write for an account with nothing left, or not enough for what it will cost. */
+export async function funded(a: Account, costBytes = 0): Promise<void> {
+	const have = balance(a);
+	if (have <= 0) throw error(402, emptyMessage(a));
+	const cost = await coinFor(costBytes);
+	if (cost > have) {
+		throw error(
+			402,
+			`${split(a).kind === 'dao' ? "The DAO's balance" : 'Your balance'} is ${have.toFixed(2)} CC; the participant puts this transaction at ${cost.toFixed(2)} CC`
+		);
+	}
+}
 
 export type Statement = {
-	/** Where to send coin, and the memo that credits it to this DAO. */
+	/** Where to send coin, and the memo that credits it to this account. */
 	payTo: string;
 	memo: string;
 	credited: number;
 	charged: number;
 	balance: number;
-	/** Coin per megabyte, after the factor; what a byte costs the DAO. */
+	/** Coin per megabyte, after the factor; what a byte costs. */
 	coinPerMb: number;
 	usdPerCoin: number;
 	factor: number;
 	updatedAt: string | null;
 };
 
-/** The DAO's account as it stands, meter plus what is not written yet. */
-export async function statement(daoId: string): Promise<Statement> {
-	if (!ledger.daos.has(daoId)) error(404, 'No such DAO');
-	const meter = ledger.meters.get(daoId);
-	const charged = (meter?.charged ?? 0) + (pending.get(daoId) ?? 0);
-	const credited = meter?.credited ?? 0;
+/** The account as it stands: ledger plus what is not written yet. */
+export async function statement(a: Account): Promise<Statement> {
+	const { kind, key } = split(a);
+	const row = kind === 'dao' ? ledger.meters.get(key) : ledger.purses.get(key);
 	const { usdPerMb, usdPerCoin } = await splice.prices();
+	const credited = row ? row.credited : (deposited.get(a) ?? 0);
+	const charged = (row?.charged ?? 0) + (pending.get(a) ?? 0);
 	return {
 		payTo: providerParty(),
-		memo: deposits.memoFor(daoId),
+		memo: deposits.memoFor(a),
 		credited,
 		charged,
 		balance: credited - charged,
 		coinPerMb: (usdPerMb / usdPerCoin) * factor(),
 		usdPerCoin,
 		factor: factor(),
-		updatedAt: meter?.updatedAt ?? null
+		updatedAt: row?.updatedAt ?? null
 	};
 }
 
-/** What the DAO can still spend: paid in, less charged. */
-export const balance = (daoId: string): number =>
-	(ledger.meters.get(daoId)?.credited ?? 0) -
-	(ledger.meters.get(daoId)?.charged ?? 0) -
-	(pending.get(daoId) ?? 0);
-
-/** Refuses a write for a DAO that has no coin left. */
-export function funded(daoId: string): void {
-	if (balance(daoId) <= 0) {
-		throw error(402, "This DAO's balance is empty — someone has to pay in first");
-	}
-}
-
-/** The traffic a transaction cost, charged to the DAO that caused it. */
-export async function charge(daoId: string, bytes: number): Promise<void> {
+/** The traffic a transaction cost, charged to the account that caused it. */
+export async function charge(a: Account, bytes: number): Promise<void> {
 	if (!bytes) return;
 	const coin = bytes * (await coinPerByte());
-	pending.set(daoId, (pending.get(daoId) ?? 0) + coin);
-	dirty.add(daoId);
-	ledger.notify(ledger.keys.dao(daoId));
+	pending.set(a, (pending.get(a) ?? 0) + coin);
+	dirty.add(a);
+	notify(a);
 	// Charges reach the ledger once they add up to something, or with the hourly write.
-	if ((pending.get(daoId) ?? 0) > 0.5) void flush();
+	if ((pending.get(a) ?? 0) > 0.5) void flush();
 }
+
+const notify = (a: Account) => {
+	const { kind, key } = split(a);
+	ledger.notify(kind === 'dao' ? ledger.keys.dao(key) : ledger.keys.purse(key));
+};
 
 /** Looks up what a transaction cost and charges it; for writes the provider submitted too. */
-export async function settle(daoId: string, updateId: string, party = providerParty()) {
-	await charge(daoId, await paidTraffic(updateId, party));
+export async function settle(a: Account, updateId: string, party = providerParty()) {
+	await charge(a, await paidTraffic(updateId, party));
 }
 
-async function write(daoId: string, credited: number, charged: number) {
-	const dao = ledger.daos.get(daoId);
-	if (!dao) return;
-	const meter = ledger.meters.get(daoId);
-	const updateId = meter
+async function write(a: Account, credited: number, charged: number, party?: string) {
+	const { kind, key } = split(a);
+	if (kind === 'dao' && !ledger.daos.has(key)) return;
+	const row = kind === 'dao' ? ledger.meters.get(key) : ledger.purses.get(key);
+	const amounts = { newCredited: credited.toFixed(10), newCharged: charged.toFixed(10) };
+	const commandId = `${kind}-${key.slice(0, 24)}-${Date.now()}`;
+	const updateId = row
 		? await submitAsProvider(
 				[
 					{
 						ExerciseCommand: {
-							templateId: Main.Meter.templateId,
-							contractId: meter.contractId,
-							choice: 'Meter_Update',
-							choiceArgument: {
-								newCredited: credited.toFixed(10),
-								newCharged: charged.toFixed(10)
-							}
+							templateId: kind === 'dao' ? Main.Meter.templateId : Main.Purse.templateId,
+							contractId: row.contractId,
+							choice: kind === 'dao' ? 'Meter_Update' : 'Purse_Update',
+							choiceArgument:
+								kind === 'dao'
+									? amounts
+									: { ...amounts, newParty: party ?? ledger.purses.get(key)?.party ?? null }
 						}
 					}
 				],
-				`meter-${daoId}-${Date.now()}`
+				commandId
 			)
 		: await submitAsProvider(
 				[
 					{
 						CreateCommand: {
-							templateId: Main.Meter.templateId,
+							templateId: kind === 'dao' ? Main.Meter.templateId : Main.Purse.templateId,
 							createArguments: {
 								provider: providerParty(),
 								operator: operatorParty(),
-								daoId,
+								...(kind === 'dao' ? { daoId: key } : { fingerprint: key, party: party ?? null }),
 								credited: credited.toFixed(10),
 								charged: charged.toFixed(10),
 								updatedAt: new Date().toISOString()
@@ -131,30 +177,33 @@ async function write(daoId: string, credited: number, charged: number) {
 						}
 					}
 				],
-				`meter-${daoId}-${Date.now()}`
+				commandId
 			);
 	await ledger.applied(updateId);
 }
 
-/** Writes every meter with unwritten charges. One at a time; a failure waits for the next round. */
+/** Writes every account with unwritten charges. One at a time; a failure waits for the next round. */
 export async function flush(): Promise<void> {
 	if (writing) return;
 	writing = true;
 	try {
-		for (const daoId of [...dirty]) {
-			const coin = pending.get(daoId) ?? 0;
-			if (coin === 0 || !ledger.daos.has(daoId)) {
-				dirty.delete(daoId);
-				pending.delete(daoId);
+		for (const a of [...dirty]) {
+			const coin = pending.get(a) ?? 0;
+			const { kind, key } = split(a);
+			// A DAO that is gone, or a purse whose party was never allocated, is not written.
+			const gone = kind === 'dao' ? !ledger.daos.has(key) : !ledger.purses.has(key);
+			if (coin === 0 || gone) {
+				dirty.delete(a);
+				pending.delete(a);
 				continue;
 			}
-			const meter = ledger.meters.get(daoId);
+			const f = figures(a);
 			try {
-				await write(daoId, meter?.credited ?? 0, (meter?.charged ?? 0) + coin);
-				pending.set(daoId, (pending.get(daoId) ?? 0) - coin);
-				dirty.delete(daoId);
+				await write(a, f.credited, f.charged + coin);
+				pending.set(a, (pending.get(a) ?? 0) - coin);
+				dirty.delete(a);
 			} catch (e) {
-				console.warn(`Meter of ${daoId} not written:`, e instanceof Error ? e.message : e);
+				console.warn(`${a} not written:`, e instanceof Error ? e.message : e);
 			}
 		}
 	} finally {
@@ -162,10 +211,39 @@ export async function flush(): Promise<void> {
 	}
 }
 
-// ---- Deposits: coin at the provider with a DAO's memo ---------------------------------------
+// ---- A party's allocation, paid from its purse ------------------------------------------------
 
-/** Coin paid in so far, by DAO, as summed from the provider's transactions. */
-const deposited = new Map<string, number>();
+/** What a new party costs: its topology and its Account, in coin, at today's price. */
+export const enrolCost = async (topologyBytesNow = topologyBytes) =>
+	coinFor(topologyBytesNow + accountBytes);
+
+/** What arrived for a key, allocated or not. */
+export const credit = (fingerprint: string) => balance(purseAccount(fingerprint));
+
+/**
+ * The purse is opened the moment the party is allocated: everything that arrived for the
+ * key is credited, the allocation is charged. The Account's own transaction is measured
+ * and charged with it, and its size remembered for the next estimate.
+ */
+export async function openPurse(
+	fingerprint: string,
+	party: string,
+	topologyBytesUsed: number,
+	accountUpdateId: string | null
+): Promise<void> {
+	const a = purseAccount(fingerprint);
+	topologyBytes = topologyBytesUsed;
+	const bytes = accountUpdateId ? await paidTraffic(accountUpdateId, providerParty()) : 0;
+	if (bytes > 0) accountBytes = bytes;
+	const charged = await coinFor(topologyBytesUsed + bytes);
+	await write(a, deposited.get(a) ?? 0, charged, party);
+	notify(a);
+}
+
+// ---- Deposits: coin at the provider with an account's memo ----------------------------------
+
+/** Coin paid in so far, by account, as summed from the provider's transactions. */
+const deposited = new Map<Account, number>();
 /** The transactions summed, so no window counts one twice. */
 const summed = new Set<string>();
 let seenOffset: number | undefined;
@@ -175,7 +253,8 @@ function take(found: deposits.Deposit[]) {
 	for (const d of found) {
 		if (summed.has(d.updateId)) continue;
 		summed.add(d.updateId);
-		deposited.set(d.daoId, (deposited.get(d.daoId) ?? 0) + d.amount);
+		deposited.set(d.account, (deposited.get(d.account) ?? 0) + d.amount);
+		notify(d.account);
 	}
 }
 
@@ -198,9 +277,11 @@ async function window(after: number, before: number): Promise<string | null> {
 
 /**
  * Takes in what waits to be accepted, then credits what arrived with a memo. On the first
- * look, walks the provider's history back to before the oldest DAO existed, so the credited
- * sums are the ledger's, not this process's memory; after that, only what is new. The meter
- * is written only when its credited figure is behind the sum.
+ * look, walks the provider's history back to before the oldest account existed — and a week
+ * further, for coin sent for a key whose party is not allocated yet — so the credited sums
+ * are the ledger's, not this process's memory; after that, only what is new. A contract is
+ * written only when its credited figure is behind the sum; a purse whose party is not
+ * allocated has no contract, and its sum waits here for the key to come back.
  */
 export async function watchDeposits(): Promise<void> {
 	if (watching) return;
@@ -213,33 +294,36 @@ export async function watchDeposits(): Promise<void> {
 		}
 		const end = await (await sdk()).ledger.ledgerEnd();
 		if (seenOffset === undefined) {
-			const oldestDao = [...ledger.daos.values()].map((d) => d.createdAt).sort()[0];
-			if (oldestDao) {
-				let to = end;
-				let step = 20_000;
-				while (to > 0) {
-					const from = Math.max(0, to - step);
-					const oldest = await window(from, to);
-					if (oldest && oldest < oldestDao) break;
-					to = from;
-					step = Math.min(step * 2, 200_000);
-				}
+			const oldest = [
+				...[...ledger.daos.values()].map((d) => d.createdAt),
+				...[...ledger.purses.values()].map((p) => p.updatedAt)
+			].sort()[0];
+			const week = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+			const floor = oldest && oldest < week ? oldest : week;
+			let to = end;
+			let step = 20_000;
+			while (to > 0) {
+				const from = Math.max(0, to - step);
+				const seen = await window(from, to);
+				if (seen && seen < floor) break;
+				to = from;
+				step = Math.min(step * 2, 200_000);
 			}
 			seenOffset = end;
 		} else if (end > seenOffset) {
 			await window(seenOffset, end);
 			seenOffset = end;
 		}
-		for (const [daoId, total] of deposited) {
-			const meter = ledger.meters.get(daoId);
-			if (!ledger.daos.has(daoId) || (meter?.credited ?? 0) >= total) continue;
+		for (const [a, total] of deposited) {
+			const f = figures(a);
+			if (!f.exists || f.credited >= total) continue;
 			try {
-				await write(daoId, total, (meter?.charged ?? 0) + (pending.get(daoId) ?? 0));
-				pending.delete(daoId);
-				dirty.delete(daoId);
-				ledger.notify(ledger.keys.dao(daoId));
+				await write(a, total, f.charged + (pending.get(a) ?? 0));
+				pending.delete(a);
+				dirty.delete(a);
+				notify(a);
 			} catch (e) {
-				console.warn(`Deposit to ${daoId} not credited yet:`, e instanceof Error ? e.message : e);
+				console.warn(`Deposit to ${a} not credited yet:`, e instanceof Error ? e.message : e);
 			}
 		}
 	} catch (e) {
