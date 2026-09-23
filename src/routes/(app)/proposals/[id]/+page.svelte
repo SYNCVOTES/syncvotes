@@ -34,7 +34,12 @@
 
 	let q = $state('');
 	let limit = $state(20);
-	const ballots = $derived(me ? remote.proposalBallots({ id, offset: 0, limit, q }) : null);
+	// Who voted how is the members' business: a reader of a public DAO gets the totals only.
+	const ballots = $derived(
+		me && proposal?.current?.me.membership
+			? remote.proposalBallots({ id, offset: 0, limit, q })
+			: null
+	);
 	const holders = $derived(
 		proposal?.current && proposal.current.effect.kind === 'shares' && !proposal.current.executedAt
 			? remote.daoShares(proposal.current.daoId)
@@ -154,51 +159,55 @@
 					{/if}
 				{/if}
 
-				<div>
-					<div class="mb-4 flex items-center justify-between gap-4">
-						<h2 class="eyebrow">Ballots</h2>
-						<div class="w-56">
-							<SearchInput bind:value={q} placeholder="Filter by name or id" />
+				{#if p.me.membership}
+					<div>
+						<div class="mb-4 flex items-center justify-between gap-4">
+							<h2 class="eyebrow">Ballots</h2>
+							<div class="w-56">
+								<SearchInput bind:value={q} placeholder="Filter by name or id" />
+							</div>
 						</div>
+						{#if ballots?.error}
+							<QueryError error={ballots.error} refresh={() => ballots?.reconnect()} />
+						{:else if !ballots?.ready}
+							<Skeleton height="h-24" />
+						{:else if ballots.current.total === 0}
+							<p class="text-[13px] text-ink-dim">
+								{q ? 'No ballot matches that.' : 'No votes yet.'}
+							</p>
+						{:else}
+							<List>
+								{#each ballots.current.items as b (b.voter)}
+									<ListItem class="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs">
+										<Who who={b.who} me={b.voter === me} class="min-w-0 flex-1 basis-56" />
+										<span class="flex shrink-0 items-center gap-3">
+											<span class="text-ink-mid">{pct(b.weight, p.eligible)}%</span>
+											<span class="text-ink-dim">{relative(b.castAt)}</span>
+											{#if !b.counted}<span
+													class="text-ink-dim"
+													title={p.rule.changeable
+														? 'Counted at the deadline'
+														: 'Cast; the provider has not counted it yet'}
+													>{p.rule.changeable ? 'may change' : 'not counted yet'}</span
+												>{/if}
+											<span class="max-w-40 truncate text-right {tone(b.vote)}"
+												>{said(b.vote, p.effect.kind === 'choose' ? p.effect.options : [])}</span
+											>
+										</span>
+									</ListItem>
+								{/each}
+							</List>
+							<LoadMore
+								shown={ballots.current.items.length}
+								total={ballots.current.total}
+								noun="ballots"
+								onmore={(n) => (limit = n)}
+							/>
+						{/if}
 					</div>
-					{#if ballots?.error}
-						<QueryError error={ballots.error} refresh={() => ballots?.reconnect()} />
-					{:else if !ballots?.ready}
-						<Skeleton height="h-24" />
-					{:else if ballots.current.total === 0}
-						<p class="text-[13px] text-ink-dim">
-							{q ? 'No ballot matches that.' : 'No votes yet.'}
-						</p>
-					{:else}
-						<List>
-							{#each ballots.current.items as b (b.voter)}
-								<ListItem class="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs">
-									<Who who={b.who} me={b.voter === me} class="min-w-0 flex-1 basis-56" />
-									<span class="flex shrink-0 items-center gap-3">
-										<span class="text-ink-mid">{pct(b.weight, p.eligible)}%</span>
-										<span class="text-ink-dim">{relative(b.castAt)}</span>
-										{#if !b.counted}<span
-												class="text-ink-dim"
-												title={p.rule.changeable
-													? 'Counted at the deadline'
-													: 'Cast; the provider has not counted it yet'}
-												>{p.rule.changeable ? 'may change' : 'not counted yet'}</span
-											>{/if}
-										<span class="max-w-40 truncate text-right {tone(b.vote)}"
-											>{said(b.vote, p.effect.kind === 'choose' ? p.effect.options : [])}</span
-										>
-									</span>
-								</ListItem>
-							{/each}
-						</List>
-						<LoadMore
-							shown={ballots.current.items.length}
-							total={ballots.current.total}
-							noun="ballots"
-							onmore={(n) => (limit = n)}
-						/>
-					{/if}
-				</div>
+				{:else}
+					<Note mono={false}>Ballots are the members' business; the tally shows the totals.</Note>
+				{/if}
 
 				<Comments proposal={id} member={!!p.me.membership} />
 			</section>
