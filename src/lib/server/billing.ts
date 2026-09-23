@@ -50,12 +50,32 @@ let accountBytes = 1500;
 /** What the last party's topology came to, in bytes; the estimate before one is measured. */
 let topologyBytes = 1600;
 
-/** The ledger's figures for an account: credited and charged, or nothing yet. */
+/**
+ * What a write in flight will make the ledger say. A charge leaves `pending` the moment its
+ * write is submitted and is counted here until the ledger's copy shows it, so it is never
+ * counted twice (once in the copy, once still pending) nor not at all.
+ */
+const expected = new Map<Account, { credited: number; charged: number }>();
+
+/** The figures for an account: the ledger's, or what a write in flight will make them. */
 const figures = (a: Account): { credited: number; charged: number; exists: boolean } => {
 	const { kind, key } = split(a);
 	const row = kind === 'dao' ? ledger.meters.get(key) : ledger.purses.get(key);
-	return { credited: row?.credited ?? 0, charged: row?.charged ?? 0, exists: !!row };
+	const ahead = expected.get(a);
+	if (ahead && row && row.charged >= ahead.charged && row.credited >= ahead.credited) {
+		expected.delete(a); // the copy has caught up
+	}
+	return {
+		credited: Math.max(row?.credited ?? 0, expected.get(a)?.credited ?? 0),
+		charged: Math.max(row?.charged ?? 0, expected.get(a)?.charged ?? 0),
+		exists: !!row || !!expected.get(a)
+	};
 };
+
+/** Puts a write in flight: the amounts count as the ledger's from now, the charge is no longer pending. */
+function ahead(a: Account, credited: number, charged: number) {
+	expected.set(a, { credited, charged });
+}
 
 /** What an account can still spend: paid in, less charged, less what is not written yet. */
 export const balance = (a: Account): number => {
@@ -101,9 +121,10 @@ export type Statement = {
 export async function statement(a: Account): Promise<Statement> {
 	const { kind, key } = split(a);
 	const row = kind === 'dao' ? ledger.meters.get(key) : ledger.purses.get(key);
+	const f = figures(a);
 	const { usdPerMb, usdPerCoin } = await splice.prices();
-	const credited = row ? row.credited : (deposited.get(a) ?? 0);
-	const charged = (row?.charged ?? 0) + (pending.get(a) ?? 0);
+	const credited = f.exists ? f.credited : (deposited.get(a) ?? 0);
+	const charged = f.charged + (pending.get(a) ?? 0);
 	return {
 		payTo: providerParty(),
 		memo: deposits.memoFor(a),
@@ -198,11 +219,17 @@ export async function flush(): Promise<void> {
 				continue;
 			}
 			const f = figures(a);
+			// The charge moves from pending to the figures as the write goes out, not as it lands.
+			pending.set(a, (pending.get(a) ?? 0) - coin);
+			ahead(a, f.credited, f.charged + coin);
+			notify(a);
 			try {
 				await write(a, f.credited, f.charged + coin);
-				pending.set(a, (pending.get(a) ?? 0) - coin);
 				dirty.delete(a);
 			} catch (e) {
+				pending.set(a, (pending.get(a) ?? 0) + coin);
+				expected.delete(a);
+				notify(a);
 				console.warn(`${a} not written:`, e instanceof Error ? e.message : e);
 			}
 		}
@@ -317,12 +344,17 @@ export async function watchDeposits(): Promise<void> {
 		for (const [a, total] of deposited) {
 			const f = figures(a);
 			if (!f.exists || f.credited >= total) continue;
+			const coin = pending.get(a) ?? 0;
+			pending.delete(a);
+			ahead(a, total, f.charged + coin);
+			notify(a);
 			try {
-				await write(a, total, f.charged + (pending.get(a) ?? 0));
-				pending.delete(a);
+				await write(a, total, f.charged + coin);
 				dirty.delete(a);
-				notify(a);
 			} catch (e) {
+				pending.set(a, (pending.get(a) ?? 0) + coin);
+				expected.delete(a);
+				notify(a);
 				console.warn(`Deposit to ${a} not credited yet:`, e instanceof Error ? e.message : e);
 			}
 		}
