@@ -81,7 +81,6 @@
 						balance={null}
 						actorPays={dao.actorPays}
 						share={null}
-						equal={dao.equal}
 						role={dao.creator === who.party ? 'creator' : null}
 					/>
 				{/each}

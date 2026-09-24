@@ -100,7 +100,6 @@
 						balance={dao.balance}
 						actorPays={dao.actorPays}
 						share={dao.units > 0 ? Math.round((dao.myShare / dao.units) * 1000) / 10 : 0}
-						equal={dao.equal}
 						isPublic={!!dao.public}
 						awaiting={dao.awaiting}
 						role={dao.creator === who.party ? 'creator' : 'member'}

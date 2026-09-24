@@ -11,7 +11,6 @@
 		balance = null,
 		actorPays = false,
 		share = null,
-		equal = false,
 		isPublic = null,
 		awaiting = null
 	}: {
@@ -29,7 +28,6 @@
 		actorPays?: boolean;
 		/** The viewer's share of the vote, in percent. */
 		share?: number | null;
-		equal?: boolean;
 		/** Whether anyone signed in may read it; null where the list already says so. */
 		isPublic?: boolean | null;
 		/** Open proposals still waiting on the viewer's vote; null for a DAO they only read. */
@@ -114,7 +112,7 @@
 				<div class="mt-0.5 font-mono text-xs tracking-[0.14em] text-ink-dim uppercase">Balance</div>
 			</div>
 		{/if}
-		{#if share !== null && !equal}
+		{#if share !== null}
 			<div>
 				<div class="font-mono text-[15px] font-bold">{share}%</div>
 				<div class="mt-0.5 font-mono text-xs tracking-[0.14em] text-ink-dim uppercase">
