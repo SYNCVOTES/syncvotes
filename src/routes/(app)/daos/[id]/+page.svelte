@@ -41,6 +41,9 @@
 
 	// The proposal list is paged and filtered on the server; more pages append below.
 	let status = $state<'open' | 'closed' | 'unvoted' | undefined>(undefined);
+	/** Every vote cast: for and against, abstaining, and for each option of a choice. */
+	const castOf = (p: { yes: number; no: number; abstain: number; tallies: number[] }) =>
+		p.yes + p.no + p.abstain + p.tallies.reduce((s, t) => s + t, 0);
 	let limit = $state(20);
 	let q = $state('');
 	const proposals = $derived(me ? remote.daoProposals({ id, offset: 0, limit, status, q }) : null);
@@ -225,10 +228,11 @@
 									<div class="mt-2 flex flex-wrap items-center gap-1.5">
 										<span class={tag}><EffectLabel effect={p.effect} equal={d.equal} /></span>
 										<span class={tag}>{categoryOf(p.effect.kind)}</span>
+										{@const cast = p.yes + p.no + p.abstain + p.tallies.reduce((s, t) => s + t, 0)}
 										<span class={tag}
-											>{p.yes + p.no + p.abstain === 0
+											>{castOf(p) === 0
 												? 'no votes yet'
-												: `${pct(p.yes + p.no + p.abstain, p.eligible)}% voted`}</span
+												: `${pct(castOf(p), p.eligible)}% voted`}</span
 										>
 										{#if !p.outcome}<span class={tag}>closes {relative(p.closesAt)}</span>{/if}
 									</div>
