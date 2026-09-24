@@ -278,19 +278,6 @@ export async function allocateParty(
 
 export type Signature = { fingerprint: string; signature: string };
 
-/** A party owned by several keys, from hand-built topology transactions signed by its owners. */
-export async function allocateMultiKeyParty(
-	transactions: string[],
-	signatures: Signature[]
-): Promise<void> {
-	await api('/v2/parties/external/allocate', {
-		synchronizer: await synchronizerId(),
-		identityProviderId: '',
-		onboardingTransactions: transactions.map((transaction) => ({ transaction })),
-		multiHashSignatures: signatures.map(wire)
-	});
-}
-
 /**
  * The parties this participant hosts, by the fingerprint in their namespace. The participant
  * lists every party the network knows — 1.35 million on MainNet in September 2026, a page of
@@ -370,15 +357,6 @@ async function hostedParties(): Promise<Map<string, string>> {
 export async function partyByFingerprint(fingerprint: string): Promise<string | null> {
 	return (await hostedParties()).get(fingerprint) ?? null;
 }
-
-/** Whether the synchronizer knows this party yet. */
-export const partyKnown = (party: string): Promise<boolean> =>
-	api<{ connectedSynchronizers?: unknown[] }>(
-		`/v2/state/connected-synchronizers?party=${encodeURIComponent(party)}`
-	).then(
-		(r) => (r.connectedSynchronizers?.length ?? 0) > 0,
-		() => false
-	);
 
 const wire = ({ fingerprint, signature }: Signature) => ({
 	format: 'SIGNATURE_FORMAT_CONCAT',

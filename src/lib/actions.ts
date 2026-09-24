@@ -19,11 +19,6 @@ export type Prepared = {
 };
 /** What a signed write is expected to do, minus the party, which is always the signer's. */
 export type Intent = Omit<Expected, 'party'>;
-export type Progress = (done: number, total: number) => void;
-
-/** The parties and prices the browser checks against; asked once. */
-let config: Promise<Awaited<ReturnType<typeof remote.config>>> | undefined;
-export const configuration = () => (config ??= remote.config());
 
 /** Whether the ledger already knows this key. */
 export const lookup = (s: Signer): Promise<Lookup> => remote.lookup(toBase64(s.publicKey));
@@ -110,37 +105,4 @@ export async function vote(
 		args: { proposalId, closesAt, changeable, vote, previous }
 	};
 	await sign(s, who, intent, prepared);
-}
-
-// ---- Comments -----------------------------------------------------------------------------
-
-/** A comment, from the member's own contract; the page hands back what the server prepared. */
-export async function comment(
-	s: Signer,
-	who: Identity,
-	prepared: Prepared & { cid: string; membership: string; proposalId: string; body: string }
-) {
-	const { cid, membership, proposalId, body, ...tx } = prepared;
-	const intent = {
-		choice: 'Member_Comment',
-		contractId: membership,
-		args: { proposalId, cid, body }
-	};
-	await sign(s, who, intent, tx);
-}
-
-// ---- Profile ------------------------------------------------------------------------------
-
-export async function setProfile(
-	s: Signer,
-	who: Identity,
-	prepared: Prepared & { name: string; avatar: string | null; bio: string; previous: string | null }
-) {
-	const { name, avatar, bio, previous, ...tx } = prepared;
-	const intent = {
-		choice: 'Account_SetProfile',
-		contractId: who.account,
-		args: { name, avatar, bio, previous }
-	};
-	await sign(s, who, intent, tx);
 }

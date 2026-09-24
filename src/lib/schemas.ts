@@ -54,14 +54,6 @@ export const BATCH = 200;
 /** The most parties one share change may touch. */
 export const MAX_CHANGES = 2000;
 
-/** Party ids as a chips field submits them: separated by whitespace, in the order typed. */
-export const partyList = (max = BATCH) =>
-	v.pipe(
-		v.optional(v.string(), ''),
-		v.transform((s) => [...new Set(s.split(/\s+/).filter((t) => t.includes('::')))]),
-		v.maxLength(max, `At most ${max} parties at once`)
-	);
-
 /**
  * A share change as the editor submits it: one `party=units` per line, units a whole number,
  * zero to leave. The ledger checks the same.
@@ -229,13 +221,6 @@ export const validOptions = (options: string[]): boolean =>
 	options.every((o) => o.length <= 80) &&
 	new Set(options).size === options.length;
 const OPTIONS = 'Two to ten distinct options, eighty characters each at most';
-
-export const coinAmount = v.pipe(
-	v.number('An amount of coin'),
-	v.minValue(0.0001, 'More than zero'),
-	v.maxValue(1e9, 'Too much'),
-	v.check((n) => Math.round(n * 10_000) === n * 10_000, 'At most four decimals')
-);
 
 export const createProposalForm = v.pipe(
 	v.object({
