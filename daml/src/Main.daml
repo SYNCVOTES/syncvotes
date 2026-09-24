@@ -106,6 +106,9 @@ data Rule = Rule with
     quorum : Int
     early : Bool
     changeable : Bool
+    -- A secret ballot: the app shows nobody a vote but their own (the provider, which counts,
+    -- sees them regardless). Absent on rules made before there was such a thing.
+    secret : Optional Bool
   deriving (Eq, Show)
 
 validRule : Rule -> Bool
@@ -200,7 +203,7 @@ template Account
             provider; operator; creator = user; daoId = id; proposer = user; id = id <> "-founding"
             title = "Founding members"; description = ""
             action = SetShares with changes = more
-            rule = Rule OfAll Majority 0 True False
+            rule = Rule OfAll Majority 0 True False None
             eligible = sum (map snd shares); createdAt = now; closesAt = now
             yes = 0; no = 0; abstain = 0; tallies = []; outcome = Some Passed; executed = 0
             executedAt = None; secret = None; picked = None
@@ -418,7 +421,9 @@ template Member
           tallies = case action of
             Choose options _ -> map (const 0) options
             _ -> []
-          secret
+          -- The rule says whether the ballot is secret; a proposal made by an older page may
+          -- still say so on its own.
+          secret = if isSome rule.secret then rule.secret else if sensitive then None else secret
           picked = case action of
             Choose _ (Some True) -> Some 0
             _ -> None

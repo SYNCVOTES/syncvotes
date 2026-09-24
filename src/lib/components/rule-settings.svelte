@@ -24,8 +24,22 @@
 		settings = $bindable(),
 		prefix,
 		eligible = 0,
-		equal = false
-	}: { settings: Settings; prefix: string; eligible?: number; equal?: boolean } = $props();
+		equal = false,
+		part = 'passing',
+		extra
+	}: {
+		settings: Settings;
+		prefix: string;
+		eligible?: number;
+		equal?: boolean;
+		/**
+		 * `passing`: what it takes and for how long (and the form's fields, all of them);
+		 * `ballot`: how members vote, secret or not, changeable or not. Both bind the same settings.
+		 */
+		part?: 'passing' | 'ballot';
+		/** More ballot rows, such as picking several options on a choice. */
+		extra?: import('svelte').Snippet;
+	} = $props();
 
 	const arithmetic = (r: Rule) => ({ ...r, early: true, changeable: false });
 	const rule = $derived(settings.rule);
@@ -71,7 +85,9 @@
 		early:
 			'The proposal settles the moment its outcome can no longer change: yes has enough even if everyone still silent said no, or yes can no longer reach enough even if they all said yes. Otherwise it waits for the deadline.',
 		changeable:
-			'A voter may replace their ballot any number of times until the deadline. Because a vote may still change, ballots are counted only at the deadline, and nothing settles early. The two switches exclude each other.',
+			'A voter may replace their ballot any number of times until the deadline. Because a vote may still change, ballots are counted only at the deadline, and nothing settles early: turning this on turns settling early off.',
+		secret:
+			'Members see the totals, not who voted how; each sees their own vote. The ballots are signed and on the ledger all the same, and the app, which counts them, sees them.',
 		days: 'How long a vote is open from the moment the proposal is signed, in days: 1 to 90.'
 	};
 	const row = 'grid items-center gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]';
@@ -80,202 +96,222 @@
 	const select = 'block w-full border border-border bg-surface px-3 py-2 text-sm';
 </script>
 
-<input type="hidden" name="{prefix}Basis" value={rule.basis} />
-<input type="hidden" name="{prefix}Threshold" value={rule.threshold.kind} />
-<input type="hidden" name="n:{prefix}Percent" value={percent} />
-<input type="hidden" name="n:{prefix}Num" value={num} />
-<input type="hidden" name="n:{prefix}Den" value={den} />
-<input type="hidden" name="n:{prefix}Quorum" value={rule.quorum} />
-<input type="hidden" name="{prefix}Early" value={rule.early ? 'yes' : 'no'} />
-<input type="hidden" name="{prefix}Changeable" value={rule.changeable ? 'yes' : 'no'} />
-<input type="hidden" name="n:{prefix}Days" value={settings.votingDays} />
+{#if part === 'ballot'}
+	<div class="divide-y divide-border border border-border">
+		<div class="{row} px-4 py-3">
+			<span class={label}>Secret ballot <Hint text={help.secret} /></span>
+			<label class="flex items-center gap-2 text-sm">
+				<input
+					type="checkbox"
+					class="accent-orange"
+					aria-label="{prefix} secret ballot"
+					checked={!!rule.secret}
+					onchange={(e) => set({ secret: (e.currentTarget as HTMLInputElement).checked })}
+				/>
+				<span class="text-ink-mid">nobody is shown who voted how</span>
+			</label>
+		</div>
+		<div class="{row} px-4 py-3">
+			<span class={label}>Votes may change <Hint text={help.changeable} /></span>
+			<label class="flex items-center gap-2 text-sm">
+				<input
+					type="checkbox"
+					class="accent-orange"
+					aria-label="{prefix} votes may change"
+					checked={rule.changeable}
+					onchange={(e) => {
+						const on = (e.currentTarget as HTMLInputElement).checked;
+						set({ changeable: on, early: on ? false : rule.early });
+					}}
+				/>
+				<span class="text-ink-mid">until the deadline; counted only then</span>
+			</label>
+		</div>
+		{@render extra?.()}
+	</div>
+{:else}
+	<input type="hidden" name="{prefix}Basis" value={rule.basis} />
+	<input type="hidden" name="{prefix}Threshold" value={rule.threshold.kind} />
+	<input type="hidden" name="n:{prefix}Percent" value={percent} />
+	<input type="hidden" name="n:{prefix}Num" value={num} />
+	<input type="hidden" name="n:{prefix}Den" value={den} />
+	<input type="hidden" name="n:{prefix}Quorum" value={rule.quorum} />
+	<input type="hidden" name="{prefix}Early" value={rule.early ? 'yes' : 'no'} />
+	<input type="hidden" name="{prefix}Changeable" value={rule.changeable ? 'yes' : 'no'} />
+	<input type="hidden" name="{prefix}Secret" value={rule.secret ? 'yes' : 'no'} />
+	<input type="hidden" name="n:{prefix}Days" value={settings.votingDays} />
 
-<div class="divide-y divide-border border border-border">
-	<div class="{row} px-4 py-3">
-		<span class={label}>Preset <Hint text={help.preset} /></span>
-		<select
-			class={select}
-			value={preset}
-			aria-label="{prefix} preset"
-			onchange={(e) => pick((e.currentTarget as HTMLSelectElement).value as Preset)}
-		>
-			{#each PRESETS as p (p.value)}<option value={p.value}>{p.title}</option>{/each}
-		</select>
-	</div>
-	<div class="{row} px-4 py-3">
-		<span class={label}>Yes measured against <Hint text={help.basis} /></span>
-		<select
-			class={select}
-			value={rule.basis}
-			onchange={(e) =>
-				set({ basis: (e.currentTarget as HTMLSelectElement).value as Rule['basis'] })}
-		>
-			<option value="all">the whole vote</option>
-			<option value="cast">the votes cast</option>
-		</select>
-	</div>
-	<div class="{row} px-4 py-3">
-		<span class={label}>It takes <Hint text={help.threshold} /></span>
-		<div class="flex items-center gap-2">
+	<div class="divide-y divide-border border border-border">
+		<div class="{row} px-4 py-3">
+			<span class={label}>Preset <Hint text={help.preset} /></span>
 			<select
 				class={select}
-				value={rule.threshold.kind}
-				onchange={(e) => {
-					const kind = (e.currentTarget as HTMLSelectElement).value;
-					set({
-						threshold:
-							kind === 'percent'
-								? { kind: 'percent', percent }
-								: kind === 'fraction'
-									? { kind: 'fraction', num, den }
-									: { kind: 'majority' }
-					});
-				}}
+				value={preset}
+				aria-label="{prefix} preset"
+				onchange={(e) => pick((e.currentTarget as HTMLSelectElement).value as Preset)}
 			>
-				<option value="majority">more than half</option>
-				<option value="fraction">at least a fraction of it (two thirds…)</option>
-				<option value="percent">at least a percentage</option>
+				{#each PRESETS as p (p.value)}<option value={p.value}>{p.title}</option>{/each}
 			</select>
-			{#if rule.threshold.kind === 'percent'}
+		</div>
+		<div class="{row} px-4 py-3">
+			<span class={label}>Yes measured against <Hint text={help.basis} /></span>
+			<select
+				class={select}
+				value={rule.basis}
+				onchange={(e) =>
+					set({ basis: (e.currentTarget as HTMLSelectElement).value as Rule['basis'] })}
+			>
+				<option value="all">the whole vote</option>
+				<option value="cast">the votes cast</option>
+			</select>
+		</div>
+		<div class="{row} px-4 py-3">
+			<span class={label}>It takes <Hint text={help.threshold} /></span>
+			<div class="flex items-center gap-2">
+				<select
+					class={select}
+					value={rule.threshold.kind}
+					onchange={(e) => {
+						const kind = (e.currentTarget as HTMLSelectElement).value;
+						set({
+							threshold:
+								kind === 'percent'
+									? { kind: 'percent', percent }
+									: kind === 'fraction'
+										? { kind: 'fraction', num, den }
+										: { kind: 'majority' }
+						});
+					}}
+				>
+					<option value="majority">more than half</option>
+					<option value="fraction">at least a fraction of it (two thirds…)</option>
+					<option value="percent">at least a percentage</option>
+				</select>
+				{#if rule.threshold.kind === 'percent'}
+					<Input
+						type="number"
+						min={1}
+						max={100}
+						class="w-24 text-right"
+						aria-label="Percent of yes"
+						value={rule.threshold.percent}
+						oninput={(e) =>
+							set({
+								threshold: {
+									kind: 'percent',
+									percent: Number((e.currentTarget as HTMLInputElement).value)
+								}
+							})}
+					/>
+					<span class="font-mono text-xs text-ink-dim">%</span>
+				{:else if rule.threshold.kind === 'fraction'}
+					<Input
+						type="number"
+						min={1}
+						max={100}
+						class="w-16 text-right"
+						aria-label="Fraction, numerator"
+						value={rule.threshold.num}
+						oninput={(e) =>
+							set({
+								threshold: {
+									kind: 'fraction',
+									num: Number((e.currentTarget as HTMLInputElement).value) || 1,
+									den
+								}
+							})}
+					/>
+					<span class="font-mono text-xs text-ink-dim">/</span>
+					<Input
+						type="number"
+						min={1}
+						max={100}
+						class="w-16 text-right"
+						aria-label="Fraction, denominator"
+						value={rule.threshold.den}
+						oninput={(e) =>
+							set({
+								threshold: {
+									kind: 'fraction',
+									num,
+									den: Number((e.currentTarget as HTMLInputElement).value) || 1
+								}
+							})}
+					/>
+				{/if}
+			</div>
+		</div>
+		<div class="{row} px-4 py-3">
+			<span class={label}>Quorum <Hint text={help.quorum} /></span>
+			<div class="flex items-center gap-2">
 				<Input
 					type="number"
-					min={1}
+					min={0}
 					max={100}
 					class="w-24 text-right"
-					aria-label="Percent of yes"
-					value={rule.threshold.percent}
+					aria-label="Quorum"
+					value={rule.quorum}
 					oninput={(e) =>
 						set({
-							threshold: {
-								kind: 'percent',
-								percent: Number((e.currentTarget as HTMLInputElement).value)
-							}
+							quorum: Math.max(
+								0,
+								Math.min(100, Number((e.currentTarget as HTMLInputElement).value) || 0)
+							)
 						})}
 				/>
-				<span class="font-mono text-xs text-ink-dim">%</span>
-			{:else if rule.threshold.kind === 'fraction'}
+				<span class="font-mono text-xs text-ink-dim">% of the vote must take part; 0 for none</span>
+			</div>
+		</div>
+		<div class="{row} px-4 py-3">
+			<span class={label}>Settle early <Hint text={help.early} /></span>
+			<label class="flex items-center gap-2 text-sm">
+				<input
+					type="checkbox"
+					class="accent-orange"
+					aria-label="{prefix} settle early"
+					checked={rule.early}
+					onchange={(e) => {
+						const on = (e.currentTarget as HTMLInputElement).checked;
+						set({ early: on, changeable: on ? false : rule.changeable });
+					}}
+				/>
+				<span class="text-ink-mid">the moment the outcome can no longer change</span>
+			</label>
+		</div>
+		<div class="{row} px-4 py-3">
+			<span class={label}>Voting period <Hint text={help.days} /></span>
+			<div class="flex items-center gap-2">
 				<Input
 					type="number"
 					min={1}
-					max={100}
-					class="w-16 text-right"
-					aria-label="Fraction, numerator"
-					value={rule.threshold.num}
+					max={90}
+					class="w-24 text-right"
+					aria-label="{prefix} voting days"
+					value={settings.votingDays}
 					oninput={(e) =>
-						set({
-							threshold: {
-								kind: 'fraction',
-								num: Number((e.currentTarget as HTMLInputElement).value) || 1,
-								den
-							}
+						(settings = {
+							...settings,
+							votingDays: Math.max(
+								1,
+								Math.min(90, Number((e.currentTarget as HTMLInputElement).value) || 1)
+							)
 						})}
 				/>
-				<span class="font-mono text-xs text-ink-dim">/</span>
-				<Input
-					type="number"
-					min={1}
-					max={100}
-					class="w-16 text-right"
-					aria-label="Fraction, denominator"
-					value={rule.threshold.den}
-					oninput={(e) =>
-						set({
-							threshold: {
-								kind: 'fraction',
-								num,
-								den: Number((e.currentTarget as HTMLInputElement).value) || 1
-							}
-						})}
-				/>
-			{/if}
+				<span class="font-mono text-xs text-ink-dim">days</span>
+			</div>
 		</div>
+		{#if rule.threshold.kind === 'fraction' && rule.threshold.num > rule.threshold.den}
+			<p class="px-4 py-3 font-mono text-xs text-red">
+				A fraction is at most one: the top number no more than the bottom.
+			</p>
+		{:else}
+			<p class="px-4 py-3 font-mono text-xs text-ink">
+				Passes when {describe(rule)}; {rule.early
+					? 'settles early once sure'
+					: rule.changeable
+						? 'votes may change, decided at the deadline'
+						: 'decided at the deadline'}. {here}
+			</p>
+		{/if}
 	</div>
-	<div class="{row} px-4 py-3">
-		<span class={label}>Quorum <Hint text={help.quorum} /></span>
-		<div class="flex items-center gap-2">
-			<Input
-				type="number"
-				min={0}
-				max={100}
-				class="w-24 text-right"
-				aria-label="Quorum"
-				value={rule.quorum}
-				oninput={(e) =>
-					set({
-						quorum: Math.max(
-							0,
-							Math.min(100, Number((e.currentTarget as HTMLInputElement).value) || 0)
-						)
-					})}
-			/>
-			<span class="font-mono text-xs text-ink-dim">% of the vote must take part; 0 for none</span>
-		</div>
-	</div>
-	<div class="{row} px-4 py-3">
-		<span class={label}>Settle early <Hint text={help.early} /></span>
-		<label class="flex items-center gap-2 text-sm">
-			<input
-				type="checkbox"
-				class="accent-orange"
-				aria-label="{prefix} settle early"
-				checked={rule.early}
-				onchange={(e) => {
-					const on = (e.currentTarget as HTMLInputElement).checked;
-					set({ early: on, changeable: on ? false : rule.changeable });
-				}}
-			/>
-			<span class="text-ink-mid">the moment the outcome can no longer change</span>
-		</label>
-	</div>
-	<div class="{row} px-4 py-3">
-		<span class={label}>Votes may change <Hint text={help.changeable} /></span>
-		<label class="flex items-center gap-2 text-sm">
-			<input
-				type="checkbox"
-				class="accent-orange"
-				aria-label="{prefix} votes may change"
-				checked={rule.changeable}
-				onchange={(e) => {
-					const on = (e.currentTarget as HTMLInputElement).checked;
-					set({ changeable: on, early: on ? false : rule.early });
-				}}
-			/>
-			<span class="text-ink-mid">until the deadline; counted only then</span>
-		</label>
-	</div>
-	<div class="{row} px-4 py-3">
-		<span class={label}>Voting period <Hint text={help.days} /></span>
-		<div class="flex items-center gap-2">
-			<Input
-				type="number"
-				min={1}
-				max={90}
-				class="w-24 text-right"
-				aria-label="{prefix} voting days"
-				value={settings.votingDays}
-				oninput={(e) =>
-					(settings = {
-						...settings,
-						votingDays: Math.max(
-							1,
-							Math.min(90, Number((e.currentTarget as HTMLInputElement).value) || 1)
-						)
-					})}
-			/>
-			<span class="font-mono text-xs text-ink-dim">days</span>
-		</div>
-	</div>
-	{#if rule.threshold.kind === 'fraction' && rule.threshold.num > rule.threshold.den}
-		<p class="px-4 py-3 font-mono text-xs text-red">
-			A fraction is at most one: the top number no more than the bottom.
-		</p>
-	{:else}
-		<p class="px-4 py-3 font-mono text-xs text-ink">
-			Passes when {describe(rule)}; {rule.early
-				? 'settles early once sure'
-				: rule.changeable
-					? 'votes may change, decided at the deadline'
-					: 'decided at the deadline'}. {here}
-		</p>
-	{/if}
-</div>
+{/if}

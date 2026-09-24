@@ -85,9 +85,9 @@
 		},
 		{
 			value: 'settings',
-			title: 'Rule',
-			text: 'What a change to the DAO takes to pass, and for how long the vote is open.',
-			more: "Changes the DAO's rule: what anything that changes the DAO — members, name, this rule, visibility, dissolution — takes to pass, and how long its vote is open. This proposal is itself such a change, so it passes under the rule as it stands today.",
+			title: 'Voting rules',
+			text: 'How the DAO votes on changes to itself.',
+			more: "Changes the DAO's voting rules: for anything that changes the DAO — members, name, these rules, visibility, dissolution — whether the ballot is secret, whether votes may change, what it takes to pass and how long the vote is open. This proposal is itself such a change, so it passes under the rules as they stand today.",
 			icon: Scale
 		},
 		{
@@ -117,8 +117,6 @@
 	// A choice's options: two to start with, ten at most; whether a member picks several.
 	let options = $state<string[]>(['', '']);
 	let several = $state(false);
-	// A secret ballot: the app shows nobody who voted how.
-	let secret = $state(false);
 	const optionList = $derived(options.map((o) => o.trim()).filter(Boolean));
 
 	// What is there today, to start from.
@@ -178,6 +176,7 @@
 		[`n:${prefix}Quorum`, s.rule.quorum],
 		[`${prefix}Early`, s.rule.early ? 'yes' : 'no'],
 		[`${prefix}Changeable`, s.rule.changeable ? 'yes' : 'no'],
+		[`${prefix}Secret`, s.rule.secret ? 'yes' : 'no'],
 		[`n:${prefix}Days`, s.votingDays]
 	];
 
@@ -252,7 +251,7 @@
 			case 'dissolve':
 				return 'The DAO is archived the moment this passes: nothing more can be proposed or voted on, what was paid in for it is spent, and its record stays readable.';
 			case 'settings':
-				return `From then on, anything that changes the DAO passes when ${describe(newSensitive.rule)}, open ${newSensitive.votingDays} days.`;
+				return `From then on, a change to the DAO is voted on by ${newSensitive.rule.secret ? 'secret' : 'open'} ballot, votes ${newSensitive.rule.changeable ? 'may change until the deadline' : 'final once cast'}, and passes when ${describe(newSensitive.rule)}, open ${newSensitive.votingDays} days.`;
 			default:
 				return 'The decision is recorded on the ledger. Nothing else changes.';
 		}
@@ -341,7 +340,7 @@
 					title: fields.title,
 					description: fields.description,
 					action,
-					secret: fields.secret === 'yes' ? true : null,
+					secret: null,
 					rule: own ? settingsToLedger(settingsOf(fields, 'newRoutine')).rule : null,
 					votingDays: own ? settingsToLedger(settingsOf(fields, 'newRoutine')).votingDays : null
 				}
@@ -364,7 +363,8 @@
 							: { kind: 'majority' },
 				quorum: Number(at('Quorum')),
 				early: at('Early') === 'yes',
-				changeable: at('Changeable') === 'yes'
+				changeable: at('Changeable') === 'yes',
+				secret: at('Secret') === 'yes'
 			},
 			votingDays: Number(at('Days'))
 		};
@@ -412,10 +412,9 @@
 			<input type="hidden" name="title" value={title.trim() || suggested} />
 			<input type="hidden" name="options" value={optionList.join('\n')} />
 			<input type="hidden" name="several" value={several ? 'yes' : 'no'} />
-			<input type="hidden" name="secret" value={secret ? 'yes' : 'no'} />
 			<input type="hidden" name="newPublic" value={d.public ? 'no' : 'yes'} />
 
-			<FormSection title="What happens when it passes">
+			<FormSection title="What it does">
 				<div class="grid gap-3 sm:grid-cols-2">
 					{#each kinds as k (k.value)}
 						{@const Icon = k.icon}
@@ -440,7 +439,35 @@
 						</label>
 					{/each}
 				</div>
+			</FormSection>
 
+			<FormSection title="The proposal">
+				<Field
+					label="Title"
+					id="title"
+					hint={suggested && !title.trim() ? `Left empty, it will be “${suggested}”.` : undefined}
+					issues={f.fields.title.issues()}
+				>
+					<Input
+						id="title"
+						placeholder={suggested || 'Adopt the Q4 budget'}
+						maxlength={120}
+						bind:value={title}
+					/>
+				</Field>
+				<Field label="Description" id="description" issues={f.fields.description.issues()}>
+					<MarkdownEditor
+						name="description"
+						id="description"
+						bind:value={description}
+						maxlength={20_000}
+						placeholder="What is being decided, and why. Markdown; pictures by link."
+						disabled={store.busy}
+					/>
+				</Field>
+			</FormSection>
+
+			<FormSection title="If it passes">
 				{#if kind === 'shares'}
 					<Field
 						label={d.equal ? 'The members after' : 'The table after'}
@@ -469,7 +496,7 @@
 					<Field
 						label="Options"
 						id="option-0"
-						hint="Two to ten, a few words each. Members pick one, or any number with the switch below; an abstention takes part without picking."
+						hint="Two to ten, a few words each. Members pick one, or several if the ballot allows it; an abstention takes part without picking."
 						issues={f.fields.options.issues()}
 					>
 						<ol class="space-y-2">
@@ -504,17 +531,6 @@
 								onclick={() => (options = [...options, ''])}>Add an option</button
 							>
 						{/if}
-						<label class="mt-4 flex cursor-pointer items-start gap-3 text-[13px]">
-							<input type="checkbox" class="mt-0.5 accent-orange" bind:checked={several} />
-							<span>
-								<span class="text-ink">Members may pick several options</span>
-								<span class="block text-ink-dim"
-									>Each option is measured on its own against the rule; every one that reaches it is
-									chosen. Where the rule counts the votes cast, an option is measured against the
-									ballots that picked anything.</span
-								>
-							</span>
-						</label>
 					</Field>
 				{:else if kind === 'info'}
 					<Field label="Name" id="newName" issues={f.fields.newName.issues()}>
@@ -542,6 +558,15 @@
 					{#each hidden('newRoutine', newRoutine) as [name, value] (name)}
 						<input type="hidden" {name} {value} />
 					{/each}
+					<h3 class="eyebrow">Ballot</h3>
+					<RuleSettings
+						bind:settings={newSensitive}
+						prefix="newSensitive"
+						part="ballot"
+						eligible={d.units}
+						equal={d.equal}
+					/>
+					<h3 class="eyebrow">How it passes</h3>
 					<RuleSettings
 						bind:settings={newSensitive}
 						prefix="newSensitive"
@@ -550,22 +575,61 @@
 					/>
 				{/if}
 
-				<Note mono={false}>
-					<span class="font-mono text-[0.6875rem] tracking-[0.14em] text-ink-dim uppercase"
-						>If it passes</span
+				<Note mono={false}>{outcome}</Note>
+			</FormSection>
+
+			<FormSection title="Ballot">
+				{#if own}
+					<p class="text-sm leading-relaxed text-ink-mid">
+						How members vote on this one. You choose, since a decision or a choice changes nothing
+						on the ledger.
+					</p>
+					<RuleSettings
+						bind:settings={newRoutine}
+						prefix="newRoutine"
+						part="ballot"
+						eligible={d.units}
+						equal={d.equal}
 					>
-					<span class="mt-1 block">{outcome}</span>
-				</Note>
+						{#snippet extra()}
+							{#if kind === 'choose'}
+								<div
+									class="grid items-center gap-3 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"
+								>
+									<span
+										class="flex items-center gap-1.5 font-mono text-xs tracking-[0.14em] text-ink-dim uppercase"
+										>Several options <Hint
+											text="Each member picks any number of options. Each option is measured on its own against the rule below; every one that reaches it is chosen. Where the rule counts the votes cast, an option is measured against the ballots that picked anything."
+										/></span
+									>
+									<label class="flex items-center gap-2 text-sm">
+										<input
+											type="checkbox"
+											class="accent-orange"
+											aria-label="Members may pick several options"
+											bind:checked={several}
+										/>
+										<span class="text-ink-mid">a member may pick more than one</span>
+									</label>
+								</div>
+							{/if}
+						{/snippet}
+					</RuleSettings>
+				{:else if applies}
+					<p class="text-sm leading-relaxed text-ink-mid">
+						Set by the DAO for every change to it: {applies.rule.secret
+							? 'a secret ballot'
+							: 'an open ballot'}, and votes {applies.rule.changeable
+							? 'may change until the deadline'
+							: 'cannot be changed once cast'}.
+					</p>
+				{/if}
 			</FormSection>
 
 			<FormSection title="How it passes">
 				{#if own}
 					<p class="text-sm leading-relaxed text-ink-mid">
-						A decision or a choice changes nothing on the ledger, so you set what it takes to pass
-						and for how long the vote is open.
-						<Hint
-							text="Anything that changes the DAO — members, name, settings, visibility, dissolution — runs under the DAO's own rule, which no proposer chooses. A decision or a choice only records how the DAO voted, so its proposer sets the rule and the period; the DAO's founding default is what this starts from."
-						/>
+						What it takes and for how long, also yours to set; it starts from the DAO's default.
 					</p>
 					<RuleSettings
 						bind:settings={newRoutine}
@@ -575,55 +639,17 @@
 					/>
 				{:else if applies}
 					<p class="text-sm leading-relaxed text-ink-mid">
-						This changes the DAO, so by the DAO's rule it passes when {describe(
+						This changes the DAO, so it runs under the DAO's voting rules: it passes when {describe(
 							applies.rule
 						)}{applies.rule.early
 							? ', settling early once that is sure'
-							: applies.rule.changeable
-								? '; votes may change, decided at the deadline'
-								: ', decided at the deadline'}. The vote is open for {applies.votingDays}
+							: ', decided at the deadline'}. The vote is open for {applies.votingDays}
 						{applies.votingDays === 1 ? 'day' : 'days'} from the moment you sign.
 						<Hint
-							text="The DAO's rule decides this, not the proposer: set at the founding, changed only by a settings proposal that passes under it. A decision or a choice, which changes nothing, runs under a rule its proposer sets."
+							text="Set when the DAO was founded, changed only by a Voting rules proposal that passes under them. No proposer chooses them."
 						/>
 					</p>
 				{/if}
-				<label class="flex cursor-pointer items-start gap-3 text-[13px]">
-					<input type="checkbox" class="mt-0.5 accent-orange" bind:checked={secret} />
-					<span>
-						<span class="text-ink">Secret ballot</span>
-						<span class="block text-ink-dim"
-							>Members see the totals, not who voted how; each sees their own vote. The ballots are
-							signed and on the ledger all the same, and the app, which counts them, sees them.</span
-						>
-					</span>
-				</label>
-			</FormSection>
-
-			<FormSection title="Put it to the vote">
-				<Field
-					label="Title"
-					id="title"
-					hint={suggested && !title.trim() ? `Left empty, it will be “${suggested}”.` : undefined}
-					issues={f.fields.title.issues()}
-				>
-					<Input
-						id="title"
-						placeholder={suggested || 'Adopt the Q4 budget'}
-						maxlength={120}
-						bind:value={title}
-					/>
-				</Field>
-				<Field label="Description" id="description" issues={f.fields.description.issues()}>
-					<MarkdownEditor
-						name="description"
-						id="description"
-						bind:value={description}
-						maxlength={20_000}
-						placeholder="What is being decided, and why. Markdown; pictures by link."
-						disabled={store.busy}
-					/>
-				</Field>
 			</FormSection>
 
 			<p class="font-mono text-xs text-ink-dim">

@@ -69,8 +69,8 @@ thousands of members, and one member's vote touches no contract another's does.
   cast), `SetShares`, `SetInfo`, `SetSettings`, `SetPublic`, `Dissolve`. A rule is yes against
   the whole vote or the votes cast, a majority, a fraction or a percentage, a quorum, whether
   it settles as soon as the outcome cannot change, whether votes may change until the deadline
-  (the last two exclude each other). Nobody cancels a proposal. A proposal may be a `secret`
-  ballot: the app shows nobody a vote but their own; the ballots are on the ledger all the
+  (the last two exclude each other). Nobody cancels a proposal. A rule may make the ballot
+  `secret`: the app shows nobody a vote but their own; the ballots are on the ledger all the
   same, and the provider, which counts them, sees them.
 - `Ballot` — one vote weighing the voter's units. The provider counts in batches
   (`Proposal_Tally`; a final count three minutes after the deadline) and `Ballot_Count` checks

@@ -46,7 +46,7 @@
 			value: 'public',
 			title: 'Public',
 			text: 'Listed for anyone signed in to read; only members act.',
-			more: 'Listed among the public DAOs: anyone signed in to the app can read its proposals, outcomes, members and comments, and pay in to its balance. Only members propose, vote and comment; who voted how stays with the members. Say in the description how one joins. Changed later by a sensitive proposal.'
+			more: 'Listed among the public DAOs: anyone signed in to the app can read its proposals, outcomes, members and comments, and pay in to its balance. Only members propose, vote and comment; who voted how stays with the members. Say in the description how one joins. Changed later by a Visibility proposal.'
 		}
 	] as const;
 	const payers = [
@@ -112,6 +112,7 @@
 		[`n:${prefix}Quorum`, s.rule.quorum],
 		[`${prefix}Early`, s.rule.early ? 'yes' : 'no'],
 		[`${prefix}Changeable`, s.rule.changeable ? 'yes' : 'no'],
+		[`${prefix}Secret`, s.rule.secret ? 'yes' : 'no'],
 		[`n:${prefix}Days`, s.votingDays]
 	];
 
@@ -136,7 +137,8 @@
 									: { kind: 'majority' },
 						quorum: Number(at('Quorum')),
 						early: at('Early') === 'yes',
-						changeable: at('Changeable') === 'yes'
+						changeable: at('Changeable') === 'yes',
+						secret: at('Secret') === 'yes'
 					},
 					votingDays: Number(at('Days'))
 				};
@@ -292,16 +294,25 @@
 				</Note>
 			</FormSection>
 
-			<FormSection title="How the DAO decides about itself">
+			<FormSection title="Voting rules">
 				<p class="text-xs leading-relaxed text-ink-mid">
-					One rule for everything that changes the DAO: its members and shares, its name, this rule,
-					whether it is public, and winding it up. What a vote takes to pass, and how long it is
-					open. Changing it later is itself such a proposal. A decision or a choice changes nothing,
-					so whoever proposes one sets its rule then.
+					How the DAO votes on changes to itself: its members and shares, its name, these rules,
+					whether it is public, and winding it up. Changing them later is itself such a vote. A
+					decision or a choice changes nothing, so whoever proposes one sets its ballot and rule
+					then.
 				</p>
 				{#each hidden('routine', routine) as [name, value] (name)}
 					<input type="hidden" {name} {value} />
 				{/each}
+				<h3 class="eyebrow">Ballot</h3>
+				<RuleSettings
+					bind:settings={sensitive}
+					prefix="sensitive"
+					part="ballot"
+					eligible={summary.units}
+					equal={mode === 'equal'}
+				/>
+				<h3 class="eyebrow">How it passes</h3>
 				<RuleSettings
 					bind:settings={sensitive}
 					prefix="sensitive"

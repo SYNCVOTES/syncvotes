@@ -740,7 +740,8 @@ const settingsOf = (f: Record<string, unknown>, prefix: string): Settings => {
 					: { kind: 'majority' },
 		quorum: Number(field('Quorum')),
 		early: field('Early') === 'yes',
-		changeable: field('Changeable') === 'yes'
+		changeable: field('Changeable') === 'yes',
+		secret: field('Secret') === 'yes'
 	};
 	return { rule, votingDays: Number(field('Days')) };
 };
@@ -830,7 +831,8 @@ export const createProposalForm = form(schemas.createProposalForm, async (f) => 
 		title: f.title,
 		description: f.description,
 		action,
-		secret: f.secret === 'yes' ? true : null,
+		// Secrecy travels in the rule, the proposer's or the DAO's.
+		secret: null,
 		rule: own?.rule ?? null,
 		votingDays: own?.votingDays ?? null
 	};

@@ -40,12 +40,10 @@
 					: `${fractionWords(t.num, t.den)} yes`;
 		return `${need} among those who vote${quorum}`;
 	}
+	const ballot = (s: Settings) =>
+		`${s.rule.secret ? 'Secret' : 'Open'} ballot; votes ${s.rule.changeable ? 'may change until the deadline' : 'final once cast'}`;
 	const timing = (s: Settings) =>
-		s.rule.early
-			? 'settles early once sure'
-			: s.rule.changeable
-				? 'votes may change; decided at the deadline'
-				: 'decided at the deadline';
+		s.rule.early ? 'settles early once sure' : 'decided at the deadline';
 </script>
 
 <dl class="divide-y divide-border border border-border">
@@ -58,7 +56,7 @@
 		</dt>
 		<dd class="text-[13px] leading-relaxed text-ink">
 			{#if !compact}<span class="text-ink-mid">{category.text}</span><br />{/if}
-			Passes when {describe(sensitive.rule)}; {timing(sensitive)}. Open for {sensitive.votingDays}
+			{ballot(sensitive)}. Passes when {describe(sensitive.rule)}; {timing(sensitive)}. Open for {sensitive.votingDays}
 			{sensitive.votingDays === 1 ? 'day' : 'days'}.
 			{#if here(sensitive)}<span class="block font-mono text-xs text-ink-mid"
 					>Here: {here(sensitive)}.</span

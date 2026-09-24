@@ -276,7 +276,7 @@
 				{/if}
 
 				<div>
-					<SectionTitle title="How proposals pass" />
+					<SectionTitle title="Voting rules" />
 					<SettingsSummary sensitive={d.sensitive} eligible={d.units} equal={d.equal} compact />
 				</div>
 

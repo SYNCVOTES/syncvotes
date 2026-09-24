@@ -103,7 +103,7 @@
 		{
 			tag: 'Rules',
 			title: 'Yours, set at the founding',
-			body: 'Anything that changes the DAO passes by the rule the DAO chose — a majority or two thirds, of the whole vote or of votes cast, a quorum, early settlement or changeable votes — for one to ninety days. A decision or a choice runs under a rule its proposer sets.'
+			body: 'Anything that changes the DAO is voted on under rules the DAO chose — an open or secret ballot, votes final or changeable, a majority or two thirds of the whole vote or of votes cast, a quorum, one to ninety days. A decision or a choice runs under rules its proposer sets.'
 		},
 		{
 			tag: 'Live',

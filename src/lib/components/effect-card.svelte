@@ -47,7 +47,7 @@
 			case 'visibility':
 				return 'Visibility';
 			case 'settings':
-				return 'Settings';
+				return 'Voting rules';
 			default:
 				return 'Decision';
 		}

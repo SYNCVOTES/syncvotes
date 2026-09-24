@@ -31,7 +31,7 @@
 			case 'visibility':
 				return effect.public ? 'go public' : 'go private';
 			case 'settings':
-				return 'settings';
+				return 'voting rules';
 			default:
 				return 'decision';
 		}

@@ -121,6 +121,7 @@ const routineFields = {
 	routineQuorum: quorumField,
 	routineEarly: yesNo,
 	routineChangeable: yesNo,
+	routineSecret: v.optional(yesNo, 'no'),
 	routineDays: votingDays
 };
 const sensitiveFields = {
@@ -132,6 +133,7 @@ const sensitiveFields = {
 	sensitiveQuorum: quorumField,
 	sensitiveEarly: yesNo,
 	sensitiveChangeable: yesNo,
+	sensitiveSecret: v.optional(yesNo, 'no'),
 	sensitiveDays: votingDays
 };
 const newRoutineFields = {
@@ -143,6 +145,7 @@ const newRoutineFields = {
 	newRoutineQuorum: quorumField,
 	newRoutineEarly: v.optional(yesNo, 'yes'),
 	newRoutineChangeable: v.optional(yesNo, 'no'),
+	newRoutineSecret: v.optional(yesNo, 'no'),
 	newRoutineDays: v.optional(votingDays, 7)
 };
 const newSensitiveFields = {
@@ -154,6 +157,7 @@ const newSensitiveFields = {
 	newSensitiveQuorum: quorumField,
 	newSensitiveEarly: v.optional(yesNo, 'yes'),
 	newSensitiveChangeable: v.optional(yesNo, 'no'),
+	newSensitiveSecret: v.optional(yesNo, 'no'),
 	newSensitiveDays: v.optional(votingDays, 14)
 };
 const EXCLUSIVE = 'Votes that may change cannot settle early';
@@ -247,8 +251,6 @@ export const createProposalForm = v.pipe(
 		options: v.optional(v.string(), ''),
 		/** A choice where each member picks several options. */
 		several: v.optional(yesNo, 'no'),
-		/** A secret ballot: the app shows nobody who voted how. */
-		secret: v.optional(yesNo, 'no'),
 		/** A visibility proposal: readable by anyone signed in, or members only. */
 		newPublic: v.optional(yesNo, 'no'),
 		// The DAO's next settings, for a proposal that changes them.

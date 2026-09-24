@@ -273,6 +273,7 @@ const rule = (v: unknown): Rule => {
 		quorum: unknown;
 		early: boolean;
 		changeable: boolean;
+		secret?: boolean | null;
 	};
 	return {
 		basis: r.basis === 'OfCast' ? 'cast' : 'all',
@@ -288,7 +289,8 @@ const rule = (v: unknown): Rule => {
 					: { kind: 'majority' },
 		quorum: num(r.quorum),
 		early: r.early === true,
-		changeable: r.changeable === true
+		changeable: r.changeable === true,
+		secret: r.secret === true
 	};
 };
 

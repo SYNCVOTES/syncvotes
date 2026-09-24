@@ -16,6 +16,8 @@ export type Rule = {
 	early: boolean;
 	/** A voter may replace their ballot until the deadline; excludes `early`. */
 	changeable: boolean;
+	/** The app shows nobody a vote but their own. */
+	secret?: boolean;
 };
 
 export type Preset = 'majority' | 'cast' | 'twoThirds' | 'unanimous' | 'custom';
@@ -187,16 +189,16 @@ export const CATEGORIES: { value: Category; title: string; text: string; covers:
 	{
 		value: 'routine',
 		title: 'Decisions and choices',
-		text: 'A decision, yes or no, or a choice among options: the proposer sets the rule.',
+		text: 'A decision, yes or no, or a choice among options: the proposer sets the ballot and the rule.',
 		covers:
 			'A decision the DAO takes, or a choice among options. Nothing on the ledger changes, so whoever proposes it says what it takes to pass and for how long it is open.'
 	},
 	{
 		value: 'sensitive',
-		title: 'The DAO itself',
-		text: 'Members and shares, the name and description, this rule, visibility, dissolution.',
+		title: 'Changes to the DAO',
+		text: 'Members and shares, the name and description, these rules, visibility, dissolution.',
 		covers:
-			'Who is in the DAO and with what share, its name, description and picture, this very rule, whether the DAO is public, and winding it up.'
+			'Who is in the DAO and with what share, its name, description and picture, these very rules, whether the DAO is public, and winding it up.'
 	}
 ];
 
@@ -223,6 +225,7 @@ export type LedgerRule = {
 	quorum: string;
 	early: boolean;
 	changeable: boolean;
+	secret: boolean | null;
 };
 export const toLedger = (r: Rule): LedgerRule => ({
 	basis: r.basis === 'all' ? 'OfAll' : 'OfCast',
@@ -237,5 +240,6 @@ export const toLedger = (r: Rule): LedgerRule => ({
 					},
 	quorum: String(r.quorum),
 	early: r.early,
-	changeable: r.changeable
+	changeable: r.changeable,
+	secret: r.secret ? true : null
 });
