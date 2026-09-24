@@ -150,16 +150,36 @@ export async function deposits(
 	for (const tx of page.transactions) {
 		if (!oldest || tx.recordTime < oldest) oldest = tx.recordTime;
 		for (const e of tx.events) {
-			if (e.label.type !== 'TransferIn') continue;
 			const m = e.label.reason?.match(MEMO);
 			if (!m) continue;
 			const account = m[1] ? (`dao:${m[1]}` as const) : (`purse:${m[2]}` as const);
-			const amount = Number(e.unlockedHoldingsChangeSummary?.amountChange ?? 0);
+			let amount = 0;
+			let from = '';
+			if (e.label.type === 'TransferIn') {
+				amount = Number(e.unlockedHoldingsChangeSummary?.amountChange ?? 0);
+				from = e.label.sender;
+			} else if (e.label.type === 'MergeSplit') {
+				// The provider crediting an account from its own coin: a transfer to itself with
+				// the memo, which the ledger records as a merge; the amount is in the choice.
+				const t = (
+					e.label.tokenStandardChoice?.choiceArgument as {
+						transfer?: { sender?: string; receiver?: string; amount?: string };
+					} | null
+				)?.transfer;
+				if (
+					e.label.tokenStandardChoice?.name === 'TransferFactory_Transfer' &&
+					t?.sender === providerParty() &&
+					t?.receiver === providerParty()
+				) {
+					amount = Number(t.amount ?? 0);
+					from = providerParty();
+				}
+			}
 			if (amount > 0) {
 				found.push({
 					account,
 					amount,
-					from: e.label.sender,
+					from,
 					updateId: tx.updateId,
 					offset: tx.offset,
 					recordTime: tx.recordTime
