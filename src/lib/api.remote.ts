@@ -682,9 +682,6 @@ const prepare = async (
 	return prepared;
 };
 
-/** A share table as the ledger reads it: tuples of party and units, the Int as text. */
-const shareRows = (rows: { party: string; share: number }[]) =>
-	rows.map((r) => ({ _1: r.party, _2: String(r.share) }));
 const nullable = (s: string) => (s === '' ? null : s);
 
 /**
@@ -715,8 +712,8 @@ export const createDaoForm = form(schemas.createDaoForm, async (f) => {
 		equal: equal === 'yes',
 		routine: settingsToLedger(settingsOf(f, 'routine')),
 		sensitive: settingsToLedger(settingsOf(f, 'sensitive')),
-		shares: shareRows(ordered.slice(0, schemas.BATCH)),
-		more: shareRows(ordered.slice(schemas.BATCH)),
+		shares: schemas.shareTuples(ordered.slice(0, schemas.BATCH)),
+		more: schemas.shareTuples(ordered.slice(schemas.BATCH)),
 		actorPays: actorPays === 'yes',
 		public: isPublic
 	};
@@ -797,7 +794,7 @@ export const createProposalForm = form(schemas.createProposalForm, async (f) => 
 				if (had > 0 && r.share === 0) count--;
 			}
 			if (count <= 0 || units <= 0) error(400, 'A DAO keeps at least one member with a share');
-			action = { tag: 'SetShares', value: { changes: shareRows(rows) } };
+			action = { tag: 'SetShares', value: { changes: schemas.shareTuples(rows) } };
 			break;
 		}
 		default:

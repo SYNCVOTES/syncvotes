@@ -4,7 +4,14 @@
 	import * as remote from '$lib/api.remote';
 	import { store } from '$lib/wallet-store.svelte';
 	import { signedForm } from '$lib/forms';
-	import { createProposalForm as schema, shareChanges, validOptions, BATCH } from '$lib/schemas';
+	import {
+		createProposalForm as schema,
+		parseOptions,
+		shareChanges,
+		shareTuples,
+		validOptions,
+		BATCH
+	} from '$lib/schemas';
 	import type { Plain } from '$lib/verify';
 	import { Input } from '$lib/components/ui/input';
 	import Page from '$lib/components/page.svelte';
@@ -273,9 +280,7 @@
 					? {
 							tag: 'SetShares',
 							value: {
-								changes: v
-									.parse(shareChanges, fields.shares)
-									.map((r) => ({ _1: r.party, _2: String(r.share) }))
+								changes: shareTuples(v.parse(shareChanges, fields.shares))
 							}
 						}
 					: fields.kind === 'info'
@@ -291,10 +296,7 @@
 							? {
 									tag: 'Choose',
 									value: {
-										options: fields.options
-											.split('\n')
-											.map((o) => o.trim())
-											.filter(Boolean),
+										options: parseOptions(fields.options),
 										several: fields.several === 'yes' ? true : null
 									}
 								}

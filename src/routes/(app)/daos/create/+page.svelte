@@ -3,7 +3,7 @@
 	import * as remote from '$lib/api.remote';
 	import { store } from '$lib/wallet-store.svelte';
 	import { signedForm } from '$lib/forms';
-	import { createDaoForm as schema, BATCH } from '$lib/schemas';
+	import { createDaoForm as schema, shareTuples, BATCH } from '$lib/schemas';
 	import { Input } from '$lib/components/ui/input';
 	import Page from '$lib/components/page.svelte';
 	import PageHeader from '$lib/components/page-header.svelte';
@@ -120,7 +120,6 @@
 				...shares.filter((r) => r.party === me),
 				...shares.filter((r) => r.party !== me)
 			];
-			const tuple = (r: { party: string; share: number }) => ({ _1: r.party, _2: String(r.share) });
 			return {
 				choice: 'Account_CreateDAO',
 				contractId: store.who!.account,
@@ -134,8 +133,8 @@
 					public: visibility === 'public',
 					routine: settingsToLedger(settingsOf(fields, 'routine')),
 					sensitive: settingsToLedger(settingsOf(fields, 'sensitive')),
-					shares: ordered.slice(0, BATCH).map(tuple),
-					more: ordered.slice(BATCH).map(tuple)
+					shares: shareTuples(ordered.slice(0, BATCH)),
+					more: shareTuples(ordered.slice(BATCH))
 				}
 			};
 		},

@@ -83,6 +83,10 @@ export const shareChanges = v.pipe(
 	)
 );
 
+/** A share table as the ledger reads it: tuples of party and units, the Int as text. */
+export const shareTuples = (rows: { party: string; share: number }[]) =>
+	rows.map((r) => ({ _1: r.party, _2: String(r.share) }));
+
 /** A category's settings, field by field, under a prefix: `routineBasis`, `routineDays`… */
 const basisField = v.picklist(['all', 'cast']);
 const thresholdField = v.picklist(['majority', 'percent', 'fraction']);
