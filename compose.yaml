@@ -33,6 +33,7 @@ services:
       INVITE_CODES: ${INVITE_CODES:-}
       # Shown to users; the ledger does not care.
       NETWORK: ${NETWORK:-TestNet}
+      NETWORKS: ${NETWORKS:-}
       # Behind another proxy (traefik, nginx) the app is told so; see CADDY_* in the env file.
     labels:
       traefik.enable: 'false'

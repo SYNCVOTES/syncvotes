@@ -3,7 +3,7 @@ import { building } from '$app/env';
 import * as v from 'valibot';
 
 /**
- * All but NETWORK are private: only the server reads them, and `$app/env/private` cannot be
+ * All but NETWORK and NETWORKS are private: only the server reads them, and `$app/env/private` cannot be
  * imported in the browser.
  *
  * Values are read at startup rather than inlined at build time, so one image can run against
@@ -72,6 +72,12 @@ export const variables = defineEnvVars({
 			'The Canton network this deployment is on, as shown to users: DevNet, TestNet or MainNet',
 		public: true,
 		schema: v.optional(v.picklist(['DevNet', 'TestNet', 'MainNet']), 'TestNet')
+	},
+	NETWORKS: {
+		description:
+			'The deployments to switch to, as Name=URL pairs, comma-separated (MainNet=https://…,TestNet=https://…). Empty: no switcher',
+		public: true,
+		schema: v.optional(v.string(), '')
 	},
 	GIT_SHA: {
 		description: 'The commit this image was built from, baked in by the Dockerfile',
