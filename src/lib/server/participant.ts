@@ -3,7 +3,6 @@ import { SDK } from '@canton-network/wallet-sdk';
 import {
 	LEDGER_API_URL,
 	PROVIDER_PARTY,
-	OPERATOR_PARTY,
 	LEDGER_AUTH_URL,
 	LEDGER_AUTH_CLIENT_ID,
 	LEDGER_AUTH_CLIENT_SECRET,
@@ -18,7 +17,7 @@ import {
  * execute here, sign in the browser in between). User parties are external: hosted on this
  * participant so the app's package is available to them, but signable only by keys the users
  * hold. The app's ledger user has no rights on user parties, so nothing in this file can act
- * for a user on its own; it reads as the operator, which observes every contract of the app.
+ * for a user on its own; it reads as the provider, which signs every contract of the app.
  */
 
 function required(name: string, value: string | undefined): string {
@@ -27,7 +26,6 @@ function required(name: string, value: string | undefined): string {
 }
 
 export const providerParty = () => required('PROVIDER_PARTY', PROVIDER_PARTY);
-export const operatorParty = () => required('OPERATOR_PARTY', OPERATOR_PARTY);
 export const ledgerUrl = () => required('LEDGER_API_URL', LEDGER_API_URL);
 export const scanUrl = () => required('SCAN_URL', SCAN_URL).replace(/\/$/, '');
 
@@ -385,8 +383,8 @@ const PREPARED_TTL = 10 * 60 * 1000;
 
 /**
  * Step one of a user transaction: the participant builds it and hands back the hash to sign.
- * The operator reads alongside the acting party, so a member's transaction can look at the
- * DAO's own contracts; the browser checks that nothing else is read as.
+ * The provider reads alongside the acting party, so a member's transaction can look at the
+ * DAO's own contracts, which the member does not observe.
  */
 export async function prepare(
 	party: string,
@@ -408,7 +406,7 @@ export async function prepare(
 			userId: await userId(),
 			commandId: crypto.randomUUID(),
 			actAs: [party],
-			readAs: [operatorParty()],
+			readAs: [providerParty()],
 			commands,
 			disclosedContracts: options.disclosedContracts ?? [],
 			synchronizerId: await synchronizerId(),

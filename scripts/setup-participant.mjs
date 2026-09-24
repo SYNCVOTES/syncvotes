@@ -4,9 +4,9 @@
 //   docker compose --env-file <net>.env run --rm --no-deps \
 //     -e VALIDATOR_CLIENT_SECRET=<KC_VALIDATOR_SECRET> app node scripts/setup-participant.mjs
 //
-// As the validator's ledger admin it makes the app's ledger user, allocates the operator party
-// if none stands, and grants the app user what README "Authentication" lists. It prints the
-// two party ids for the env file. Every step is idempotent.
+// As the validator's ledger admin it makes the app's ledger user and grants it what README
+// "Authentication" lists. It prints the provider party id for the env file. Every step is
+// idempotent.
 const env = process.env;
 const need = (k) => {
 	if (!env[k]) throw new Error(`${k} is not set`);
@@ -15,7 +15,6 @@ const need = (k) => {
 const LEDGER = need('LEDGER_API_URL');
 const AUTH_URL = need('LEDGER_AUTH_URL');
 const APP_USER = need('KC_APP_USER_ID');
-const OPERATOR_HINT = env.OPERATOR_HINT ?? 'syncvotes-operator';
 const PROVIDER_HINT = need('WALLET_USER_NAME');
 
 async function token(clientId, secret) {
@@ -64,21 +63,6 @@ const parties = await localParties();
 const provider = parties.find((p) => p.split('::')[0] === PROVIDER_HINT);
 if (!provider)
 	throw new Error(`No hosted party with hint ${PROVIDER_HINT}; is the validator onboarded?`);
-let operator = parties.find((p) => p.split('::')[0] === OPERATOR_HINT);
-if (!operator) {
-	const sync = (
-		await api(`/v2/state/connected-synchronizers?party=${encodeURIComponent(provider)}`)
-	).connectedSynchronizers[0].synchronizerId;
-	const r = await api('/v2/parties', {
-		partyIdHint: OPERATOR_HINT,
-		identityProviderId: '',
-		synchronizerId: sync,
-		userId: ''
-	});
-	operator = r.partyDetails.party;
-	console.log(`Operator party allocated: ${operator}`);
-}
-
 // The app's ledger user: made if missing, then given its rights.
 const exists = await api(`/v2/users/${encodeURIComponent(APP_USER)}`).then(
 	() => true,
@@ -101,7 +85,6 @@ const rights = [
 	{ kind: { ParticipantAdmin: { value: {} } } },
 	{ kind: { CanReadAsAnyParty: { value: {} } } },
 	{ kind: { CanExecuteAsAnyParty: { value: {} } } },
-	{ kind: { CanReadAs: { value: { party: operator } } } },
 	{ kind: { CanActAs: { value: { party: provider } } } }
 ];
 await api(`/v2/users/${encodeURIComponent(APP_USER)}/rights`, {
@@ -110,8 +93,7 @@ await api(`/v2/users/${encodeURIComponent(APP_USER)}/rights`, {
 	rights
 });
 console.log(
-	`App user ${APP_USER} holds: ParticipantAdmin, CanReadAsAnyParty, CanExecuteAsAnyParty, CanReadAs operator, CanActAs provider`
+	`App user ${APP_USER} holds: ParticipantAdmin, CanReadAsAnyParty, CanExecuteAsAnyParty, CanActAs provider`
 );
 console.log('');
 console.log(`PROVIDER_PARTY=${provider}`);
-console.log(`OPERATOR_PARTY=${operator}`);

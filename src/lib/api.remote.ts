@@ -88,7 +88,6 @@ const matches = (needle: string) => (party: string) => {
 /** The parties and prices the browser shows and checks against. Public, nothing secret. */
 export const config = query(async () => ({
 	provider: participant.providerParty(),
-	operator: participant.operatorParty(),
 	prices: await splice.prices(),
 	batch: schemas.BATCH,
 	maxChanges: schemas.MAX_CHANGES,
@@ -132,7 +131,8 @@ async function ensureAccount(
 					templateId: Main.Account.templateId,
 					createArguments: {
 						provider: participant.providerParty(),
-						operator: participant.operatorParty(),
+						// The operator field predates the provider doing everything; it names the provider.
+						operator: participant.providerParty(),
 						user: party
 					}
 				}

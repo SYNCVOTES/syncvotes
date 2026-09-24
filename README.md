@@ -88,7 +88,7 @@ asked for before anyone pays for a party and checked again when the party is mad
 door is open. A DAO is private unless founded public or made so by a `SetPublic` vote under
 its voting rules: public DAOs are listed at `/daos` for anyone signed in to read (proposals,
 outcomes, members, comments), while only members act and who voted how stays with the members.
-Nothing is public on the Canton network itself; "public" is the app reading as operator for
+Nothing is public on the Canton network itself; "public" is the app reading as provider for
 whoever asks.
 
 ### The balances
@@ -147,7 +147,7 @@ realm's JWKS; the app reaches the realm over the compose network, the browser ov
 Clients: `validator-app-backend` and `syncvotes-app` (client credentials, each a service account
 whose `sub` is its ledger user name), `wallet-web-ui` / `cns-ui` (public, PKCE) for the
 validator's own UIs. The app's ledger user holds `ParticipantAdmin` (DAR upload, party
-allocation), `CanReadAsAnyParty`, `CanExecuteAsAnyParty`, `CanReadAs` the operator and `CanActAs`
+allocation), `CanReadAsAnyParty`, `CanExecuteAsAnyParty` and `CanActAs`
 the provider, and never `CanActAs` a user party: the only way a user's transaction is submitted
 is with the user's own signature. `CanReadAsAnyParty` is not optional: the participant refuses
 to prepare for a party the caller cannot read as.
@@ -171,7 +171,7 @@ Every read and prepare takes its party from it; DAO reads require membership or 
 A restart forgets sessions; the browser, still holding the key, signs again.
 
 Reads are live and never touch the participant. The server keeps an in-memory copy of every
-contract the operator sees (`ledger.ts`), built from the streaming active-contracts endpoint at
+contract the provider signs (`ledger.ts`), built from the streaming active-contracts endpoint at
 startup and kept current from the update stream; a transaction wakes the live queries waiting on
 the DAO, proposal or party it touched. Lists are paged and filtered on the server. A write's
 `execute` returns once the copy holds its transaction, so the page that signed is already up to
@@ -198,7 +198,7 @@ at once in 45 seconds with no conflicts, counted within 3 seconds.
 | `src/routes/+page.svelte`        | The landing, `landing-*` components                                         |
 | `src/lib/components/`            | Everything built on the shadcn primitives in `ui/`                          |
 | `compose.yaml`                   | The compose project for the servers, Caddy config inline                    |
-| `scripts/setup-participant.mjs`  | Once per validator: the app's ledger user, the operator party, rights       |
+| `scripts/setup-participant.mjs`  | Once per validator: the app's ledger user and its rights                    |
 
 ## Deployment
 

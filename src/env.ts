@@ -23,11 +23,6 @@ export const variables = defineEnvVars({
 			'The app provider party: signs every contract a user acts on, so it confirms and earns',
 		schema: required
 	},
-	OPERATOR_PARTY: {
-		description:
-			"The backend's own party: observer on every contract of the app, reads, never earns",
-		schema: required
-	},
 	LEDGER_AUTH_URL: {
 		description: "The identity provider's OpenID discovery document",
 		schema: required

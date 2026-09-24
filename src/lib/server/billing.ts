@@ -4,7 +4,7 @@ import { BILLING_FACTOR } from '$app/env/private';
 import * as ledger from './ledger';
 import * as splice from './splice';
 import * as deposits from './deposits';
-import { operatorParty, paidTraffic, providerParty, sdk, submitAsProvider } from './participant';
+import { paidTraffic, providerParty, sdk, submitAsProvider } from './participant';
 
 /**
  * Who pays for what. Every transaction costs this validator traffic — bytes the network
@@ -189,7 +189,7 @@ async function write(a: Account, credited: number, charged: number, party?: stri
 							templateId: kind === 'dao' ? Main.Meter.templateId : Main.Purse.templateId,
 							createArguments: {
 								provider: providerParty(),
-								operator: operatorParty(),
+								operator: providerParty(),
 								...(kind === 'dao' ? { daoId: key } : { fingerprint: key, party: party ?? null }),
 								credited: credited.toFixed(10),
 								charged: charged.toFixed(10),
