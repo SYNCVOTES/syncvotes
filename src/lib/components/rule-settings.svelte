@@ -80,7 +80,7 @@
 		preset:
 			'A starting point for the three settings below. Majority of the vote: more than half of everyone who could vote. Majority of votes cast: more yes than no among those who vote, a quarter taking part. Two thirds and unanimous: of the whole vote. Change any setting and it reads custom.',
 		basis:
-			'The whole vote: yes is compared with everyone who could vote, so a member who stays silent counts as a no, and the count cannot be gamed by leaving ballots out. The votes cast: yes is compared with the yes and no actually cast, so a few voters can decide unless a quorum says how many must take part — and the app, which hands the ballots to the ledger, could sway it by leaving some out.',
+			'The whole vote: yes is compared with everyone who could vote, so a member who stays silent counts as a no, and the app, which hands the ballots to the ledger, cannot pass anything by leaving ballots out; it could still make a proposal fail by leaving out yes ballots. The votes cast: yes is compared with the yes and no actually cast, so a few voters can decide unless a quorum says how many must take part, and the app could sway it either way by leaving ballots out.',
 		threshold:
 			'More than half: strictly over 50% of what yes is compared with; 50 of 100 is not enough, 51 is. A fraction, say two thirds: at least that much, rounded up — two of three. A percentage: at least that share; 100% means everyone.',
 		quorum:

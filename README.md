@@ -111,10 +111,14 @@ What arrived with a memo is read off the provider's own transactions and recompu
 restart; the ledger's figure is the only figure. What is paid in is spent on traffic and is not
 paid back: the DAO holds no coin, and nothing leaves the provider on a DAO's behalf.
 
-What the provider cannot do: invent a member, a ballot or a proposal, change a count, or pass
-anything measured against the whole vote by leaving ballots out. What it can: delay, and, where
-a rule is measured against the votes cast or has a quorum, fail or flip a result by omitting
-ballots at the final count; the hints on those settings say so.
+What the provider cannot do: forge a ballot or a proposal, count a ballot the ledger refuses,
+or pass anything measured against the whole vote by leaving ballots out. What it can: delay;
+make any proposal fail by leaving yes ballots out of the count; where a rule is measured
+against the votes cast or has a quorum, flip a result either way by omitting ballots; and, when
+it carries out a share change, leave a member's contract out of the batch, so that a removal is
+skipped or a member ends up with a second membership and a second vote. The ledger cannot tell
+a missing membership from a withheld one (Canton has no contract keys), but either shows on the
+ledger as two `Member` contracts for one party, or one that should be gone.
 
 ## Setup
 
@@ -175,8 +179,7 @@ contract the provider signs (`ledger.ts`), built from the streaming active-contr
 startup and kept current from the update stream; a transaction wakes the live queries waiting on
 the DAO, proposal or party it touched. Lists are paged and filtered on the server. A write's
 `execute` returns once the copy holds its transaction, so the page that signed is already up to
-date. Measured on TestNet with 221 members: 220 members added in 13 seconds, 40 members voting
-at once in 45 seconds with no conflicts, counted within 3 seconds.
+date.
 
 | Path                             | What it is                                                                  |
 | -------------------------------- | --------------------------------------------------------------------------- |
