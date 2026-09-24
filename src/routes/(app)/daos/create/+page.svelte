@@ -17,7 +17,7 @@
 	import ImageField from '$lib/components/image-field.svelte';
 	import Note from '$lib/components/note.svelte';
 	import Hint from '$lib/components/hint.svelte';
-	import SettingsTabs from '$lib/components/settings-tabs.svelte';
+	import RuleSettings from '$lib/components/rule-settings.svelte';
 	import { DEFAULTS, settingsToLedger, validRule, type Settings } from '$lib/rules';
 	import Users from '@lucide/svelte/icons/users';
 	import PieChart from '@lucide/svelte/icons/pie-chart';
@@ -94,14 +94,26 @@
 	});
 	let description = $state('');
 	let image = $state('');
-	// What every proposal takes to pass, at the least; a majority of all to start with.
-	// What proposals run under, by category; the founding defaults to start from.
+	// The rule everything that changes the DAO passes by; the founding default to start from.
+	// A decision or a choice runs under a rule its proposer sets, so the DAO's routine settings
+	// are the founding default, sent along unchanged: what a proposer's form starts from.
 	const copy = (x: Settings): Settings => ({
 		...x,
 		rule: { ...x.rule, threshold: { ...x.rule.threshold } }
 	});
-	let routine = $state<Settings>(copy(DEFAULTS.routine));
+	const routine = copy(DEFAULTS.routine);
 	let sensitive = $state<Settings>(copy(DEFAULTS.sensitive));
+	const hidden = (prefix: string, s: Settings): [string, string | number][] => [
+		[`${prefix}Basis`, s.rule.basis],
+		[`${prefix}Threshold`, s.rule.threshold.kind],
+		[`n:${prefix}Percent`, s.rule.threshold.kind === 'percent' ? s.rule.threshold.percent : 67],
+		[`n:${prefix}Num`, s.rule.threshold.kind === 'fraction' ? s.rule.threshold.num : 2],
+		[`n:${prefix}Den`, s.rule.threshold.kind === 'fraction' ? s.rule.threshold.den : 3],
+		[`n:${prefix}Quorum`, s.rule.quorum],
+		[`${prefix}Early`, s.rule.early ? 'yes' : 'no'],
+		[`${prefix}Changeable`, s.rule.changeable ? 'yes' : 'no'],
+		[`n:${prefix}Days`, s.votingDays]
+	];
 
 	// The intent is the founding table as the ledger reads it: the first batch of rows, and the
 	// rest as a proposal already passed. The server orders the creator first; so does this.
@@ -280,15 +292,19 @@
 				</Note>
 			</FormSection>
 
-			<FormSection title="How proposals pass">
+			<FormSection title="How the DAO decides about itself">
 				<p class="text-xs leading-relaxed text-ink-mid">
-					Two kinds of proposal, two settings: what a vote takes to pass, and how long it is open.
-					Nobody who proposes chooses either; changing them later is itself a sensitive proposal.
+					One rule for everything that changes the DAO: its members and shares, its name, this rule,
+					whether it is public, and winding it up. What a vote takes to pass, and how long it is
+					open. Changing it later is itself such a proposal. A decision or a choice changes nothing,
+					so whoever proposes one sets its rule then.
 				</p>
-				<SettingsTabs
-					bind:routine
-					bind:sensitive
-					prefixes={{ routine: 'routine', sensitive: 'sensitive' }}
+				{#each hidden('routine', routine) as [name, value] (name)}
+					<input type="hidden" {name} {value} />
+				{/each}
+				<RuleSettings
+					bind:settings={sensitive}
+					prefix="sensitive"
 					eligible={summary.units}
 					equal={mode === 'equal'}
 				/>
@@ -324,7 +340,7 @@
 			<FormActions
 				label="Create DAO"
 				busy={store.busy || f.pending > 0}
-				disabled={!summary.valid || !validRule(routine.rule) || !validRule(sensitive.rule)}
+				disabled={!summary.valid || !validRule(sensitive.rule)}
 				cancelHref="/my-daos"
 				problem={store.problem}
 			/>

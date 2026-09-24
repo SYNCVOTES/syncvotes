@@ -277,13 +277,7 @@
 
 				<div>
 					<SectionTitle title="How proposals pass" />
-					<SettingsSummary
-						routine={d.routine}
-						sensitive={d.sensitive}
-						eligible={d.units}
-						equal={d.equal}
-						compact
-					/>
+					<SettingsSummary sensitive={d.sensitive} eligible={d.units} equal={d.equal} compact />
 				</div>
 
 				<div>

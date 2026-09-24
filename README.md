@@ -50,13 +50,15 @@ thousands of members, and one member's vote touches no contract another's does.
 - `Account` — one per party, made by the provider; creates DAOs and keeps a `Profile`. A party
   is its hint plus its key's fingerprint (`alice::1220…`).
 - `DAO` — name, description, picture, stable `id`, `equal` (by membership) or units of the
-  vote, `public`, `actorPays`, two `Settings` (routine and sensitive proposals: the rule and
-  the voting period). `DAO_Execute` carries out what a vote decided, in batches; nobody changes
+  vote, `public`, `actorPays`, `Settings` (the rule anything that changes the DAO passes by,
+  and the voting period; the `routine` settings are only the founding default a proposer
+  starts from). `DAO_Execute` carries out what a vote decided, in batches; nobody changes
   a DAO by hand. Founded with a share table: the first two hundred members at once, the rest as
   a proposal already passed.
 - `Member` — one per party per DAO, with its share and when that share last changed. The
-  member's door to proposing (`Member_Propose` fixes the DAO's units as the electorate and
-  takes the rule from the DAO's settings for the action's category), commenting and voting
+  member's door to proposing (`Member_Propose` fixes the DAO's units as the electorate; a
+  change to the DAO runs under the DAO's rule, a decision or a choice under the rule and
+  period the proposer sets), commenting and voting
   (`Member_Vote` remembers the proposal, so a second ballot is impossible unless votes may
   change, in which case the old one is withdrawn).
 - `Proposal` — counters, not lists: `yes`, `no`, `abstain`, `tallies` per option, `eligible`,

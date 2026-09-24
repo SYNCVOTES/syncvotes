@@ -13,7 +13,7 @@ import { fingerprintOf } from './verify';
 import { INVITE_CODES } from '$app/env/private';
 import { normaliseHint, hintProblem } from './hint';
 import * as schemas from './schemas';
-import { settingsToLedger, type Rule, type Settings } from './rules';
+import { categoryOf, settingsToLedger, type Rule, type Settings } from './rules';
 
 /**
  * The server's API as remote functions: pages call these like local functions and SvelteKit
@@ -819,13 +819,18 @@ export const createProposalForm = form(schemas.createProposalForm, async (f) => 
 		default:
 			action = { tag: 'Signal', value: {} };
 	}
+	// A decision or a choice runs under the rule its proposer set; the rest under the DAO's.
+	const own =
+		categoryOf(f.kind) === 'routine' ? settingsToLedger(settingsOf(f, 'newRoutine')) : null;
 	const args = {
 		dao: d.contractId,
 		pid,
 		title: f.title,
 		description: f.description,
 		action,
-		secret: f.secret === 'yes' ? true : null
+		secret: f.secret === 'yes' ? true : null,
+		rule: own?.rule ?? null,
+		votingDays: own?.votingDays ?? null
 	};
 	return {
 		pid,

@@ -175,24 +175,28 @@ export type Settings = { rule: Rule; votingDays: number };
 
 export type Category = 'routine' | 'sensitive';
 
-/** What a proposal does decides its category: routine, or touching members, coin, rules, existence. */
+/**
+ * What a proposal does decides its category: routine (a decision or a choice, which change
+ * nothing on the ledger and run under a rule their proposer sets) or sensitive (anything that
+ * changes the DAO, which runs under the DAO's own rule).
+ */
 export const categoryOf = (kind: string): Category =>
-	kind === 'signal' || kind === 'choose' || kind === 'info' ? 'routine' : 'sensitive';
+	kind === 'signal' || kind === 'choose' ? 'routine' : 'sensitive';
 
 export const CATEGORIES: { value: Category; title: string; text: string; covers: string }[] = [
 	{
 		value: 'routine',
-		title: 'Routine',
-		text: 'Decisions and choices, and the name, description or picture.',
+		title: 'Decisions and choices',
+		text: 'A decision, yes or no, or a choice among options: the proposer sets the rule.',
 		covers:
-			'A decision the DAO takes, yes or no or among options, or a new name, description or picture.'
+			'A decision the DAO takes, or a choice among options. Nothing on the ledger changes, so whoever proposes it says what it takes to pass and for how long it is open.'
 	},
 	{
 		value: 'sensitive',
-		title: 'Sensitive',
-		text: 'Members and shares, these settings, visibility, dissolution.',
+		title: 'The DAO itself',
+		text: 'Members and shares, the name and description, this rule, visibility, dissolution.',
 		covers:
-			'Who is in the DAO and with what share, these very settings, whether the DAO is public, and winding it up.'
+			'Who is in the DAO and with what share, its name, description and picture, this very rule, whether the DAO is public, and winding it up.'
 	}
 ];
 

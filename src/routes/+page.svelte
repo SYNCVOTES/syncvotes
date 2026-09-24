@@ -103,7 +103,7 @@
 		{
 			tag: 'Rules',
 			title: 'Yours, set at the founding',
-			body: 'Routine and sensitive proposals each pass by a rule the DAO chose — a majority or two thirds, of the whole vote or of votes cast, a quorum, early settlement or changeable votes — for one to ninety days. Changing them is itself a sensitive proposal.'
+			body: 'Anything that changes the DAO passes by the rule the DAO chose — a majority or two thirds, of the whole vote or of votes cast, a quorum, early settlement or changeable votes — for one to ninety days. A decision or a choice runs under a rule its proposer sets.'
 		},
 		{
 			tag: 'Live',

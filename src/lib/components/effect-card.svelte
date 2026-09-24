@@ -148,7 +148,7 @@
 		</p>
 	{:else if effect.kind === 'settings'}
 		<p class="text-[13px] text-ink-mid">From then on:</p>
-		<SettingsSummary routine={effect.routine} sensitive={effect.sensitive} />
+		<SettingsSummary sensitive={effect.sensitive} />
 	{:else}
 		<p class="text-[13px] text-ink-mid">Decides, and does nothing else.</p>
 	{/if}

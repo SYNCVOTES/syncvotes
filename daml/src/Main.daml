@@ -79,7 +79,6 @@ data Effect
 isSensitive : Effect -> Bool
 isSensitive Signal = False
 isSensitive (Choose _ _) = False
-isSensitive (SetInfo {}) = False
 isSensitive _ = True
 
 -- | What counts as passing, chosen per proposal. Yes is measured against all members, or
@@ -380,14 +379,27 @@ template Member
         -- A secret ballot: the app shows nobody who voted how (the provider, which counts,
         -- sees the ballots regardless). Absent on proposals made before there was such a thing.
         secret : Optional Bool
+        -- A decision or a choice changes nothing on the ledger, so its proposer says what it
+        -- takes to pass and for how long it is open; the DAO's settings stand in where these
+        -- are absent. Anything that changes the DAO runs under the DAO's sensitive settings,
+        -- and these must be absent.
+        rule : Optional Rule
+        votingDays : Optional Int
       controller party
       do
         now <- getTime
         found <- fetch dao
         assertMsg "Not this member's DAO" (found.id == daoId && found.creator == creator)
-        let settings = if isSensitive action then found.sensitive else found.routine
-            rule = settings.rule
-            closesAt = addRelTime now (days settings.votingDays)
+        let sensitive = isSensitive action
+            settings = if sensitive then found.sensitive else found.routine
+        assertMsg "A proposal that changes the DAO runs under the DAO's rule"
+          (not sensitive || (isNone rule && isNone votingDays))
+        let chosen = Settings with
+              rule = fromOptional settings.rule rule
+              votingDays = fromOptional settings.votingDays votingDays
+        assertMsg "The rule's numbers are out of range" (validSettings chosen)
+        let rule = chosen.rule
+            closesAt = addRelTime now (days chosen.votingDays)
         case action of
           Signal -> pure ()
           Choose options _ ->

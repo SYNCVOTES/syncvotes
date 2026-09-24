@@ -19,7 +19,7 @@
 	import MarkdownEditor from '$lib/components/markdown-editor.svelte';
 	import ImageField from '$lib/components/image-field.svelte';
 	import Note from '$lib/components/note.svelte';
-	import SettingsTabs from '$lib/components/settings-tabs.svelte';
+	import RuleSettings from '$lib/components/rule-settings.svelte';
 	import Hint from '$lib/components/hint.svelte';
 	import { categoryOf, describe, settingsToLedger, validRule, type Settings } from '$lib/rules';
 	import PieChart from '@lucide/svelte/icons/pie-chart';
@@ -58,7 +58,7 @@
 			value: 'choose',
 			title: 'Choice',
 			text: 'The DAO picks one of several options.',
-			more: 'Puts two to ten options to the vote; each member picks one, or abstains. The option with the most votes wins if it reaches what the DAO’s routine rule asks of a yes — more than half of the whole vote, say — and stands alone at the top; a tie decides nothing. Nothing on the ledger changes but the record of the choice.',
+			more: 'Puts two to ten options to the vote; each member picks one, or abstains. The option with the most votes wins if it reaches what the rule you set asks of a yes — more than half of the whole vote, say — and stands alone at the top; a tie decides nothing. Nothing on the ledger changes but the record of the choice.',
 			icon: ListChecks
 		},
 		d?.equal
@@ -85,9 +85,9 @@
 		},
 		{
 			value: 'settings',
-			title: 'Settings',
-			text: 'What proposals take to pass, and for how long they are open.',
-			more: "Changes the DAO's settings for routine and for sensitive proposals: the rule each passes by and how long its vote is open. This proposal is itself sensitive, so it passes under the sensitive settings as they stand today.",
+			title: 'Rule',
+			text: 'What a change to the DAO takes to pass, and for how long the vote is open.',
+			more: "Changes the DAO's rule: what anything that changes the DAO — members, name, this rule, visibility, dissolution — takes to pass, and how long its vote is open. This proposal is itself such a change, so it passes under the rule as it stands today.",
 			icon: Scale
 		},
 		{
@@ -166,8 +166,20 @@
 		newRoutine = copy(d.routine);
 		newSensitive = copy(d.sensitive);
 	});
-	/** The settings this proposal runs under: routine or sensitive, by what it does. */
-	const applies = $derived(d ? d[categoryOf(kind)] : null);
+	/** What this proposal runs under: the DAO's rule for anything that changes the DAO; for a decision or a choice, the rule set below. */
+	const own = $derived(categoryOf(kind) === 'routine');
+	const applies = $derived(d ? (own ? newRoutine : d.sensitive) : null);
+	const hidden = (prefix: string, s: Settings): [string, string | number][] => [
+		[`${prefix}Basis`, s.rule.basis],
+		[`${prefix}Threshold`, s.rule.threshold.kind],
+		[`n:${prefix}Percent`, s.rule.threshold.kind === 'percent' ? s.rule.threshold.percent : 67],
+		[`n:${prefix}Num`, s.rule.threshold.kind === 'fraction' ? s.rule.threshold.num : 2],
+		[`n:${prefix}Den`, s.rule.threshold.kind === 'fraction' ? s.rule.threshold.den : 3],
+		[`n:${prefix}Quorum`, s.rule.quorum],
+		[`${prefix}Early`, s.rule.early ? 'yes' : 'no'],
+		[`${prefix}Changeable`, s.rule.changeable ? 'yes' : 'no'],
+		[`n:${prefix}Days`, s.votingDays]
+	];
 
 	// The share editor starts as today's table, read once; the rest is the proposer's.
 	const today = $derived(store.who && kind === 'shares' ? remote.daoShares(id) : null);
@@ -240,7 +252,7 @@
 			case 'dissolve':
 				return 'The DAO is archived the moment this passes: nothing more can be proposed or voted on, what was paid in for it is spent, and its record stays readable.';
 			case 'settings':
-				return `From then on routine proposals pass when ${describe(newRoutine.rule)}, open ${newRoutine.votingDays} days; sensitive ones when ${describe(newSensitive.rule)}, open ${newSensitive.votingDays} days.`;
+				return `From then on, anything that changes the DAO passes when ${describe(newSensitive.rule)}, open ${newSensitive.votingDays} days.`;
 			default:
 				return 'The decision is recorded on the ledger. Nothing else changes.';
 		}
@@ -329,7 +341,9 @@
 					title: fields.title,
 					description: fields.description,
 					action,
-					secret: fields.secret === 'yes' ? true : null
+					secret: fields.secret === 'yes' ? true : null,
+					rule: own ? settingsToLedger(settingsOf(fields, 'newRoutine')).rule : null,
+					votingDays: own ? settingsToLedger(settingsOf(fields, 'newRoutine')).votingDays : null
 				}
 			};
 		},
@@ -363,9 +377,11 @@
 			case 'info':
 				return newName.trim().length >= 2 && infoChanged;
 			case 'choose':
-				return validOptions(optionList);
+				return validOptions(optionList) && validRule(newRoutine.rule);
+			case 'signal':
+				return validRule(newRoutine.rule);
 			case 'settings':
-				return validRule(newRoutine.rule) && validRule(newSensitive.rule);
+				return validRule(newSensitive.rule);
 			default:
 				return true;
 		}
@@ -523,10 +539,12 @@
 						<ImageField name="newImage" id="newImage" bind:value={newImage} disabled={store.busy} />
 					</Field>
 				{:else if kind === 'settings'}
-					<SettingsTabs
-						bind:routine={newRoutine}
-						bind:sensitive={newSensitive}
-						prefixes={{ routine: 'newRoutine', sensitive: 'newSensitive' }}
+					{#each hidden('newRoutine', newRoutine) as [name, value] (name)}
+						<input type="hidden" {name} {value} />
+					{/each}
+					<RuleSettings
+						bind:settings={newSensitive}
+						prefix="newSensitive"
 						eligible={d.units}
 						equal={d.equal}
 					/>
@@ -541,9 +559,23 @@
 			</FormSection>
 
 			<FormSection title="How it passes">
-				{#if applies}
+				{#if own}
 					<p class="text-sm leading-relaxed text-ink-mid">
-						A {categoryOf(kind)} proposal, so by the DAO's settings it passes when {describe(
+						A decision or a choice changes nothing on the ledger, so you set what it takes to pass
+						and for how long the vote is open.
+						<Hint
+							text="Anything that changes the DAO — members, name, settings, visibility, dissolution — runs under the DAO's own rule, which no proposer chooses. A decision or a choice only records how the DAO voted, so its proposer sets the rule and the period; the DAO's founding default is what this starts from."
+						/>
+					</p>
+					<RuleSettings
+						bind:settings={newRoutine}
+						prefix="newRoutine"
+						eligible={d.units}
+						equal={d.equal}
+					/>
+				{:else if applies}
+					<p class="text-sm leading-relaxed text-ink-mid">
+						This changes the DAO, so by the DAO's rule it passes when {describe(
 							applies.rule
 						)}{applies.rule.early
 							? ', settling early once that is sure'
@@ -552,7 +584,7 @@
 								: ', decided at the deadline'}. The vote is open for {applies.votingDays}
 						{applies.votingDays === 1 ? 'day' : 'days'} from the moment you sign.
 						<Hint
-							text="The DAO's settings decide this, not the proposer: routine proposals (a decision, a name) and sensitive ones (members, coin, settings, dissolution) each have their own rule and voting period, set at the founding and changed only by a sensitive proposal."
+							text="The DAO's rule decides this, not the proposer: set at the founding, changed only by a settings proposal that passes under it. A decision or a choice, which changes nothing, runs under a rule its proposer sets."
 						/>
 					</p>
 				{/if}

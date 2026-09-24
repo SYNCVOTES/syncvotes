@@ -9,19 +9,19 @@
 	 * vote is open.
 	 */
 	let {
-		routine,
 		sensitive,
 		eligible = 0,
 		equal = false,
 		compact = false
 	}: {
-		routine: Settings;
+		/** The rule everything that changes the DAO passes by. */
 		sensitive: Settings;
 		eligible?: number;
 		equal?: boolean;
 		compact?: boolean;
 	} = $props();
-	const both = $derived({ routine, sensitive });
+	const category = CATEGORIES.find((c) => c.value === 'sensitive')!;
+	const routine = CATEGORIES.find((c) => c.value === 'routine')!;
 	const unit = (n: number) => (equal ? (n === 1 ? 'member' : 'members') : 'units');
 	function here(s: Settings): string {
 		if (eligible <= 0) return '';
@@ -49,21 +49,29 @@
 </script>
 
 <dl class="divide-y divide-border border border-border">
-	{#each CATEGORIES as c (c.value)}
-		{@const s = both[c.value]}
-		<div class="space-y-1 px-4 py-3">
-			<dt
-				class="flex items-center gap-1.5 font-mono text-[0.6875rem] tracking-[0.14em] text-ink-dim uppercase"
-			>
-				{c.title}
-				<Hint text={c.covers} />
-			</dt>
-			<dd class="text-[13px] leading-relaxed text-ink">
-				{#if !compact}<span class="text-ink-mid">{c.text}</span><br />{/if}
-				Passes when {describe(s.rule)}; {timing(s)}. Open for {s.votingDays}
-				{s.votingDays === 1 ? 'day' : 'days'}.
-				{#if here(s)}<span class="block font-mono text-xs text-ink-mid">Here: {here(s)}.</span>{/if}
-			</dd>
-		</div>
-	{/each}
+	<div class="space-y-1 px-4 py-3">
+		<dt
+			class="flex items-center gap-1.5 font-mono text-[0.6875rem] tracking-[0.14em] text-ink-dim uppercase"
+		>
+			{category.title}
+			<Hint text={category.covers} />
+		</dt>
+		<dd class="text-[13px] leading-relaxed text-ink">
+			{#if !compact}<span class="text-ink-mid">{category.text}</span><br />{/if}
+			Passes when {describe(sensitive.rule)}; {timing(sensitive)}. Open for {sensitive.votingDays}
+			{sensitive.votingDays === 1 ? 'day' : 'days'}.
+			{#if here(sensitive)}<span class="block font-mono text-xs text-ink-mid"
+					>Here: {here(sensitive)}.</span
+				>{/if}
+		</dd>
+	</div>
+	<div class="space-y-1 px-4 py-3">
+		<dt
+			class="flex items-center gap-1.5 font-mono text-[0.6875rem] tracking-[0.14em] text-ink-dim uppercase"
+		>
+			{routine.title}
+			<Hint text={routine.covers} />
+		</dt>
+		<dd class="text-[13px] leading-relaxed text-ink-mid">{routine.text}</dd>
+	</div>
 </dl>
