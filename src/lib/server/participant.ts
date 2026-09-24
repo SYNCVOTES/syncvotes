@@ -4,6 +4,7 @@ import {
 	LEDGER_API_URL,
 	PROVIDER_PARTY,
 	PAYEE_PARTY,
+	PAYEE_SINCE,
 	LEDGER_AUTH_URL,
 	LEDGER_AUTH_CLIENT_ID,
 	LEDGER_AUTH_CLIENT_SECRET,
@@ -32,6 +33,11 @@ export const providerParty = () => required('PROVIDER_PARTY', PROVIDER_PARTY);
  * their transactions use; the provider where none is set. The app only reads its history.
  */
 export const payeeParty = () => PAYEE_PARTY || providerParty();
+/**
+ * From when the payee's transfers count: a validator party that was the provider once holds
+ * memos in its history that were credited under that provider, or moved over by hand.
+ */
+export const payeeSince = () => (PAYEE_PARTY ? PAYEE_SINCE || '' : '');
 /** Whose history holds deposits: the payee's, and the provider's, which was the payee before. */
 export const receivingParties = () => [...new Set([payeeParty(), providerParty()])];
 export const ledgerUrl = () => required('LEDGER_API_URL', LEDGER_API_URL);

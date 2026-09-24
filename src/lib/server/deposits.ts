@@ -2,6 +2,7 @@ import * as splice from './splice';
 import {
 	activeContracts,
 	payeeParty,
+	payeeSince,
 	providerParty,
 	receivingParties,
 	sdk,
@@ -166,8 +167,10 @@ async function depositsOf(
 	}
 	const found: Deposit[] = [];
 	let oldest: string | null = null;
+	const since = party === payeeParty() && party !== providerParty() ? payeeSince() : '';
 	for (const tx of page.transactions) {
 		if (!oldest || tx.recordTime < oldest) oldest = tx.recordTime;
+		if (since && tx.recordTime < since) continue;
 		for (const e of tx.events) {
 			if (e.label.type !== 'TransferIn' && e.label.type !== 'MergeSplit') continue;
 			const m = e.label.reason?.match(MEMO);

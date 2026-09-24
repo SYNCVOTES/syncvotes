@@ -28,6 +28,11 @@ export const variables = defineEnvVars({
 			"Where users pay in by memo: the validator's own party, whose wallet buys the traffic. Empty: the provider",
 		schema: v.optional(v.string(), '')
 	},
+	PAYEE_SINCE: {
+		description:
+			"When the payee started taking the app's payments (ISO time): its earlier memos were someone else's, or already counted",
+		schema: v.optional(v.string(), '')
+	},
 	LEDGER_AUTH_URL: {
 		description: "The identity provider's OpenID discovery document",
 		schema: required
