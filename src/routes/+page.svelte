@@ -33,7 +33,7 @@
 			num: '01',
 			tag: 'Propose',
 			title: 'A contract, not a post',
-			body: 'A proposal is a Daml contract on Canton that says what it does: a decision, who is in and with what share, the name, the settings, dissolution. What it takes to pass and how long the vote is open come from the DAO’s own settings, set at the founding and changed only by vote — not by the proposer, not by a moderator.'
+			body: 'A proposal is a Daml contract on Canton that says what it does: a decision, who is in and with what share, the name, the voting rules, dissolution. For anything that changes the DAO, what it takes to pass and how long the vote is open come from the DAO’s own voting rules, set at the founding and changed only by vote — not by the proposer, not by a moderator.'
 		},
 		{
 			num: '02',
@@ -319,10 +319,10 @@
 			<p>
 				SyncVotes is a governance app on the Canton Network. A DAO is a Daml contract signed by its
 				creator and this app, run by nobody: everything it changes about itself it decides by vote.
-				A proposal is another contract, under the DAO's own settings; a ballot is a member's choice
-				on it, weighing their share of the vote, signed by their own key. This app counts the
-				ballots in batches, the ledger checks every one, and once the rule is met — or the deadline
-				comes — the outcome is written to the ledger and carried out.
+				A proposal is another contract, under the DAO's voting rules or its proposer's; a ballot is
+				a member's choice on it, weighing their share of the vote, signed by their own key. This app
+				counts the ballots in batches, the ledger checks every one, and once the rule is met — or
+				the deadline comes — the outcome is written to the ledger and carried out.
 			</p>
 			<p>
 				There is no database of DAOs and no server that votes for anyone. This app hosts your party,

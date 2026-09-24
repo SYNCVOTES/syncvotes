@@ -106,7 +106,7 @@
 			text: d?.public
 				? 'Make the DAO private again.'
 				: 'Make the DAO public: listed, readable by anyone signed in.',
-			more: 'Public: listed among the public DAOs, readable by anyone signed in — proposals, outcomes, members, comments — and open to pay-ins; only members act, and who voted how stays with the members. Private: only members see it exists. Sensitive, so it passes under the sensitive settings.',
+			more: "Public: listed among the public DAOs, readable by anyone signed in — proposals, outcomes, members, comments — and open to pay-ins; only members act, and who voted how stays with the members. Private: only members see it exists. A change to the DAO, so it passes under the DAO's voting rules.",
 			icon: Eye
 		},
 		{
@@ -153,7 +153,10 @@
 		newRoutine = copySettings(d.routine);
 		newSensitive = copySettings(d.sensitive);
 	});
-	/** What this proposal runs under: the DAO's rule for anything that changes the DAO; for a decision or a choice, the rule set below. */
+	/**
+	 * What this proposal runs under: the DAO's rule for anything that changes the DAO; for a
+	 * decision or a choice, the rule set below.
+	 */
 	const own = $derived(categoryOf(kind) === 'routine');
 	const applies = $derived(d ? (own ? newRoutine : d.sensitive) : null);
 

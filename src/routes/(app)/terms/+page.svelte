@@ -96,7 +96,7 @@
 			<p>
 				A transaction the ledger has accepted is <strong>final</strong>: it cannot be reversed,
 				undone or modified through this interface. A ballot can be changed until the deadline only
-				where the DAO's settings allow it. A proposal cannot be edited once made; it can be
+				where the proposal's ballot allows it. A proposal cannot be edited once made; it can be
 				cancelled and proposed again. Once a proposal settles, its outcome is carried out with the
 				DAO's own authority. Exercise due diligence before confirming any governance action.
 			</p>
