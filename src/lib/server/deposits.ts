@@ -150,6 +150,7 @@ export async function deposits(
 	for (const tx of page.transactions) {
 		if (!oldest || tx.recordTime < oldest) oldest = tx.recordTime;
 		for (const e of tx.events) {
+			if (e.label.type !== 'TransferIn' && e.label.type !== 'MergeSplit') continue;
 			const m = e.label.reason?.match(MEMO);
 			if (!m) continue;
 			const account = m[1] ? (`dao:${m[1]}` as const) : (`purse:${m[2]}` as const);
