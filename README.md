@@ -85,11 +85,11 @@ thousands of members, and one member's vote touches no contract another's does.
 
 Sign-up is by invitation while `INVITE_CODES` names any codes (comma-separated); a code is
 asked for before anyone pays for a party and checked again when the party is made. Empty, the
-door is open. A DAO is private unless founded public or made so by a sensitive `SetPublic`
-vote: public DAOs are listed at `/daos` for anyone signed in to read (proposals, outcomes,
-members, comments), while only members act and who voted how stays with the members. Nothing
-is public on the Canton network itself; "public" is the app reading as operator for whoever
-asks.
+door is open. A DAO is private unless founded public or made so by a `SetPublic` vote under
+its voting rules: public DAOs are listed at `/daos` for anyone signed in to read (proposals,
+outcomes, members, comments), while only members act and who voted how stays with the members.
+Nothing is public on the Canton network itself; "public" is the app reading as operator for
+whoever asks.
 
 ### The balances
 
