@@ -228,7 +228,6 @@
 									<div class="mt-2 flex flex-wrap items-center gap-1.5">
 										<span class={tag}><EffectLabel effect={p.effect} equal={d.equal} /></span>
 										<span class={tag}>{categoryOf(p.effect.kind)}</span>
-										{@const cast = p.yes + p.no + p.abstain + p.tallies.reduce((s, t) => s + t, 0)}
 										<span class={tag}
 											>{castOf(p) === 0
 												? 'no votes yet'
