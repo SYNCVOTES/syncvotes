@@ -30,7 +30,7 @@
 </script>
 
 <span
-	class="inline-flex min-w-0 items-center gap-1.5 font-mono {size === 'md'
+	class="inline-flex max-w-full min-w-0 items-center gap-1.5 font-mono {size === 'md'
 		? 'text-sm'
 		: 'text-xs'} {className}"
 	title={party}

@@ -32,13 +32,9 @@
 					? 'text-orange'
 					: ''}">{who.name}</a
 			>
-			<PartyId party={who.party} class="block" />
+			<PartyId party={who.party} />
 		{:else}
-			<PartyId
-				party={who.party}
-				{size}
-				class="block {me ? '[&>span>span:first-child]:text-orange' : ''}"
-			/>
+			<PartyId party={who.party} {size} class={me ? '[&>span>span:first-child]:text-orange' : ''} />
 		{/if}
 	</span>
 </span>
