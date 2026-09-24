@@ -9,12 +9,11 @@ import {
 } from './participant';
 
 /**
- * Coin that arrives at the provider. A DAO's balance is paid in by sending Canton Coin to the
- * provider's party from any wallet, with the DAO's memo; nothing else lands here on a DAO's
- * behalf. The provider has a transfer pre-approval, so coin lands in one step; a wallet that
- * does not see it sends a transfer instruction instead, which is accepted here. What arrived
- * with a memo is read off the provider's own transactions, so the figure is the ledger's,
- * not a file's: a restart recomputes it.
+ * Coin that arrives at the provider. A DAO's balance, or a party's purse, is paid in by sending
+ * Canton Coin to the provider's party from any wallet, with the account's memo. The provider
+ * has a transfer pre-approval, so coin lands in one step; a wallet that does not see it sends
+ * a transfer instruction instead, which is accepted here. What arrived with a memo is read off
+ * the provider's own transactions, so the figure is the ledger's: a restart recomputes it.
  */
 
 const AMULET = '#splice-amulet:Splice.Amulet:Amulet';
@@ -125,7 +124,7 @@ export type Deposit = {
 };
 
 /**
- * Coin that arrived at the provider in this window of offsets, carrying a DAO's memo: the
+ * Coin that arrived at the provider in this window of offsets, carrying an account's memo: the
  * token standard's view of the provider's transactions, filtered to transfers in. Everything
  * else that lands (fees, rewards, unmarked coin) is the provider's own. The participant lists
  * at most two hundred transactions per call, so a window that holds more comes back as

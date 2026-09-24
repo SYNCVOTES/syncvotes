@@ -168,7 +168,6 @@ async function run(action: () => Promise<void>) {
 	}
 }
 
-/** Remote functions rethrow server errors as HttpError; the message is in the body. */
 /**
  * Whether an error is the server being away rather than saying no: a gateway answer while the
  * app restarts (a deploy), or no answer at all. Such errors are worth retrying, quietly.
@@ -184,6 +183,7 @@ export function transient(error: unknown): boolean {
 	);
 }
 
+/** Remote functions rethrow server errors as HttpError; the message is in the body. */
 export function describe(error: unknown): string {
 	if (transient(error)) return 'The app is being updated or is out of reach — back in a moment';
 	const body = (error as { body?: { message?: string } })?.body;

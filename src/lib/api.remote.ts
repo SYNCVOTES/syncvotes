@@ -486,9 +486,9 @@ const proposalReader = (p: ledger.Proposal): ledger.Member | null => {
 	return membership ?? null;
 };
 
-/** Whether this member may cast a ballot now: none cast, or one that may still be replaced. */
 /** Signing takes a moment; a ballot prepared this close to the deadline could land after it. */
 const SIGNING_MARGIN = 90_000;
+/** Whether this member may cast a ballot now: none cast, or one that may still be replaced. */
 const mayVote = (p: ledger.Proposal, m: ledger.Member | null) => {
 	if (!m || p.outcome) return false;
 	if (ledger.time(p.closesAt) - Date.now() < SIGNING_MARGIN) return false;
@@ -877,7 +877,6 @@ function paceLookups() {
 /** Parties made lately from one address: the provider pays for each, so a flood is refused. */
 const recentEnrols = new Map<string, number[]>();
 const ENROLS_PER_HOUR = 60;
-/** The visitor's address as the proxies in front report it, or the socket's as a last resort. */
 /**
  * Who is asking, by address: the one the proxy in front worked out (`X-Client-Ip`, set by
  * Caddy from Cloudflare's headers only where the request came through Cloudflare, else from

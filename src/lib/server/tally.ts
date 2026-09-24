@@ -9,8 +9,8 @@ import * as billing from './billing';
  * until then; a few minutes after the deadline (ballots signed at the last moment still
  * arrive) the batch that empties the queue is final and decides the outcome. A passed
  * proposal with something to do gets a `DAO_Execute` per batch of its entries. One count at a
- * time per proposal, since each replaces
- * the contract, and never on a contract the copy has not caught up with. What fails is retried
+ * time per proposal, since each replaces the contract, and never on a contract the copy has not
+ * caught up with. What fails is retried
  * later, less and less often, and after enough failures the proposal says why it is stuck. A
  * ballot the ledger itself refuses is found by halving the batch and left out; any other
  * failure is the network's and is waited out. The ledger checks every ballot and every effect

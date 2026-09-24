@@ -17,7 +17,8 @@
 	/**
 	 * The thread under a proposal, the way one runs under a pull request: who said what, when,
 	 * in Markdown, said once and kept as said. Every comment is a signed transaction of its
-	 * author, and the DAO pays its traffic like any other.
+	 * author, and its traffic is paid like any other: by the DAO, or by the author where each
+	 * member pays.
 	 */
 	let {
 		proposal,

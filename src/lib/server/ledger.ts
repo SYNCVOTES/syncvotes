@@ -4,9 +4,10 @@ import type { Rule, Settings } from '$lib/rules';
 
 /**
  * The provider's copy of the ledger, in memory: every contract of the app's templates (the
- * provider signs each one, so it sees them all), in the maps the pages read. It is filled from the active contracts at startup and kept current from
- * the update stream, so a read never touches the participant and a DAO of ten thousand costs a
- * map lookup. A page waits on the keys it shows (`nextChange`); a transaction wakes only those.
+ * provider signs each one, so it sees them all), in the maps the pages read. It is filled from
+ * the active contracts at startup and kept current from the update stream, so a read never
+ * touches the participant and a DAO of ten thousand costs a map lookup. A page waits on the
+ * keys it shows (`nextChange`); a transaction wakes only those.
  */
 
 /**
@@ -57,9 +58,9 @@ export type Dao = {
 	image: string | null;
 	/** One member, one unit of the vote. */
 	equal: boolean;
-	/** What routine proposals (decisions, the name) run under. */
+	/** The founding default a proposer's rule for a decision or a choice starts from. */
 	routine: Settings;
-	/** What sensitive ones (members, settings, dissolution) run under. */
+	/** What anything that changes the DAO runs under: members, info, these rules, dissolution. */
 	sensitive: Settings;
 	createdAt: string;
 	members: number;
@@ -208,8 +209,10 @@ export const keys = {
 const waiting = new Map<string, Set<() => void>>();
 const touched = new Set<string>([keys.all]);
 
-/** Resolves the next time a transaction touches `key`. */
-/** Resolves when any of these keys changes; its place under the other keys is given up then. */
+/**
+ * Resolves the next time a transaction touches any of these keys; its place under the others
+ * is given up then.
+ */
 export const nextChange = (...keys: string[]) =>
 	new Promise<void>((resolve) => {
 		const done = () => {

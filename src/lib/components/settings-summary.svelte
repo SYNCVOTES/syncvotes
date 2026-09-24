@@ -4,9 +4,9 @@
 	import { fmt } from '$lib/format';
 
 	/**
-	 * A DAO's settings, read at a glance: for each category, what it covers, the rule its
-	 * proposals pass by, in words and — given the size of the vote — in numbers, and how long a
-	 * vote is open.
+	 * A DAO's voting rules, read at a glance: for changes to the DAO, what they cover, the ballot,
+	 * the rule they pass by, in words and — given the size of the vote — in numbers, and how long
+	 * a vote is open; for decisions and choices, that their proposer sets all that.
 	 */
 	let {
 		sensitive,

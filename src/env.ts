@@ -19,12 +19,13 @@ export const variables = defineEnvVars({
 		schema: required
 	},
 	PROVIDER_PARTY: {
-		description: 'The app provider party: holds the FeaturedAppRight, signs the proxy, earns',
+		description:
+			'The app provider party: signs every contract a user acts on, so it confirms and earns',
 		schema: required
 	},
 	OPERATOR_PARTY: {
 		description:
-			"The backend's own party: observer on every proxy, reads the directory, never earns",
+			"The backend's own party: observer on every contract of the app, reads, never earns",
 		schema: required
 	},
 	LEDGER_AUTH_URL: {
@@ -52,7 +53,7 @@ export const variables = defineEnvVars({
 		schema: required
 	},
 	BILLING_FACTOR: {
-		description: 'What a DAO pays per byte of traffic, as a multiple of the network price',
+		description: 'What a payer is charged per byte of traffic, as a multiple of the network price',
 		schema: v.optional(v.string(), '1')
 	},
 	INVITE_CODES: {
@@ -61,7 +62,8 @@ export const variables = defineEnvVars({
 		schema: v.optional(v.string(), '')
 	},
 	NETWORK: {
-		description: 'The Canton network this deployment is on, as shown to users: TestNet or MainNet',
+		description:
+			'The Canton network this deployment is on, as shown to users: DevNet, TestNet or MainNet',
 		public: true,
 		schema: v.optional(v.picklist(['DevNet', 'TestNet', 'MainNet']), 'TestNet')
 	},
