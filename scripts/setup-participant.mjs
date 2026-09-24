@@ -15,7 +15,8 @@ const need = (k) => {
 const LEDGER = need('LEDGER_API_URL');
 const AUTH_URL = need('LEDGER_AUTH_URL');
 const APP_USER = need('KC_APP_USER_ID');
-const PROVIDER_HINT = need('WALLET_USER_NAME');
+// The provider is the validator's own party unless the app has one of its own (MainNet).
+const PROVIDER_HINT = env.PROVIDER_HINT ?? need('WALLET_USER_NAME');
 
 async function token(clientId, secret) {
 	const cfg = await (await fetch(AUTH_URL)).json();
