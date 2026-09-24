@@ -108,56 +108,54 @@ const quorumField = v.pipe(
 	v.minValue(0, 'At least 0%'),
 	v.maxValue(100, 'At most 100%')
 );
-const routineFields = {
-	routineBasis: basisField,
-	routineThreshold: thresholdField,
-	routinePercent: percentField,
-	routineNum: fractionField,
-	routineDen: fractionField,
-	routineQuorum: quorumField,
-	routineEarly: yesNo,
-	routineChangeable: yesNo,
-	routineSecret: v.optional(yesNo, 'no'),
-	routineDays: votingDays
+/** What a rule's fields fall back to where the form does not send them. */
+type RuleDefaults = {
+	basis: 'all' | 'cast';
+	threshold: 'majority' | 'percent' | 'fraction';
+	early: 'yes' | 'no';
+	days: number;
 };
-const sensitiveFields = {
-	sensitiveBasis: basisField,
-	sensitiveThreshold: thresholdField,
-	sensitivePercent: percentField,
-	sensitiveNum: fractionField,
-	sensitiveDen: fractionField,
-	sensitiveQuorum: quorumField,
-	sensitiveEarly: yesNo,
-	sensitiveChangeable: yesNo,
-	sensitiveSecret: v.optional(yesNo, 'no'),
-	sensitiveDays: votingDays
-};
-const newRoutineFields = {
-	newRoutineBasis: v.optional(basisField, 'all'),
-	newRoutineThreshold: v.optional(thresholdField, 'majority'),
-	newRoutinePercent: percentField,
-	newRoutineNum: fractionField,
-	newRoutineDen: fractionField,
-	newRoutineQuorum: quorumField,
-	newRoutineEarly: v.optional(yesNo, 'yes'),
-	newRoutineChangeable: v.optional(yesNo, 'no'),
-	newRoutineSecret: v.optional(yesNo, 'no'),
-	newRoutineDays: v.optional(votingDays, 7)
-};
-const newSensitiveFields = {
-	newSensitiveBasis: v.optional(basisField, 'all'),
-	newSensitiveThreshold: v.optional(thresholdField, 'fraction'),
-	newSensitivePercent: percentField,
-	newSensitiveNum: fractionField,
-	newSensitiveDen: fractionField,
-	newSensitiveQuorum: quorumField,
-	newSensitiveEarly: v.optional(yesNo, 'yes'),
-	newSensitiveChangeable: v.optional(yesNo, 'no'),
-	newSensitiveSecret: v.optional(yesNo, 'no'),
-	newSensitiveDays: v.optional(votingDays, 14)
-};
+/**
+ * A rule's fields under a prefix: `routine` and `sensitive` at the founding, `newRoutine` (a
+ * decision's or a choice's own) and `newSensitive` (the DAO's next voting rules) on a proposal.
+ */
+function ruleFields<P extends string>(prefix: P, d: RuleDefaults) {
+	const entries = {
+		Basis: v.optional(basisField, d.basis),
+		Threshold: v.optional(thresholdField, d.threshold),
+		Percent: percentField,
+		Num: fractionField,
+		Den: fractionField,
+		Quorum: quorumField,
+		Early: v.optional(yesNo, d.early),
+		Changeable: v.optional(yesNo, 'no'),
+		Secret: v.optional(yesNo, 'no'),
+		Days: v.optional(votingDays, d.days)
+	};
+	type Entries = typeof entries;
+	return Object.fromEntries(Object.entries(entries).map(([k, s]) => [prefix + k, s])) as {
+		[K in keyof Entries as `${P}${K & string}`]: Entries[K];
+	};
+}
+const MAJORITY: RuleDefaults = { basis: 'all', threshold: 'majority', early: 'yes', days: 7 };
+const TWO_THIRDS: RuleDefaults = { basis: 'all', threshold: 'fraction', early: 'yes', days: 14 };
 const EXCLUSIVE = 'Votes that may change cannot settle early';
 const FRACTION = 'A fraction is at most one';
+
+const ruleField = (f: object, prefix: string, k: string) =>
+	(f as Record<string, unknown>)[prefix + k];
+/** Whether a rule's two time switches are not both on: votes that may change never settle early. */
+const switchesOk = (f: object, ...prefixes: string[]) =>
+	prefixes.every(
+		(p) => !(ruleField(f, p, 'Early') === 'yes' && ruleField(f, p, 'Changeable') === 'yes')
+	);
+/** Whether a rule's fraction, if it has one, is at most one. */
+const fractionOk = (f: object, ...prefixes: string[]) =>
+	prefixes.every(
+		(p) =>
+			ruleField(f, p, 'Threshold') !== 'fraction' ||
+			Number(ruleField(f, p, 'Num')) <= Number(ruleField(f, p, 'Den'))
+	);
 
 export const createDaoForm = v.pipe(
 	v.object({
@@ -168,28 +166,11 @@ export const createDaoForm = v.pipe(
 		actorPays: v.optional(yesNo, 'no'),
 		public: v.optional(yesNo, 'no'),
 		shares: shareChanges,
-		...routineFields,
-		...sensitiveFields
+		...ruleFields('routine', MAJORITY),
+		...ruleFields('sensitive', TWO_THIRDS)
 	}),
-	v.forward(
-		v.check((f) => !(f.routineEarly === 'yes' && f.routineChangeable === 'yes'), EXCLUSIVE),
-		['routineChangeable']
-	),
-	v.forward(
-		v.check((f) => f.routineThreshold !== 'fraction' || f.routineNum <= f.routineDen, FRACTION),
-		['routineNum']
-	),
-	v.forward(
-		v.check((f) => !(f.sensitiveEarly === 'yes' && f.sensitiveChangeable === 'yes'), EXCLUSIVE),
-		['sensitiveChangeable']
-	),
-	v.forward(
-		v.check(
-			(f) => f.sensitiveThreshold !== 'fraction' || f.sensitiveNum <= f.sensitiveDen,
-			FRACTION
-		),
-		['sensitiveNum']
-	),
+	v.check((f) => switchesOk(f, 'routine', 'sensitive'), EXCLUSIVE),
+	v.check((f) => fractionOk(f, 'routine', 'sensitive'), FRACTION),
 	v.forward(
 		v.check((f) => f.shares.every((r) => r.share > 0), 'Every founding member holds a share'),
 		['shares']
@@ -242,10 +223,12 @@ export const createProposalForm = v.pipe(
 		several: v.optional(yesNo, 'no'),
 		/** A visibility proposal: readable by anyone signed in, or members only. */
 		newPublic: v.optional(yesNo, 'no'),
-		// The DAO's next settings, for a proposal that changes them.
-		...newRoutineFields,
-		...newSensitiveFields
+		// A decision's or a choice's own rule, and the DAO's next voting rules on a rules proposal.
+		...ruleFields('newRoutine', MAJORITY),
+		...ruleFields('newSensitive', TWO_THIRDS)
 	}),
+	v.check((f) => switchesOk(f, 'newRoutine', 'newSensitive'), EXCLUSIVE),
+	v.check((f) => fractionOk(f, 'newRoutine', 'newSensitive'), FRACTION),
 	v.forward(
 		v.check(
 			(f) => f.kind !== 'shares' || v.safeParse(shareChanges, f.shares).success,
@@ -277,31 +260,6 @@ export const createProposalForm = v.pipe(
 			'The description is at most 10 000 characters'
 		),
 		['newDescription']
-	),
-	v.forward(
-		v.check((f) => !(f.newRoutineEarly === 'yes' && f.newRoutineChangeable === 'yes'), EXCLUSIVE),
-		['newRoutineChangeable']
-	),
-	v.forward(
-		v.check(
-			(f) => f.newRoutineThreshold !== 'fraction' || f.newRoutineNum <= f.newRoutineDen,
-			FRACTION
-		),
-		['newRoutineNum']
-	),
-	v.forward(
-		v.check(
-			(f) => !(f.newSensitiveEarly === 'yes' && f.newSensitiveChangeable === 'yes'),
-			EXCLUSIVE
-		),
-		['newSensitiveChangeable']
-	),
-	v.forward(
-		v.check(
-			(f) => f.newSensitiveThreshold !== 'fraction' || f.newSensitiveNum <= f.newSensitiveDen,
-			FRACTION
-		),
-		['newSensitiveNum']
 	)
 );
 

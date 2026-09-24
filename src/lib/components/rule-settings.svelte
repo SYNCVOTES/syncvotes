@@ -42,6 +42,8 @@
 		extra?: import('svelte').Snippet;
 	} = $props();
 
+	// What screen readers hear before each control: whose rule this is.
+	const whose = $derived(/ensitive$/.test(prefix) ? 'Voting rules' : 'This proposal');
 	const arithmetic = (r: Rule) => ({ ...r, early: true, changeable: false });
 	const rule = $derived(settings.rule);
 	// The preset the dials stand at, or custom; a dial moved by hand changes it accordingly.
@@ -105,7 +107,7 @@
 				<input
 					type="checkbox"
 					class="accent-orange"
-					aria-label="{prefix} secret ballot"
+					aria-label="{whose}: secret ballot"
 					checked={!!rule.secret}
 					onchange={(e) => set({ secret: (e.currentTarget as HTMLInputElement).checked })}
 				/>
@@ -118,14 +120,18 @@
 				<input
 					type="checkbox"
 					class="accent-orange"
-					aria-label="{prefix} votes may change"
+					aria-label="{whose}: votes may change"
 					checked={rule.changeable}
 					onchange={(e) => {
 						const on = (e.currentTarget as HTMLInputElement).checked;
 						set({ changeable: on, early: on ? false : rule.early });
 					}}
 				/>
-				<span class="text-ink-mid">until the deadline; counted only then</span>
+				<span class="text-ink-mid"
+					>until the deadline; counted only then{rule.changeable
+						? ', so it does not settle early'
+						: ''}</span
+				>
 			</label>
 		</div>
 		{@render extra?.()}
@@ -141,7 +147,7 @@
 			<select
 				class={select}
 				value={preset}
-				aria-label="{prefix} preset"
+				aria-label="{whose}: preset"
 				onchange={(e) => pick((e.currentTarget as HTMLSelectElement).value as Preset)}
 			>
 				{#each PRESETS as p (p.value)}<option value={p.value}>{p.title}</option>{/each}
@@ -187,7 +193,7 @@
 						min={1}
 						max={100}
 						class="w-24 text-right"
-						aria-label="Percent of yes"
+						aria-label="{whose}: percent of yes"
 						value={rule.threshold.percent}
 						oninput={(e) =>
 							set({
@@ -204,7 +210,7 @@
 						min={1}
 						max={100}
 						class="w-16 text-right"
-						aria-label="Fraction, numerator"
+						aria-label="{whose}: fraction, numerator"
 						value={rule.threshold.num}
 						oninput={(e) =>
 							set({
@@ -221,7 +227,7 @@
 						min={1}
 						max={100}
 						class="w-16 text-right"
-						aria-label="Fraction, denominator"
+						aria-label="{whose}: fraction, denominator"
 						value={rule.threshold.den}
 						oninput={(e) =>
 							set({
@@ -243,7 +249,7 @@
 					min={0}
 					max={100}
 					class="w-24 text-right"
-					aria-label="Quorum"
+					aria-label="{whose}: quorum"
 					value={rule.quorum}
 					oninput={(e) =>
 						set({
@@ -262,14 +268,18 @@
 				<input
 					type="checkbox"
 					class="accent-orange"
-					aria-label="{prefix} settle early"
+					aria-label="{whose}: settle early"
 					checked={rule.early}
 					onchange={(e) => {
 						const on = (e.currentTarget as HTMLInputElement).checked;
 						set({ early: on, changeable: on ? false : rule.changeable });
 					}}
 				/>
-				<span class="text-ink-mid">the moment the outcome can no longer change</span>
+				<span class="text-ink-mid"
+					>{rule.changeable
+						? 'off while votes may change (under Ballot): the count waits for the deadline'
+						: 'the moment the outcome can no longer change'}</span
+				>
 			</label>
 		</div>
 		<div class="{row} px-4 py-3">
@@ -280,7 +290,7 @@
 					min={1}
 					max={90}
 					class="w-24 text-right"
-					aria-label="{prefix} voting days"
+					aria-label="{whose}: voting days"
 					value={settings.votingDays}
 					oninput={(e) =>
 						(settings = {

@@ -213,8 +213,7 @@ Each is `docker compose build && up -d` against a Docker context named `syncvote
 context travels over SSH and the server's daemon builds the image. Nothing lives on a server but
 Docker and the validator. Compose reads `<network>.env` locally (template in `.env.example`,
 the files never in git): the participant, the parties, the realm's secrets, `SCAN_URL`,
-`NETWORK`, `BILLING_FACTOR`, `INVITE_CODES`, the proxy knobs. The commit is baked in as
-`GIT_SHA`; `/version` answers with it.
+`NETWORK`, `BILLING_FACTOR`, `INVITE_CODES`, the proxy knobs. The commit is baked in as `GIT_SHA`; `/version` answers with it and with the id of the Daml package the app uploaded, the id the participant knows the code by.
 
 `compose.yaml` joins the Splice validator's network and must never recreate its containers
 (the validator has its own `start.sh`). Caddy serves the domain and the realm; behind Cloudflare

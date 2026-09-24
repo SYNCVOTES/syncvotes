@@ -33,9 +33,9 @@ const CONFIRMATION = 2;
 const EC_CURVE25519 = 1;
 
 /** The package this app was built with; a same-named choice elsewhere is refused. */
-const PACKAGE_NAME = Main.Account.templateId.slice(1).split(':')[0];
+export const PACKAGE_NAME = Main.Account.templateId.slice(1).split(':')[0];
 
-type Home = { template: string; pkg: string; iface?: string };
+type Home = { template: string; pkg: string };
 
 /** The only choices a user is ever asked to sign, and where each lives. */
 const CHOICES: Record<string, Home> = {
@@ -293,15 +293,14 @@ export async function verifyPrepared(
 		const exercise = root.v1.nodeType.exercise;
 		const home = CHOICES[want.choice];
 		const template = `${exercise.templateId?.moduleName}:${exercise.templateId?.entityName}`;
-		const iface = exercise.interfaceId
-			? `${exercise.interfaceId.moduleName}:${exercise.interfaceId.entityName}`
-			: undefined;
 		if (!home || exercise.choiceId !== want.choice || template !== home.template) {
 			throw new Error(
 				`Expected to sign ${want.choice} on ${home?.template}, got ${exercise.choiceId} on ${template}`
 			);
 		}
-		if (home.iface !== iface) throw new Error('The choice is not on the interface expected');
+		// Every choice a user signs is on the app's own template directly; one reached through an
+		// interface would be some other package's code under a familiar name.
+		if (exercise.interfaceId) throw new Error('The choice is reached through an interface');
 		if (exercise.packageName !== home.pkg) {
 			throw new Error(`The transaction uses ${exercise.packageName}, not ${home.pkg}`);
 		}
