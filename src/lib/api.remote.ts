@@ -439,7 +439,8 @@ export const daoProposals = query.live(
 								: true) &&
 					(!needle || p.title.toLowerCase().includes(needle) || matches(q)(p.proposer))
 			);
-			return page(all, offset, limit);
+			const shown = page(all, offset, limit);
+			return { ...shown, items: shown.items.map((p) => ({ ...p, ...tallyOf(p) })) };
 		})
 );
 
@@ -518,6 +519,23 @@ const summed = (p: ledger.Proposal) => {
 	return sum;
 };
 
+/**
+ * A proposal's totals as a page shows them: the ledger's counters once it has counted, and
+ * until then (always, where votes may change and are counted at the deadline) what is cast.
+ */
+const tallyOf = (p: ledger.Proposal) => {
+	const counted = p.yes + p.no + p.abstain + p.tallies.reduce((s, t) => s + t, 0);
+	return counted > 0 && !p.rule.changeable
+		? {
+				yes: p.yes,
+				no: p.no,
+				abstain: p.abstain,
+				tallies: p.tallies,
+				picked: p.picked ?? p.tallies.reduce((s, t) => s + t, 0)
+			}
+		: summed(p);
+};
+
 /** A vote as the ledger takes it: a variant, since some constructors carry the options picked. */
 const voteWire = (vote: ledger.Vote) => {
 	const picks = ledger.picksOf(vote);
@@ -535,18 +553,8 @@ export const proposal = query.live(contractId, (id) =>
 		const me = proposalReader(p);
 		const dao = ledger.daos.get(p.daoId);
 		const mine = me && ledger.ballots.get(id)?.get(me.party);
-		// Until the ledger has counted, the page shows what has been cast.
 		const counted = p.yes + p.no + p.abstain + p.tallies.reduce((s, t) => s + t, 0);
-		const shown =
-			counted > 0 && !p.rule.changeable
-				? {
-						yes: p.yes,
-						no: p.no,
-						abstain: p.abstain,
-						tallies: p.tallies,
-						picked: p.picked ?? p.tallies.reduce((s, t) => s + t, 0)
-					}
-				: summed(p);
+		const shown = tallyOf(p);
 		return {
 			...p,
 			...shown,
