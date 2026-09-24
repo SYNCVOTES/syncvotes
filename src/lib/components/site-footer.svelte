@@ -35,9 +35,14 @@
 		</div>
 	</div>
 	<div
-		class="mx-auto flex max-w-[1120px] items-center justify-between gap-4 border-t border-border pt-5 font-mono text-xs text-ink-dim"
+		class="mx-auto flex max-w-[1120px] flex-wrap items-center justify-between gap-4 border-t border-border pt-5 font-mono text-xs text-ink-dim"
 	>
-		<span>© {new Date().getFullYear()} SyncVotes</span>
+		<span class="flex flex-wrap items-center gap-x-4 gap-y-1">
+			<span>© {new Date().getFullYear()} SyncVotes</span>
+			<a href="/terms" class="hover:text-orange">Terms</a>
+			<a href="/privacy" class="hover:text-orange">Privacy</a>
+			<a href="/brand" class="hover:text-orange">Brand kit</a>
+		</span>
 		<span class="flex items-center gap-4">
 			<span class="hidden sm:inline">Built on Canton Network</span>
 			<a href="/version" class="hover:text-orange">build</a>
