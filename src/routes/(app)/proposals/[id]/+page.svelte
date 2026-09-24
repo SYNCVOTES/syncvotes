@@ -240,7 +240,7 @@
 					<Note mono={false}>Ballots are the members' business; the tally shows the totals.</Note>
 				{/if}
 
-				<Comments proposal={id} member={!!p.me.membership} />
+				<Comments proposal={id} member={!!p.me.membership} actorPays={p.daoActorPays} />
 			</section>
 
 			<aside class="order-first min-w-0 space-y-6 lg:order-none">

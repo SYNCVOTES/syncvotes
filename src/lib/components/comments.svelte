@@ -19,7 +19,11 @@
 	 * in Markdown, said once and kept as said. Every comment is a signed transaction of its
 	 * author, and the DAO pays its traffic like any other.
 	 */
-	let { proposal, member }: { proposal: string; member: boolean } = $props();
+	let {
+		proposal,
+		member,
+		actorPays = false
+	}: { proposal: string; member: boolean; actorPays?: boolean } = $props();
 	let limit = $state(20);
 	const comments = $derived(store.who ? remote.proposalComments({ id: proposal, limit }) : null);
 
@@ -106,7 +110,9 @@
 						{store.busy ? 'Signing…' : 'Comment'}
 					</Button>
 					<span class="font-mono text-[0.6875rem] text-ink-dim"
-						>Signed with your key; the DAO pays the traffic — a few CC per write at TestNet prices.</span
+						>Signed with your key; {actorPays
+							? 'you pay the traffic from your balance'
+							: 'the DAO pays the traffic'} — a few CC per write at today's prices.</span
 					>
 				</div>
 			</form>

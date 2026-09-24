@@ -41,9 +41,14 @@
 
 	// The proposal list is paged and filtered on the server; more pages append below.
 	let status = $state<'open' | 'closed' | 'unvoted' | undefined>(undefined);
-	/** Every vote cast: for and against, abstaining, and for each option of a choice. */
-	const castOf = (p: { yes: number; no: number; abstain: number; tallies: number[] }) =>
-		p.yes + p.no + p.abstain + p.tallies.reduce((s, t) => s + t, 0);
+	/** Every vote cast: for and against, abstaining, and the ballots that picked options. */
+	const castOf = (p: {
+		yes: number;
+		no: number;
+		abstain: number;
+		tallies: number[];
+		picked: number | null;
+	}) => p.yes + p.no + p.abstain + (p.picked ?? p.tallies.reduce((s, t) => s + t, 0));
 	let limit = $state(20);
 	let q = $state('');
 	const proposals = $derived(me ? remote.daoProposals({ id, offset: 0, limit, status, q }) : null);

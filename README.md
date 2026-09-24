@@ -61,11 +61,15 @@ thousands of members, and one member's vote touches no contract another's does.
   change, in which case the old one is withdrawn).
 - `Proposal` — counters, not lists: `yes`, `no`, `abstain`, `tallies` per option, `eligible`,
   `outcome`, how far its effect is carried out. Effects: `Signal`, `Choose` (two to ten
-  options; the leader wins if it reaches what a yes would need, a tie decides nothing),
-  `SetShares`, `SetInfo`, `SetSettings`, `SetPublic`, `Dissolve`. A rule is yes against the
-  whole vote or the votes cast, a majority, a fraction or a percentage, a quorum, whether it
-  settles as soon as the outcome cannot change, whether votes may change until the deadline
-  (the last two exclude each other). Nobody cancels a proposal.
+  options; the leader wins if it reaches what a yes would need, a tie decides nothing — or,
+  with `several`, each member picks any number and every option that reaches the rule is
+  chosen, measured against the ballots that picked anything where the rule counts the votes
+  cast), `SetShares`, `SetInfo`, `SetSettings`, `SetPublic`, `Dissolve`. A rule is yes against
+  the whole vote or the votes cast, a majority, a fraction or a percentage, a quorum, whether
+  it settles as soon as the outcome cannot change, whether votes may change until the deadline
+  (the last two exclude each other). Nobody cancels a proposal. A proposal may be a `secret`
+  ballot: the app shows nobody a vote but their own; the ballots are on the ledger all the
+  same, and the provider, which counts them, sees them.
 - `Ballot` — one vote weighing the voter's units. The provider counts in batches
   (`Proposal_Tally`; a final count three minutes after the deadline) and `Ballot_Count` checks
   each ballot: right DAO and proposal, cast in time, under the same rule, by a member of the
