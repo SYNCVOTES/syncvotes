@@ -13,7 +13,7 @@ import { fingerprintOf } from './verify';
 import { INVITE_CODES } from '$app/env/private';
 import { normaliseHint, hintProblem } from './hint';
 import * as schemas from './schemas';
-import { categoryOf, settingsToLedger, type Rule, type Settings } from './rules';
+import { categoryOf, settingsOf, settingsToLedger } from './rules';
 
 /**
  * The server's API as remote functions: pages call these like local functions and SvelteKit
@@ -726,25 +726,6 @@ export const createDaoForm = form(schemas.createDaoForm, async (f) => {
 		prepared: await prepare(party, Main.Account, account, 'Account_CreateDAO', args, null)
 	};
 });
-
-/** A category's settings from a form's fields under a prefix (`routineBasis`, `newSensitiveDays`…). */
-const settingsOf = (f: Record<string, unknown>, prefix: string): Settings => {
-	const field = (name: string) => f[prefix + name];
-	const rule: Rule = {
-		basis: field('Basis') as Rule['basis'],
-		threshold:
-			field('Threshold') === 'percent'
-				? { kind: 'percent', percent: Number(field('Percent')) }
-				: field('Threshold') === 'fraction'
-					? { kind: 'fraction', num: Number(field('Num')), den: Number(field('Den')) }
-					: { kind: 'majority' },
-		quorum: Number(field('Quorum')),
-		early: field('Early') === 'yes',
-		changeable: field('Changeable') === 'yes',
-		secret: field('Secret') === 'yes'
-	};
-	return { rule, votingDays: Number(field('Days')) };
-};
 
 export const createProposalForm = form(schemas.createProposalForm, async (f) => {
 	const party = session.required();

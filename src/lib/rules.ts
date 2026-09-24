@@ -208,6 +208,54 @@ export const DEFAULTS: Record<Category, Settings> = {
 	sensitive: { rule: PRESETS[2].rule!, votingDays: 14 }
 };
 
+/** A deep copy, so a form edits its own settings and never the object it started from. */
+export const copySettings = (s: Settings): Settings => ({
+	...s,
+	rule: { ...s.rule, threshold: { ...s.rule.threshold } }
+});
+
+/**
+ * The settings as a form submits them, one field per value under a prefix (`routineBasis`,
+ * `n:newSensitiveDays`…; `n:` marks a number). A threshold's unused numbers go as the values
+ * the dials start from, so the schema always finds them.
+ */
+export const settingsFields = (prefix: string, s: Settings): [string, string | number][] => [
+	[`${prefix}Basis`, s.rule.basis],
+	[`${prefix}Threshold`, s.rule.threshold.kind],
+	[`n:${prefix}Percent`, s.rule.threshold.kind === 'percent' ? s.rule.threshold.percent : 67],
+	[`n:${prefix}Num`, s.rule.threshold.kind === 'fraction' ? s.rule.threshold.num : 2],
+	[`n:${prefix}Den`, s.rule.threshold.kind === 'fraction' ? s.rule.threshold.den : 3],
+	[`n:${prefix}Quorum`, s.rule.quorum],
+	[`${prefix}Early`, s.rule.early ? 'yes' : 'no'],
+	[`${prefix}Changeable`, s.rule.changeable ? 'yes' : 'no'],
+	[`${prefix}Secret`, s.rule.secret ? 'yes' : 'no'],
+	[`n:${prefix}Days`, s.votingDays]
+];
+
+/**
+ * The settings back from a form's fields under a prefix. The browser reads the fields it
+ * submitted with this and the server the fields it received, so both build the same arguments.
+ */
+export const settingsOf = (fields: Record<string, unknown>, prefix: string): Settings => {
+	const at = (name: string) => fields[prefix + name];
+	return {
+		rule: {
+			basis: at('Basis') as Rule['basis'],
+			threshold:
+				at('Threshold') === 'percent'
+					? { kind: 'percent', percent: Number(at('Percent')) }
+					: at('Threshold') === 'fraction'
+						? { kind: 'fraction', num: Number(at('Num')), den: Number(at('Den')) }
+						: { kind: 'majority' },
+			quorum: Number(at('Quorum')),
+			early: at('Early') === 'yes',
+			changeable: at('Changeable') === 'yes',
+			secret: at('Secret') === 'yes'
+		},
+		votingDays: Number(at('Days'))
+	};
+};
+
 /** The settings as the ledger's JSON writes them. */
 export const settingsToLedger = (s: Settings) => ({
 	rule: toLedger(s.rule),

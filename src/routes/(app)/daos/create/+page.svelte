@@ -18,7 +18,15 @@
 	import Note from '$lib/components/note.svelte';
 	import Hint from '$lib/components/hint.svelte';
 	import RuleSettings from '$lib/components/rule-settings.svelte';
-	import { DEFAULTS, settingsToLedger, validRule, type Settings } from '$lib/rules';
+	import {
+		DEFAULTS,
+		copySettings,
+		settingsFields,
+		settingsOf,
+		settingsToLedger,
+		validRule,
+		type Settings
+	} from '$lib/rules';
 	import Users from '@lucide/svelte/icons/users';
 	import PieChart from '@lucide/svelte/icons/pie-chart';
 	import { fmt } from '$lib/format';
@@ -94,27 +102,11 @@
 	});
 	let description = $state('');
 	let image = $state('');
-	// The rule everything that changes the DAO passes by; the founding default to start from.
-	// A decision or a choice runs under a rule its proposer sets, so the DAO's routine settings
-	// are the founding default, sent along unchanged: what a proposer's form starts from.
-	const copy = (x: Settings): Settings => ({
-		...x,
-		rule: { ...x.rule, threshold: { ...x.rule.threshold } }
-	});
-	const routine = copy(DEFAULTS.routine);
-	let sensitive = $state<Settings>(copy(DEFAULTS.sensitive));
-	const hidden = (prefix: string, s: Settings): [string, string | number][] => [
-		[`${prefix}Basis`, s.rule.basis],
-		[`${prefix}Threshold`, s.rule.threshold.kind],
-		[`n:${prefix}Percent`, s.rule.threshold.kind === 'percent' ? s.rule.threshold.percent : 67],
-		[`n:${prefix}Num`, s.rule.threshold.kind === 'fraction' ? s.rule.threshold.num : 2],
-		[`n:${prefix}Den`, s.rule.threshold.kind === 'fraction' ? s.rule.threshold.den : 3],
-		[`n:${prefix}Quorum`, s.rule.quorum],
-		[`${prefix}Early`, s.rule.early ? 'yes' : 'no'],
-		[`${prefix}Changeable`, s.rule.changeable ? 'yes' : 'no'],
-		[`${prefix}Secret`, s.rule.secret ? 'yes' : 'no'],
-		[`n:${prefix}Days`, s.votingDays]
-	];
+	// The rule everything that changes the DAO passes by, starting from the founding default. A
+	// decision or a choice runs under a rule its proposer sets, so the DAO's routine settings go
+	// along unchanged, as the founding default a proposer's form starts from.
+	const routine = copySettings(DEFAULTS.routine);
+	let sensitive = $state<Settings>(copySettings(DEFAULTS.sensitive));
 
 	// The intent is the founding table as the ledger reads it: the first batch of rows, and the
 	// rest as a proposal already passed. The server orders the creator first; so does this.
@@ -123,26 +115,6 @@
 		schema,
 		(fields, { id }) => {
 			const { daoName, description, image, equal, shares } = fields;
-			const settingsOf = (prefix: 'routine' | 'sensitive'): Settings => {
-				const x = fields as unknown as Record<string, unknown>;
-				const at = (name: string) => x[prefix + name];
-				return {
-					rule: {
-						basis: at('Basis') as Settings['rule']['basis'],
-						threshold:
-							at('Threshold') === 'percent'
-								? { kind: 'percent', percent: Number(at('Percent')) }
-								: at('Threshold') === 'fraction'
-									? { kind: 'fraction', num: Number(at('Num')), den: Number(at('Den')) }
-									: { kind: 'majority' },
-						quorum: Number(at('Quorum')),
-						early: at('Early') === 'yes',
-						changeable: at('Changeable') === 'yes',
-						secret: at('Secret') === 'yes'
-					},
-					votingDays: Number(at('Days'))
-				};
-			};
 			const me = store.who!.party;
 			const ordered = [
 				...shares.filter((r) => r.party === me),
@@ -160,8 +132,8 @@
 					equal: equal === 'yes',
 					actorPays: payer === 'members',
 					public: visibility === 'public',
-					routine: settingsToLedger(settingsOf('routine')),
-					sensitive: settingsToLedger(settingsOf('sensitive')),
+					routine: settingsToLedger(settingsOf(fields, 'routine')),
+					sensitive: settingsToLedger(settingsOf(fields, 'sensitive')),
 					shares: ordered.slice(0, BATCH).map(tuple),
 					more: ordered.slice(BATCH).map(tuple)
 				}
@@ -301,7 +273,7 @@
 					decision or a choice changes nothing, so whoever proposes one sets its ballot and rule
 					then.
 				</p>
-				{#each hidden('routine', routine) as [name, value] (name)}
+				{#each settingsFields('routine', routine) as [name, value] (name)}
 					<input type="hidden" {name} {value} />
 				{/each}
 				<h3 class="eyebrow">Ballot</h3>

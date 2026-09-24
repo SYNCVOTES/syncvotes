@@ -21,7 +21,17 @@
 	import Note from '$lib/components/note.svelte';
 	import RuleSettings from '$lib/components/rule-settings.svelte';
 	import Hint from '$lib/components/hint.svelte';
-	import { categoryOf, describe, settingsToLedger, validRule, type Settings } from '$lib/rules';
+	import {
+		DEFAULTS,
+		categoryOf,
+		copySettings,
+		describe,
+		settingsFields,
+		settingsOf,
+		settingsToLedger,
+		validRule,
+		type Settings
+	} from '$lib/rules';
 	import PieChart from '@lucide/svelte/icons/pie-chart';
 	import Users from '@lucide/svelte/icons/users';
 	import Pencil from '@lucide/svelte/icons/pencil';
@@ -132,53 +142,20 @@
 		newImage = d.image ?? '';
 	});
 
-	// A settings proposal carries the DAO's next settings, starting from today's.
-	const copy = (x: Settings): Settings => ({
-		...x,
-		rule: { ...x.rule, threshold: { ...x.rule.threshold } }
-	});
-	let newRoutine = $state<Settings>({
-		rule: {
-			basis: 'all',
-			threshold: { kind: 'majority' },
-			quorum: 0,
-			early: true,
-			changeable: false
-		},
-		votingDays: 7
-	});
-	let newSensitive = $state<Settings>({
-		rule: {
-			basis: 'all',
-			threshold: { kind: 'fraction', num: 2, den: 3 },
-			quorum: 0,
-			early: true,
-			changeable: false
-		},
-		votingDays: 14
-	});
+	// A rules proposal carries the DAO's next settings, starting from today's; a decision or a
+	// choice carries its proposer's rule in `newRoutine`, starting from the DAO's routine default.
+	let newRoutine = $state<Settings>(copySettings(DEFAULTS.routine));
+	let newSensitive = $state<Settings>(copySettings(DEFAULTS.sensitive));
 	let settingsSeeded = $state(false);
 	$effect(() => {
 		if (!d || settingsSeeded) return;
 		settingsSeeded = true;
-		newRoutine = copy(d.routine);
-		newSensitive = copy(d.sensitive);
+		newRoutine = copySettings(d.routine);
+		newSensitive = copySettings(d.sensitive);
 	});
 	/** What this proposal runs under: the DAO's rule for anything that changes the DAO; for a decision or a choice, the rule set below. */
 	const own = $derived(categoryOf(kind) === 'routine');
 	const applies = $derived(d ? (own ? newRoutine : d.sensitive) : null);
-	const hidden = (prefix: string, s: Settings): [string, string | number][] => [
-		[`${prefix}Basis`, s.rule.basis],
-		[`${prefix}Threshold`, s.rule.threshold.kind],
-		[`n:${prefix}Percent`, s.rule.threshold.kind === 'percent' ? s.rule.threshold.percent : 67],
-		[`n:${prefix}Num`, s.rule.threshold.kind === 'fraction' ? s.rule.threshold.num : 2],
-		[`n:${prefix}Den`, s.rule.threshold.kind === 'fraction' ? s.rule.threshold.den : 3],
-		[`n:${prefix}Quorum`, s.rule.quorum],
-		[`${prefix}Early`, s.rule.early ? 'yes' : 'no'],
-		[`${prefix}Changeable`, s.rule.changeable ? 'yes' : 'no'],
-		[`${prefix}Secret`, s.rule.secret ? 'yes' : 'no'],
-		[`n:${prefix}Days`, s.votingDays]
-	];
 
 	// The share editor starts as today's table, read once; the rest is the proposer's.
 	const today = $derived(store.who && kind === 'shares' ? remote.daoShares(id) : null);
@@ -349,26 +326,6 @@
 		({ pid }) => goto(`/proposals/${pid}`)
 	);
 
-	/** A category's settings from the submitted fields under a prefix, as the server reads them. */
-	const settingsOf = (fields: Record<string, unknown>, prefix: string): Settings => {
-		const at = (name: string) => fields[prefix + name];
-		return {
-			rule: {
-				basis: at('Basis') as Settings['rule']['basis'],
-				threshold:
-					at('Threshold') === 'percent'
-						? { kind: 'percent', percent: Number(at('Percent')) }
-						: at('Threshold') === 'fraction'
-							? { kind: 'fraction', num: Number(at('Num')), den: Number(at('Den')) }
-							: { kind: 'majority' },
-				quorum: Number(at('Quorum')),
-				early: at('Early') === 'yes',
-				changeable: at('Changeable') === 'yes',
-				secret: at('Secret') === 'yes'
-			},
-			votingDays: Number(at('Days'))
-		};
-	};
 	const ready = $derived.by(() => {
 		if (!d) return false;
 		switch (kind) {
@@ -555,7 +512,7 @@
 						<ImageField name="newImage" id="newImage" bind:value={newImage} disabled={store.busy} />
 					</Field>
 				{:else if kind === 'settings'}
-					{#each hidden('newRoutine', newRoutine) as [name, value] (name)}
+					{#each settingsFields('newRoutine', newRoutine) as [name, value] (name)}
 						<input type="hidden" {name} {value} />
 					{/each}
 					<h3 class="eyebrow">Ballot</h3>

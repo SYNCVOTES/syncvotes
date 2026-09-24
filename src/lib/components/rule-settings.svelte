@@ -9,7 +9,8 @@
 		type Preset,
 		type Rule,
 		type Settings,
-		fractionWords
+		fractionWords,
+		settingsFields
 	} from '$lib/rules';
 	import { fmt } from '$lib/format';
 
@@ -130,16 +131,9 @@
 		{@render extra?.()}
 	</div>
 {:else}
-	<input type="hidden" name="{prefix}Basis" value={rule.basis} />
-	<input type="hidden" name="{prefix}Threshold" value={rule.threshold.kind} />
-	<input type="hidden" name="n:{prefix}Percent" value={percent} />
-	<input type="hidden" name="n:{prefix}Num" value={num} />
-	<input type="hidden" name="n:{prefix}Den" value={den} />
-	<input type="hidden" name="n:{prefix}Quorum" value={rule.quorum} />
-	<input type="hidden" name="{prefix}Early" value={rule.early ? 'yes' : 'no'} />
-	<input type="hidden" name="{prefix}Changeable" value={rule.changeable ? 'yes' : 'no'} />
-	<input type="hidden" name="{prefix}Secret" value={rule.secret ? 'yes' : 'no'} />
-	<input type="hidden" name="n:{prefix}Days" value={settings.votingDays} />
+	{#each settingsFields(prefix, settings) as [name, value] (name)}
+		<input type="hidden" {name} {value} />
+	{/each}
 
 	<div class="divide-y divide-border border border-border">
 		<div class="{row} px-4 py-3">
