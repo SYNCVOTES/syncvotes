@@ -213,7 +213,31 @@
 					>{screen.hint}::{screen.fingerprint}</code
 				>. Creating it costs the network traffic, and nothing is created before that has arrived for
 				your key. This page waits; once enough is in, the party is made and you go on.
+				{#if screen.kept}
+					The key is kept on this device, so you can close this page and come back later: unlocking
+					it brings you here.
+				{:else}
+					The key exists only in this tab: leave it open until the party is made, or restore the
+					phrase and pay in for the same party.
+				{/if}
 			</p>
+			{#await setup then c}
+				{#if c.invitesRequired && !screen.invite}
+					<div class="space-y-1">
+						<Input
+							placeholder="Invite code"
+							class="font-mono"
+							maxlength={80}
+							autocomplete="off"
+							bind:value={inviteInput}
+							onchange={() => flow.setInvite(inviteInput.trim())}
+						/>
+						<p class="font-mono text-xs text-ink-dim">
+							The code this key was invited with is not on this device; enter it again.
+						</p>
+					</div>
+				{/if}
+			{/await}
 			{#if funding?.error}
 				<QueryError error={funding.error} refresh={() => funding?.reconnect()} />
 			{:else if funding?.ready}
@@ -230,7 +254,8 @@
 			<p class="text-sm text-ink-mid">
 				It is stored encrypted, and unlocked with Touch ID or a password each visit. Until you
 				choose, the key exists only in this tab: reloading or closing it means restoring from the
-				phrase.
+				phrase.{#if screen.pending}
+					Kept here, it also lets you leave while the pay-in for your party lands.{/if}
 			</p>
 			{#if passkeys}
 				<Button disabled={store.busy} onclick={() => flow.protect({ passkey: true })}

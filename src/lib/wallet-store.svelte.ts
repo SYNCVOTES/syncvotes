@@ -16,8 +16,22 @@ export type Screen =
 	| { at: 'create'; phrase: string }
 	| { at: 'restore' }
 	| { at: 'hint'; signer: wallet.Signer; fingerprint: string }
-	| { at: 'fund'; signer: wallet.Signer; fingerprint: string; hint: string; invite: string }
-	| { at: 'protect'; signer: wallet.Signer; who: actions.Identity }
+	| {
+			at: 'fund';
+			signer: wallet.Signer;
+			fingerprint: string;
+			hint: string;
+			invite: string;
+			/** Whether the key is kept on this device, so the page may be left while the pay-in lands. */
+			kept: boolean;
+	  }
+	| {
+			at: 'protect';
+			signer: wallet.Signer;
+			who: actions.Identity;
+			/** Set while the party is not made yet: the key is kept first, paid for next. */
+			pending?: { hint: string; invite: string; fingerprint: string };
+	  }
 	| { at: 'locked'; lock: 'passkey' | 'password' }
 	| { at: 'home'; signer: wallet.Signer; who: actions.Identity };
 
@@ -28,6 +42,35 @@ let problem = $state<string | null>(null);
 let phase = $state<string | null>(null);
 let wallets = $state<wallet.StoredWallet[]>([]);
 let selected = $state<string | null>(null);
+
+/** Invite codes by key fingerprint, kept on the device until the party they were for is made. */
+const INVITES = 'syncvotes.invites';
+const invites = {
+	all(): Record<string, string> {
+		try {
+			return JSON.parse(localStorage.getItem(INVITES) ?? '{}') as Record<string, string>;
+		} catch {
+			return {};
+		}
+	},
+	get: (fingerprint: string) => invites.all()[fingerprint] ?? '',
+	set(fingerprint: string, invite: string) {
+		try {
+			localStorage.setItem(INVITES, JSON.stringify({ ...invites.all(), [fingerprint]: invite }));
+		} catch {
+			// Not remembered: the code is asked for again after a reload.
+		}
+	},
+	forget(fingerprint: string) {
+		const rest = invites.all();
+		delete rest[fingerprint];
+		try {
+			localStorage.setItem(INVITES, JSON.stringify(rest));
+		} catch {
+			// Nothing to forget.
+		}
+	}
+};
 
 export const store = {
 	get screen() {
@@ -165,7 +208,14 @@ async function identify(signer: wallet.Signer, andThen: 'protect' | 'enter') {
 	autoLock.start(lock);
 	const found = await actions.lookup(signer);
 	if (!found.exists) {
-		screen = { at: 'hint', signer, fingerprint: found.fingerprint };
+		// A key kept on this device before its party was made carries the hint it was named with:
+		// the pay-in can be resumed after a reload, on the same party, with the same invite.
+		const kept = wallets.find((w) => w.party.endsWith(`::${found.fingerprint}`));
+		if (kept) {
+			const hint = kept.party.slice(0, -found.fingerprint.length - 2);
+			const invite = invites.get(found.fingerprint);
+			screen = { at: 'fund', signer, fingerprint: found.fingerprint, hint, invite, kept: true };
+		} else screen = { at: 'hint', signer, fingerprint: found.fingerprint };
 		return;
 	}
 	const who = { party: found.party, account: found.account };
@@ -216,26 +266,45 @@ export const flow = {
 			if (!(await remote.checkInvite(invite))) {
 				throw new Error('This app is by invitation for now; the code is missing or wrong');
 			}
-			screen = { at: 'fund', signer, fingerprint, hint, invite };
+			// The key is kept before anyone pays for it: a reload while the pay-in lands must not
+			// cost a new key. The party id is known already; it is the hint and the fingerprint.
+			invites.set(fingerprint, invite);
+			screen = {
+				at: 'protect',
+				signer,
+				who: { party: `${hint}::${fingerprint}`, account: '' },
+				pending: { hint, invite, fingerprint }
+			};
 		});
 	},
 
-	/** What arrived covers a party: the key signs the topology that names it. */
+	/** A later visit knows the code again; the server asks for it when the party is made. */
+	setInvite(invite: string) {
+		if (screen.at !== 'fund') return;
+		invites.set(screen.fingerprint, invite);
+		screen = { ...screen, invite };
+	},
+
+	/** What arrived covers a party: the key signs the topology that names it, and you are in. */
 	enrolNow() {
 		if (screen.at !== 'fund' || busy) return;
-		const { signer, hint, invite } = screen;
+		const { signer, hint, invite, fingerprint } = screen;
 		return run(async () => {
 			working('Creating your party on the ledger');
 			const topology = await actions.topology(signer, hint);
 			const who = await actions.enrol(signer, hint, topology, invite);
-			screen = { at: 'protect', signer, who };
+			invites.forget(fingerprint);
+			await enter(signer, who);
 		});
 	},
 
-	/** Keeps the key on this device behind a passkey or a password, then signs in. */
+	/**
+	 * Keeps the key on this device behind a passkey or a password. A party that exists is then
+	 * signed in; one that is not yet is paid for next.
+	 */
 	protect(how: { passkey: true } | { password: string }) {
 		if (screen.at !== 'protect') return;
-		const { signer, who } = screen;
+		const { signer, who, pending } = screen;
 		return run(async () => {
 			working('Encrypting the key on this device');
 			selected =
@@ -243,13 +312,18 @@ export const flow = {
 					? await wallet.lockWithPasskey(signer, who.party)
 					: await wallet.lockWithPassword(signer, how.password, who.party);
 			wallets = wallet.storedWallets();
-			await enter(signer, who);
+			if (pending) screen = { at: 'fund', signer, ...pending, kept: true };
+			else await enter(signer, who);
 		});
 	},
 
 	skipProtection() {
 		if (screen.at !== 'protect') return;
-		const { signer, who } = screen;
+		const { signer, who, pending } = screen;
+		if (pending) {
+			screen = { at: 'fund', signer, ...pending, kept: false };
+			return;
+		}
 		return run(() => enter(signer, who));
 	},
 
