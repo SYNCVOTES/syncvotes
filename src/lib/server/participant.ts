@@ -291,33 +291,44 @@ export async function allocateMultiKeyParty(
 
 /**
  * A party this participant hosts whose namespace is this fingerprint: the party a key made,
- * found without its Account — for a key that comes back after the app's package changed.
+ * found without its Account — for a key that comes back after the app's package changed. Read
+ * from the list kept below; empty until the first walk of the participant's parties is done.
  */
-export async function partyByFingerprint(fingerprint: string): Promise<string | null> {
-	return (await localParties()).find((p) => p.split('::')[1] === fingerprint) ?? null;
-}
+export const partyByFingerprint = (fingerprint: string): string | null =>
+	hosted.get(fingerprint) ?? null;
 
-let partiesCache: { at: number; promise: Promise<string[]> } | undefined;
-/** The parties this participant hosts, read once a minute at most: a key search is a map lookup. */
-function localParties(): Promise<string[]> {
-	if (partiesCache && Date.now() - partiesCache.at < 60_000) return partiesCache.promise;
-	const promise = listLocalParties();
-	promise.catch(() => (partiesCache = undefined));
-	partiesCache = { at: Date.now(), promise };
-	return promise;
-}
-async function listLocalParties(): Promise<string[]> {
-	const found: string[] = [];
-	let token: string | undefined;
-	do {
-		const page = await api<{
-			partyDetails: { party: string; isLocal: boolean }[];
-			nextPageToken?: string;
-		}>(`/v2/parties?pageSize=1000${token ? `&pageToken=${encodeURIComponent(token)}` : ''}`);
-		for (const p of page.partyDetails) if (p.isLocal) found.push(p.party);
-		token = page.nextPageToken || undefined;
-	} while (token);
-	return found;
+/** The parties this participant hosts, by fingerprint. */
+const hosted = new Map<string, string>();
+let walking = false;
+
+/**
+ * The participant lists every party it has heard of — on MainNet the whole network, well over
+ * fifty thousand — so the walk is done in the background, once at start and then every ten
+ * minutes, and never on a request. Only hosted parties are kept.
+ */
+export async function refreshHostedParties(): Promise<void> {
+	if (walking) return;
+	walking = true;
+	try {
+		const found = new Map<string, string>();
+		let token: string | undefined;
+		do {
+			const page = await api<{
+				partyDetails: { party: string; isLocal: boolean }[];
+				nextPageToken?: string;
+			}>(`/v2/parties?pageSize=1000${token ? `&pageToken=${encodeURIComponent(token)}` : ''}`);
+			for (const p of page.partyDetails) {
+				if (p.isLocal) found.set(p.party.split('::')[1] ?? '', p.party);
+			}
+			token = page.nextPageToken || undefined;
+		} while (token);
+		hosted.clear();
+		for (const [k, v] of found) hosted.set(k, v);
+	} catch (e) {
+		console.warn('Hosted parties not read:', e instanceof Error ? e.message : e);
+	} finally {
+		walking = false;
+	}
 }
 
 /** Whether the synchronizer knows this party yet. */

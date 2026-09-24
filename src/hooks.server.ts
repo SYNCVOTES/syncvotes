@@ -2,7 +2,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { HandleServerError, ServerInit } from '@sveltejs/kit';
 import { packageId } from '@daml.js/model';
-import { api, sdk } from '$lib/server/participant';
+import { api, refreshHostedParties, sdk } from '$lib/server/participant';
 import * as ledger from '$lib/server/ledger';
 import * as tally from '$lib/server/tally';
 import * as billing from '$lib/server/billing';
@@ -35,6 +35,9 @@ export const init: ServerInit = async () => {
 	await ledger.ready();
 	tally.start();
 	billing.start();
+	// The participant's party list is walked in the background, never on a request.
+	void refreshHostedParties();
+	setInterval(() => void refreshHostedParties(), 10 * 60_000);
 };
 
 /** An unexpected error still tells the user what happened; there is nothing secret in these. */
