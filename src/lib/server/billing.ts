@@ -4,7 +4,7 @@ import { BILLING_FACTOR } from '$app/env/private';
 import * as ledger from './ledger';
 import * as splice from './splice';
 import * as deposits from './deposits';
-import { paidTraffic, providerParty, sdk, submitAsProvider } from './participant';
+import { paidTraffic, payeeParty, providerParty, sdk, submitAsProvider } from './participant';
 
 /**
  * Who pays for what. Every transaction costs this validator traffic — bytes the network
@@ -126,7 +126,7 @@ export async function statement(a: Account): Promise<Statement> {
 	const credited = f.exists ? f.credited : (deposited.get(a) ?? 0);
 	const charged = f.charged + (pending.get(a) ?? 0);
 	return {
-		payTo: providerParty(),
+		payTo: payeeParty(),
 		memo: deposits.memoFor(a),
 		credited,
 		charged,

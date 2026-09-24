@@ -3,6 +3,7 @@ import { SDK } from '@canton-network/wallet-sdk';
 import {
 	LEDGER_API_URL,
 	PROVIDER_PARTY,
+	PAYEE_PARTY,
 	LEDGER_AUTH_URL,
 	LEDGER_AUTH_CLIENT_ID,
 	LEDGER_AUTH_CLIENT_SECRET,
@@ -26,6 +27,13 @@ function required(name: string, value: string | undefined): string {
 }
 
 export const providerParty = () => required('PROVIDER_PARTY', PROVIDER_PARTY);
+/**
+ * Where users pay in: the validator's own party, so that what they pay is what buys the traffic
+ * their transactions use; the provider where none is set. The app only reads its history.
+ */
+export const payeeParty = () => PAYEE_PARTY || providerParty();
+/** Whose history holds deposits: the payee's, and the provider's, which was the payee before. */
+export const receivingParties = () => [...new Set([payeeParty(), providerParty()])];
 export const ledgerUrl = () => required('LEDGER_API_URL', LEDGER_API_URL);
 export const scanUrl = () => required('SCAN_URL', SCAN_URL).replace(/\/$/, '');
 

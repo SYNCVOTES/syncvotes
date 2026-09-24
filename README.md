@@ -104,12 +104,13 @@ has paid: the wallet page shows the memo of the key and what a party costs today
 is made once that much has arrived. Before signing anything, the participant's own estimate is
 checked against the payer's balance.
 
-A balance is paid in by sending Canton Coin to the provider's party from any wallet with the
-memo as the transfer's reason (`syncvotes:<dao id>` or `syncvotes:<fingerprint>`). The provider
-has a transfer pre-approval (renewed twenty days before it runs out), so coin lands in one step.
-What arrived with a memo is read off the provider's own transactions and recomputed on a
+A balance is paid in by sending Canton Coin from any wallet to the payee (`PAYEE_PARTY`: the
+validator operator's own party, whose wallet buys the traffic the transactions use) with the memo
+as the transfer's reason (`syncvotes:<dao id>` or `syncvotes:<fingerprint>`). The payee has its
+own transfer pre-approval, so coin lands in one step. What arrived with a memo is read off the
+payee's transactions (and the provider's, which took payments before) and recomputed on a
 restart; the ledger's figure is the only figure. What is paid in is spent on traffic and is not
-paid back: the DAO holds no coin, and nothing leaves the provider on a DAO's behalf.
+paid back: the DAO holds no coin, and nothing leaves the payee on a DAO's behalf.
 
 What the provider cannot do: forge a ballot or a proposal, count a ballot the ledger refuses,
 or pass anything measured against the whole vote by leaving ballots out. What it can: delay;
