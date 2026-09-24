@@ -4,9 +4,11 @@
 //   docker compose --env-file <net>.env run --rm --no-deps \
 //     -e VALIDATOR_CLIENT_SECRET=<KC_VALIDATOR_SECRET> app node scripts/setup-participant.mjs
 //
-// As the validator's ledger admin it makes the app's ledger user and grants it what README
-// "Authentication" lists. It prints the provider party id for the env file. Every step is
-// idempotent.
+// As the validator's ledger admin it allocates the app's own provider party
+// (syncvotes-app-provider, not the validator's party: rewards and the coin paid in by memo belong
+// to the app), makes the app's ledger user and grants it what README "Authentication" lists. It
+// prints the provider party id for the env file. Every step is idempotent. The provider then
+// needs some coin, sent from any wallet, for its transfer pre-approval.
 const env = process.env;
 const need = (k) => {
 	if (!env[k]) throw new Error(`${k} is not set`);
@@ -15,8 +17,9 @@ const need = (k) => {
 const LEDGER = need('LEDGER_API_URL');
 const AUTH_URL = need('LEDGER_AUTH_URL');
 const APP_USER = need('KC_APP_USER_ID');
-// The provider is the validator's own party unless the app has one of its own (MainNet).
-const PROVIDER_HINT = env.PROVIDER_HINT ?? need('WALLET_USER_NAME');
+const PROVIDER_HINT = env.PROVIDER_HINT ?? 'syncvotes-app-provider';
+// The validator's own party, onboarded before this runs: where the synchronizer is found.
+const VALIDATOR_HINT = need('WALLET_USER_NAME');
 
 async function token(clientId, secret) {
 	const cfg = await (await fetch(AUTH_URL)).json();
@@ -46,24 +49,33 @@ async function api(path, body, method = body ? 'POST' : 'GET') {
 	return text ? JSON.parse(text) : undefined;
 }
 
-// Parties this participant hosts. The participant lists every party the network knows (well
-// over a million on MainNet), so the pages are as large as it serves, ten thousand.
-async function localParties() {
-	const out = [];
-	let pageToken;
-	do {
-		const page = await api(
-			`/v2/parties?pageSize=10000${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`
-		);
-		for (const p of page.partyDetails) if (p.isLocal) out.push(p.party);
-		pageToken = page.nextPageToken || undefined;
-	} while (pageToken);
-	return out;
+// Parties allocated here live in the participant's own namespace, so their ids are known from
+// their hints; nothing has to walk the network's party list.
+const namespace = (await api('/v2/parties/participant-id')).participantId.split('::')[1];
+const hosted = (party) =>
+	api(`/v2/parties/${encodeURIComponent(party)}`).then(
+		(r) => !!r.partyDetails?.[0]?.isLocal,
+		() => false
+	);
+const validator = `${VALIDATOR_HINT}::${namespace}`;
+if (!(await hosted(validator)))
+	throw new Error(`No hosted party ${validator}; is the validator onboarded?`);
+let provider = `${PROVIDER_HINT}::${namespace}`;
+if (!(await hosted(provider))) {
+	const sync = (
+		await api(`/v2/state/connected-synchronizers?party=${encodeURIComponent(validator)}`)
+	).connectedSynchronizers[0].synchronizerId;
+	const r = await api('/v2/parties', {
+		partyIdHint: PROVIDER_HINT,
+		identityProviderId: '',
+		synchronizerId: sync,
+		userId: '',
+		localMetadata: { resourceVersion: '', annotations: { app: 'syncvotes', role: 'app-provider' } }
+	});
+	provider = r.partyDetails.party;
+	console.log(`Provider party allocated: ${provider}`);
 }
-const parties = await localParties();
-const provider = parties.find((p) => p.split('::')[0] === PROVIDER_HINT);
-if (!provider)
-	throw new Error(`No hosted party with hint ${PROVIDER_HINT}; is the validator onboarded?`);
+
 // The app's ledger user: made if missing, then given its rights.
 const exists = await api(`/v2/users/${encodeURIComponent(APP_USER)}`).then(
 	() => true,
