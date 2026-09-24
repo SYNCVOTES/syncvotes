@@ -158,7 +158,7 @@ export const lookup = query(base64, async (publicKey) => {
 			return { exists: true as const, party: account.party, account: account.contractId };
 		}
 	}
-	const hosted = participant.partyByFingerprint(fingerprint);
+	const hosted = await participant.partyByFingerprint(fingerprint);
 	if (hosted) {
 		const { account } = await ensureAccount(hosted);
 		return { exists: true as const, party: hosted, account: account.contractId };

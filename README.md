@@ -266,6 +266,11 @@ comes from the page: a form's intent is built from its own fields (as the shared
 them) and the contract it is showing, never from the server's reply. The server, in turn,
 executes only transactions it prepared itself, so its own rules cannot be bypassed.
 
+A key that comes back without an Account is looked up in an index of the parties this participant
+hosts, read once in the background at startup: the participant's own list is the whole network's —
+over a million parties on MainNet — too long to search on every visit. A phrase made just now is
+not looked up at all; its fingerprint names the party in the browser.
+
 Reads need a session. A DAO is private to the _network_ by construction, and this app — as
 operator — sees all of them; what keeps a DAO to its members on the way to a browser is the app.
 Once per unlock the browser signs a challenge with the party's key (`sessionChallenge` /
