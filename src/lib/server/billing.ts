@@ -402,6 +402,15 @@ export function start(): void {
 	void watchDeposits();
 	setInterval(() => void watchDeposits(), 20_000);
 	setInterval(() => void flush(), 60 * 60_000);
+	// The provider's rewards go to the wallet that buys the traffic, hourly.
+	const sweep = () =>
+		deposits
+			.sweepToPayee()
+			.catch((e) =>
+				console.warn('Provider coin not moved to the payee:', e instanceof Error ? e.message : e)
+			);
+	void sweep();
+	setInterval(() => void sweep(), 60 * 60_000);
 	for (const signal of ['SIGTERM', 'SIGINT'] as const) {
 		process.once(signal, () => {
 			void flush().finally(() => process.exit(0));

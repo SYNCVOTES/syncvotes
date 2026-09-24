@@ -120,6 +120,47 @@ export async function acceptIncoming(): Promise<number> {
 	return accepted;
 }
 
+/** What the provider keeps of its own coin: enough for its fees and a pre-approval. */
+const PROVIDER_FLOAT = 20;
+
+/**
+ * The provider's coin beyond its float, moved to the payee: its app rewards arrive at the
+ * provider, while the payee's wallet is what buys the traffic they are paid for. The memo is
+ * not an account's, so nothing is credited. Nothing moves where the provider is the payee.
+ */
+export async function sweepToPayee(): Promise<number> {
+	if (payeeParty() === providerParty()) return 0;
+	const coins = (await activeContracts(providerParty(), [AMULET])).filter(
+		(c) => (c.createArgument as { owner?: string }).owner === providerParty()
+	);
+	const held = coins.reduce(
+		(s, c) =>
+			s +
+			Number(
+				(c.createArgument as { amount?: { initialAmount?: string } }).amount?.initialAmount ?? 0
+			),
+		0
+	);
+	const amount = Math.floor((held - PROVIDER_FLOAT) * 100) / 100;
+	if (amount < 5) return 0;
+	const token = (await sdk()).token;
+	const [command, disclosed] = await token.transfer.create({
+		sender: providerParty(),
+		recipient: payeeParty(),
+		amount: amount.toFixed(2),
+		instrumentId: 'Amulet',
+		registryUrl: splice.scanUrl(),
+		memo: 'syncvotes provider rewards to the payee'
+	});
+	await submitAsProvider(
+		[command] as Commands,
+		`sweep-${Date.now()}`,
+		disclosed as DisclosedContract[]
+	);
+	console.log(`Moved ${amount} CC of the provider's to the payee`);
+	return amount;
+}
+
 export type Deposit = {
 	/** `dao:<id>` or `purse:<fingerprint>`. */
 	account: `dao:${string}` | `purse:${string}`;
