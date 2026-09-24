@@ -46,13 +46,14 @@ async function api(path, body, method = body ? 'POST' : 'GET') {
 	return text ? JSON.parse(text) : undefined;
 }
 
-// Parties this participant hosts, by hint.
+// Parties this participant hosts. The participant lists every party the network knows (well
+// over a million on MainNet), so the pages are as large as it serves, ten thousand.
 async function localParties() {
 	const out = [];
 	let pageToken;
 	do {
 		const page = await api(
-			`/v2/parties?pageSize=1000${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`
+			`/v2/parties?pageSize=10000${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`
 		);
 		for (const p of page.partyDetails) if (p.isLocal) out.push(p.party);
 		pageToken = page.nextPageToken || undefined;
