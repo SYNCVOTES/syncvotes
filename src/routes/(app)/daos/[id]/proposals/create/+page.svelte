@@ -394,7 +394,7 @@
 	<PageHeader
 		eyebrow="New proposal"
 		title="Propose"
-		description="Every member votes with their share. The DAO's settings decide what passing takes and how long the vote runs; you choose what the proposal does, and the ledger does it once it passes."
+		description="Every member votes with their share. A change to the DAO runs under its voting rules; for a decision or a choice you set the ballot and the rule yourself. The ledger carries out what passes."
 	/>
 
 	{#if store.screen.at === 'loading'}
