@@ -245,6 +245,10 @@ export const createProposalForm = v.pipe(
 		newImage: imageUrl,
 		/** A choice's options, one per line. */
 		options: v.optional(v.string(), ''),
+		/** A choice where each member picks several options. */
+		several: v.optional(yesNo, 'no'),
+		/** A secret ballot: the app shows nobody who voted how. */
+		secret: v.optional(yesNo, 'no'),
 		/** A visibility proposal: readable by anyone signed in, or members only. */
 		newPublic: v.optional(yesNo, 'no'),
 		// The DAO's next settings, for a proposal that changes them.

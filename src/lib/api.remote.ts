@@ -499,13 +499,14 @@ const mayVote = (p: ledger.Proposal, m: ledger.Member | null) => {
 /** Ballots that would count, summed by vote: the live tally where the ledger counts last. */
 const summed = (p: ledger.Proposal) => {
 	const options = p.effect.kind === 'choose' ? p.effect.options.length : 0;
-	const sum = { yes: 0, no: 0, abstain: 0, tallies: Array<number>(options).fill(0) };
+	const sum = { yes: 0, no: 0, abstain: 0, tallies: Array<number>(options).fill(0), picked: 0 };
 	for (const b of ledger.ballots.get(p.id)?.values() ?? []) {
 		if (b.daoId !== p.daoId || b.changeable !== p.rule.changeable || !ledger.eligible(p, b))
 			continue;
-		const pick = ledger.pickOf(b.vote);
-		if (pick !== null) {
-			if (pick < options) sum.tallies[pick] += b.weight;
+		const picks = ledger.picksOf(b.vote);
+		if (picks.length > 0) {
+			for (const pick of picks) if (pick < options) sum.tallies[pick] += b.weight;
+			sum.picked += b.weight;
 		} else if (b.vote === 'Abstain') sum.abstain += b.weight;
 		else if (options > 0)
 			continue; // a yes or no on a choice: the count refuses it
@@ -515,10 +516,14 @@ const summed = (p: ledger.Proposal) => {
 	return sum;
 };
 
-/** A vote as the ledger takes it: a variant, since one constructor carries an option. */
+/** A vote as the ledger takes it: a variant, since some constructors carry the options picked. */
 const voteWire = (vote: ledger.Vote) => {
-	const pick = ledger.pickOf(vote);
-	return pick === null ? { tag: vote, value: {} } : { tag: 'Pick', value: String(pick) };
+	const picks = ledger.picksOf(vote);
+	return picks.length === 0
+		? { tag: vote, value: {} }
+		: vote.startsWith('PickMany:')
+			? { tag: 'PickMany', value: picks.map(String) }
+			: { tag: 'Pick', value: String(picks[0]) };
 };
 
 /** A proposal with its tally and the caller's standing: a ballot cast, a vote to cast, or neither. */
@@ -532,7 +537,13 @@ export const proposal = query.live(contractId, (id) =>
 		const counted = p.yes + p.no + p.abstain + p.tallies.reduce((s, t) => s + t, 0);
 		const shown =
 			counted > 0 && !p.rule.changeable
-				? { yes: p.yes, no: p.no, abstain: p.abstain, tallies: p.tallies }
+				? {
+						yes: p.yes,
+						no: p.no,
+						abstain: p.abstain,
+						tallies: p.tallies,
+						picked: p.picked ?? p.tallies.reduce((s, t) => s + t, 0)
+					}
 				: summed(p);
 		return {
 			...p,
@@ -570,8 +581,10 @@ export const proposalBallots = query.live(
 			if (!proposalReader(p) && p.proposer !== session.required()) {
 				error(403, 'Only members see the ballots');
 			}
+			// A secret ballot: nobody is shown anyone's vote but their own.
+			const me = session.required();
 			const all = [...(ledger.ballots.get(id)?.values() ?? [])]
-				.filter((b) => b.daoId === p.daoId && matches(q)(b.voter))
+				.filter((b) => b.daoId === p.daoId && matches(q)(b.voter) && (!p.secret || b.voter === me))
 				.sort((a, b) => b.castAt.localeCompare(a.castAt))
 				.map((b) => ({ ...b, who: who(b.voter) }));
 			return page(all, offset, limit);
@@ -750,7 +763,7 @@ export const createProposalForm = form(schemas.createProposalForm, async (f) => 
 		case 'choose': {
 			const options = schemas.parseOptions(f.options);
 			if (!schemas.validOptions(options)) error(400, 'Two to ten distinct options');
-			action = { tag: 'Choose', value: { options } };
+			action = { tag: 'Choose', value: { options, several: f.several === 'yes' ? true : null } };
 			break;
 		}
 		case 'visibility':
@@ -805,7 +818,14 @@ export const createProposalForm = form(schemas.createProposalForm, async (f) => 
 		default:
 			action = { tag: 'Signal', value: {} };
 	}
-	const args = { dao: d.contractId, pid, title: f.title, description: f.description, action };
+	const args = {
+		dao: d.contractId,
+		pid,
+		title: f.title,
+		description: f.description,
+		action,
+		secret: f.secret === 'yes' ? true : null
+	};
 	return {
 		pid,
 		membership,
@@ -818,18 +838,27 @@ export const createProposalForm = form(schemas.createProposalForm, async (f) => 
 export const prepareVote = command(
 	v.object({
 		proposal: contractId,
-		vote: v.union([v.picklist(['Yes', 'No', 'Abstain']), v.pipe(v.string(), v.regex(/^Pick:\d$/))])
+		vote: v.union([
+			v.picklist(['Yes', 'No', 'Abstain']),
+			v.pipe(v.string(), v.regex(/^Pick:\d$/)),
+			v.pipe(v.string(), v.regex(/^PickMany:\d(,\d){0,9}$/))
+		])
 	}),
 	({ proposal, vote }) => {
 		const p = proposalOf(proposal);
 		const me = proposalReader(p);
 		if (!me || !mayVote(p, me)) error(409, 'You have no vote on this proposal');
-		const pick = ledger.pickOf(vote);
+		const picks = ledger.picksOf(vote);
 		if (p.effect.kind === 'choose') {
-			if (pick === null && vote !== 'Abstain')
+			const { options, several } = p.effect;
+			if (picks.length === 0 && vote !== 'Abstain')
 				error(400, 'This proposal is a choice among options');
-			if (pick !== null && pick >= p.effect.options.length) error(400, 'No such option');
-		} else if (pick !== null) error(400, 'This proposal takes yes or no');
+			if (picks.some((pick) => pick >= options.length)) error(400, 'No such option');
+			if (vote.startsWith('PickMany:')) {
+				if (!several) error(400, 'This proposal takes one option');
+				if (new Set(picks).size !== picks.length) error(400, 'An option picked twice');
+			}
+		} else if (picks.length > 0) error(400, 'This proposal takes yes or no');
 		const previous = ledger.ballots.get(proposal)?.get(me.party)?.contractId ?? null;
 		const args = {
 			proposalId: proposal,

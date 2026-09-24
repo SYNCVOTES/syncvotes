@@ -17,7 +17,7 @@
 	const state = $derived(
 		outcome === 'Passed'
 			? { label: executedAt ? 'Executed' : 'Passed', icon: Check, variant: 'green' as const }
-			: outcome?.startsWith('Chosen:')
+			: outcome?.startsWith('Chosen:') || outcome?.startsWith('ChosenMany:')
 				? { label: 'Decided', icon: Check, variant: 'green' as const }
 				: outcome === 'Failed'
 					? { label: 'Failed', icon: X, variant: 'red' as const }

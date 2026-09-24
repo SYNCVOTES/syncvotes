@@ -3,7 +3,7 @@ module Main where
 import DA.Action (foldlA, void, when)
 import DA.Foldable (forA_)
 import DA.List (dedup, elemIndex, sortBy)
-import DA.Optional (fromSome, isNone, isSome)
+import DA.Optional (fromOptional, fromSome, isNone, isSome)
 import qualified DA.Text as T
 import DA.Time (addRelTime, days)
 
@@ -36,13 +36,15 @@ import DA.Time (addRelTime, days)
 -- ballots in batches; the ledger checks each one it is handed, so the provider can delay a
 -- result but never change it. Nothing here grows with history.
 
--- | Yes, no or abstain on a proposal; or, on a choice among options, the option picked.
-data Vote = Yes | No | Abstain | Pick Int
+-- | Yes, no or abstain on a proposal; or, on a choice among options, the option picked —
+-- or several of them, where the proposal allows it.
+data Vote = Yes | No | Abstain | Pick Int | PickMany [Int]
   deriving (Eq, Show)
 
 -- | Passed or failed; a choice among options is decided as the option chosen, or fails when
--- none reached the rule (a tie at the deadline fails too).
-data Outcome = Passed | Failed | Chosen Int
+-- none reached the rule (a tie at the deadline fails too). A choice that takes several picks
+-- is decided as every option that reached the rule.
+data Outcome = Passed | Failed | Chosen Int | ChosenMany [Int]
   deriving (Eq, Show)
 
 -- | What a proposal does when it passes (`Effect`: `Action` is the Prelude's). `Signal`
@@ -54,6 +56,9 @@ data Effect
   = Signal
   | Choose with
       options : [Text]
+      -- Each member picks several options rather than one; every option that reaches the rule
+      -- is chosen. Absent on proposals made before there was such a thing.
+      several : Optional Bool
   | SetShares with
       changes : [(Party, Int)]
   | SetInfo with
@@ -73,7 +78,7 @@ data Effect
 -- rules or the DAO's existence.
 isSensitive : Effect -> Bool
 isSensitive Signal = False
-isSensitive (Choose _) = False
+isSensitive (Choose _ _) = False
 isSensitive (SetInfo {}) = False
 isSensitive _ = True
 
@@ -199,7 +204,7 @@ template Account
             rule = Rule OfAll Majority 0 True False
             eligible = sum (map snd shares); createdAt = now; closesAt = now
             yes = 0; no = 0; abstain = 0; tallies = []; outcome = Some Passed; executed = 0
-            executedAt = None
+            executedAt = None; secret = None; picked = None
         create DAO with
           provider; operator; creator = user; id; name = daoName; description; image
           equal; routine; sensitive; createdAt = now
@@ -279,7 +284,7 @@ template DAO
           Signal -> do
             exercise proposal Proposal_Advance with upTo = 1
             Some <$> create this
-          Choose _ -> do
+          Choose _ _ -> do
             exercise proposal Proposal_Advance with upTo = 1
             Some <$> create this
           SetInfo daoName description image -> do
@@ -372,6 +377,9 @@ template Member
         title : Text
         description : Text
         action : Effect
+        -- A secret ballot: the app shows nobody who voted how (the provider, which counts,
+        -- sees the ballots regardless). Absent on proposals made before there was such a thing.
+        secret : Optional Bool
       controller party
       do
         now <- getTime
@@ -382,7 +390,7 @@ template Member
             closesAt = addRelTime now (days settings.votingDays)
         case action of
           Signal -> pure ()
-          Choose options ->
+          Choose options _ ->
             assertMsg "Two to ten distinct options, eighty characters each at most" (validOptions options)
           Dissolve -> pure ()
           SetSettings routine sensitive ->
@@ -396,8 +404,12 @@ template Member
           action; rule; eligible = found.units; createdAt = now; closesAt
           yes = 0; no = 0; abstain = 0; outcome = None; executed = 0; executedAt = None
           tallies = case action of
-            Choose options -> map (const 0) options
+            Choose options _ -> map (const 0) options
             _ -> []
+          secret
+          picked = case action of
+            Choose _ (Some True) -> Some 0
+            _ -> None
 
     -- Nothing here reads the proposal, so a vote never waits on the count or on other voters.
     -- Whether the ballot is valid for its proposal (right DAO, member in time, before the
@@ -477,6 +489,12 @@ template Proposal
     outcome : Optional Outcome
     executed : Int
     executedAt : Optional Time
+    -- Who voted how is not shown by the app. Absent on proposals made before there was such a thing.
+    secret : Optional Bool
+    -- Units of the ballots that picked options, on a choice that takes several picks: what an
+    -- option is measured against where the rule counts the votes cast, since one ballot can
+    -- stand behind several options. Absent elsewhere.
+    picked : Optional Int
   where
     signatory proposer, provider, creator
     observer operator
@@ -495,17 +513,23 @@ template Proposal
         assertMsg "Already settled" (isNone outcome)
         now <- getTime
         assertMsg "Votes may change until the deadline" (not rule.changeable || now >= closesAt)
-        (y, n, a, ts) <- foldlA
-          (\(y, n, a, ts) cid -> do
+        let bump is weight ts = zipWith (\j t -> if j `elem` is then t + weight else t) [0 .. length ts - 1] ts
+        (y, n, a, ts, pk) <- foldlA
+          (\(y, n, a, ts, pk) cid -> do
             (vote, weight) <- exercise cid Ballot_Count with proposal = this
             pure case vote of
-              Yes -> (y + weight, n, a, ts)
-              No -> (y, n + weight, a, ts)
-              Abstain -> (y, n, a + weight, ts)
-              Pick i -> (y, n, a, zipWith (\j t -> if j == i then t + weight else t) [0 .. length ts - 1] ts))
-          (yes, no, abstain, tallies) ballots
+              Yes -> (y + weight, n, a, ts, pk)
+              No -> (y, n + weight, a, ts, pk)
+              Abstain -> (y, n, a + weight, ts, pk)
+              Pick i -> (y, n, a, bump [i] weight ts, pk + weight)
+              PickMany is -> (y, n, a, bump is weight ts, pk + weight))
+          -- Where one ballot picks one option, the units that picked are the tallies' sum.
+          (yes, no, abstain, tallies, fromOptional (sum tallies) picked) ballots
         let isChoice = case action of
-              Choose _ -> True
+              Choose _ _ -> True
+              _ -> False
+            several = case action of
+              Choose _ (Some True) -> True
               _ -> False
             -- On a choice, the leading option stands where yes stands and the rest where no does.
             lead = if isChoice then foldl max 0 ts else y
@@ -513,7 +537,7 @@ template Proposal
               (True, _ :: s :: _) -> s
               _ -> 0
             rest = if isChoice then sum ts - lead else n
-            cast = y + n + a + sum ts
+            cast = y + n + a + pk
             outstanding = eligible - cast
             quorumMet = rule.quorum == 0 || cast * 100 >= rule.quorum * eligible
             meets yes denom = denom > 0 && case rule.threshold of
@@ -535,12 +559,32 @@ template Proposal
             lost = not (meets (lead + outstanding) denomWorst)
             over = final && now >= closesAt
             won = if isChoice then Chosen (fromSome (elemIndex lead ts)) else Passed
+            -- Several picks: each option is measured on its own against the units that picked
+            -- (or the whole vote); every option that reaches the rule is chosen. Settled early
+            -- once every option is sure to reach it or cannot any more.
+            manyDenomNow = case rule.basis of
+              OfAll -> eligible
+              OfCast -> pk
+            manyDenomWorst = case rule.basis of
+              OfAll -> eligible
+              OfCast -> pk + outstanding
+            indexed = zip [0 .. length ts - 1] ts
+            reached = [i | (i, t) <- indexed, quorumMet && meets t manyDenomNow]
+            sureT t = quorumMet && meets t manyDenomWorst
+            lostT t = not (meets (t + outstanding) manyDenomWorst)
+            manySettled = all (\t -> sureT t || lostT t) ts
+            wonMany = if null reached then Failed else ChosenMany reached
             decided
+              | several && rule.early && manySettled = Some wonMany
+              | several && over = Some wonMany
+              | several = None
               | rule.early && sure = Some won
               | rule.early && lost = Some Failed
               | over = Some (if passedNow then won else Failed)
               | otherwise = None
-        create this with yes = y; no = n; abstain = a; tallies = ts; outcome = decided
+        create this with
+          yes = y; no = n; abstain = a; tallies = ts; outcome = decided
+          picked = if several then Some pk else picked
 
     -- Only the DAO (creator and provider together) records progress on a passed proposal:
     -- how many of its entries are carried out, and the moment the last one was.
@@ -552,6 +596,7 @@ template Proposal
         assertMsg "The proposal did not pass" (case outcome of
           Some Passed -> True
           Some (Chosen _) -> True
+          Some (ChosenMany _) -> True
           _ -> False)
         assertMsg "Already executed" (isNone executedAt)
         let size = case action of
@@ -601,10 +646,16 @@ template Ballot
         assertMsg "Joined after the vote opened" (since <= proposal.createdAt)
         assertMsg "The share changed after the vote opened" (shareSince <= proposal.createdAt)
         case (proposal.action, vote) of
-          (Choose options, Pick i) -> assertMsg "No such option" (i >= 0 && i < length options)
-          (Choose _, Abstain) -> pure ()
-          (Choose _, _) -> abort "This proposal is a choice among options, not yes or no"
+          (Choose options _, Pick i) -> assertMsg "No such option" (i >= 0 && i < length options)
+          (Choose options several, PickMany is) -> do
+            assertMsg "This proposal takes one option" (several == Some True)
+            assertMsg "Pick at least one option" (not (null is))
+            assertMsg "No such option" (all (\i -> i >= 0 && i < length options) is)
+            assertMsg "An option picked twice" (length (dedup is) == length is)
+          (Choose _ _, Abstain) -> pure ()
+          (Choose _ _, _) -> abort "This proposal is a choice among options, not yes or no"
           (_, Pick _) -> abort "This proposal takes yes or no, not an option"
+          (_, PickMany _) -> abort "This proposal takes yes or no, not options"
           _ -> pure ()
         create this with counted = True
         pure (vote, weight)

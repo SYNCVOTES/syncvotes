@@ -114,8 +114,11 @@
 		icon: unknown;
 	}[]);
 
-	// A choice's options: two to start with, ten at most.
+	// A choice's options: two to start with, ten at most; whether a member picks several.
 	let options = $state<string[]>(['', '']);
+	let several = $state(false);
+	// A secret ballot: the app shows nobody who voted how.
+	let secret = $state(false);
 	const optionList = $derived(options.map((o) => o.trim()).filter(Boolean));
 
 	// What is there today, to start from.
@@ -227,7 +230,9 @@
 					return optionList.length < 2
 						? 'Give at least two options below.'
 						: 'Two to ten distinct options, eighty characters each at most.';
-				return `Members pick one of ${fmt(optionList.length)} options; the one with the most votes wins if it reaches what a yes would need, and stands alone at the top.`;
+				return several
+					? `Members pick any of ${fmt(optionList.length)} options; every option that reaches what a yes would need is chosen.`
+					: `Members pick one of ${fmt(optionList.length)} options; the one with the most votes wins if it reaches what a yes would need, and stands alone at the top.`;
 			case 'visibility':
 				return d?.public
 					? 'The DAO becomes private: it leaves the public list, and only its members can read it from then on.'
@@ -298,7 +303,8 @@
 										options: fields.options
 											.split('\n')
 											.map((o) => o.trim())
-											.filter(Boolean)
+											.filter(Boolean),
+										several: fields.several === 'yes' ? true : null
 									}
 								}
 							: fields.kind === 'visibility'
@@ -317,7 +323,14 @@
 			return {
 				choice: 'Member_Propose',
 				contractId: membership,
-				args: { dao: args.dao, pid, title: fields.title, description: fields.description, action }
+				args: {
+					dao: args.dao,
+					pid,
+					title: fields.title,
+					description: fields.description,
+					action,
+					secret: fields.secret === 'yes' ? true : null
+				}
 			};
 		},
 		({ pid }) => goto(`/proposals/${pid}`)
@@ -382,6 +395,8 @@
 			<input type="hidden" name="kind" value={kind} />
 			<input type="hidden" name="title" value={title.trim() || suggested} />
 			<input type="hidden" name="options" value={optionList.join('\n')} />
+			<input type="hidden" name="several" value={several ? 'yes' : 'no'} />
+			<input type="hidden" name="secret" value={secret ? 'yes' : 'no'} />
 			<input type="hidden" name="newPublic" value={d.public ? 'no' : 'yes'} />
 
 			<FormSection title="What happens when it passes">
@@ -438,7 +453,7 @@
 					<Field
 						label="Options"
 						id="option-0"
-						hint="Two to ten, a few words each. Members pick one; an abstention takes part without picking."
+						hint="Two to ten, a few words each. Members pick one, or any number with the switch below; an abstention takes part without picking."
 						issues={f.fields.options.issues()}
 					>
 						<ol class="space-y-2">
@@ -473,6 +488,17 @@
 								onclick={() => (options = [...options, ''])}>Add an option</button
 							>
 						{/if}
+						<label class="mt-4 flex cursor-pointer items-start gap-3 text-[13px]">
+							<input type="checkbox" class="mt-0.5 accent-orange" bind:checked={several} />
+							<span>
+								<span class="text-ink">Members may pick several options</span>
+								<span class="block text-ink-dim"
+									>Each option is measured on its own against the rule; every one that reaches it is
+									chosen. Where the rule counts the votes cast, an option is measured against the
+									ballots that picked anything.</span
+								>
+							</span>
+						</label>
 					</Field>
 				{:else if kind === 'info'}
 					<Field label="Name" id="newName" issues={f.fields.newName.issues()}>
@@ -530,6 +556,16 @@
 						/>
 					</p>
 				{/if}
+				<label class="flex cursor-pointer items-start gap-3 text-[13px]">
+					<input type="checkbox" class="mt-0.5 accent-orange" bind:checked={secret} />
+					<span>
+						<span class="text-ink">Secret ballot</span>
+						<span class="block text-ink-dim"
+							>Members see the totals, not who voted how; each sees their own vote. The ballots are
+							signed and on the ledger all the same, and the app, which counts them, sees them.</span
+						>
+					</span>
+				</label>
 			</FormSection>
 
 			<FormSection title="Put it to the vote">

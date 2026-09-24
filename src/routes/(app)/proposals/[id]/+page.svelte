@@ -72,9 +72,22 @@
 				: v === 'Abstain'
 					? 'text-ink-dim'
 					: 'text-ink';
-	/** A vote as words: yes, no, abstain, or the option picked. */
-	const said = (v: string, options: string[] = []) =>
-		v.startsWith('Pick:') ? (options[Number(v.slice(5))] ?? `option ${Number(v.slice(5)) + 1}`) : v;
+	/** The options a vote picked or a choice decided on, by index; none for yes, no, abstain. */
+	const picksOf = (v: string): number[] => {
+		const m = /^(?:Pick|Chosen|PickMany|ChosenMany):(.*)$/.exec(v);
+		return m ? m[1].split(',').filter(Boolean).map(Number) : [];
+	};
+	/** A vote as words: yes, no, abstain, or the options picked. */
+	const said = (v: string, options: string[] = []) => {
+		const picks = picksOf(v);
+		return picks.length ? picks.map((i) => options[i] ?? `option ${i + 1}`).join(', ') : v;
+	};
+	// On a choice that takes several picks, the options ticked before the ballot is cast.
+	let picks = $state<number[]>([]);
+	const toggle = (i: number) =>
+		(picks = picks.includes(i)
+			? picks.filter((j) => j !== i)
+			: [...picks, i].sort((a, b) => a - b));
 	const pct = (units: number, of: number) => (of > 0 ? Math.round((units / of) * 1000) / 10 : 0);
 	// Time moves without a ledger event: the deadline and the signing margin are re-read each minute.
 	let now = $state(Date.now());
@@ -171,6 +184,24 @@
 							<QueryError error={ballots.error} refresh={() => ballots?.reconnect()} />
 						{:else if !ballots?.ready}
 							<Skeleton height="h-24" />
+						{:else if p.secret}
+							<p class="text-[13px] text-ink-dim">
+								A secret ballot: the totals are shown, not who voted how; you see your own vote
+								{#if ballots.current.total > 0}below{:else}here once cast{/if}. The ballots are
+								signed and on the ledger all the same, and the app, which counts them, sees them.
+							</p>
+							{#if ballots.current.total > 0}
+								<List>
+									{#each ballots.current.items as b (b.voter)}
+										<ListItem class="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs">
+											<Who who={b.who} me={b.voter === me} class="min-w-0 flex-1 basis-56" />
+											<span class="max-w-40 truncate text-right {tone(b.vote)}"
+												>{said(b.vote, p.effect.kind === 'choose' ? p.effect.options : [])}</span
+											>
+										</ListItem>
+									{/each}
+								</List>
+							{/if}
 						{:else if ballots.current.total === 0}
 							<p class="text-[13px] text-ink-dim">
 								{q ? 'No ballot matches that.' : 'No votes yet.'}
@@ -222,6 +253,9 @@
 						cast={p.cast}
 						rule={p.rule}
 						counted={p.counted > 0 || !!p.outcome}
+						several={p.effect.several}
+						picked={p.picked}
+						chosen={p.outcome ? picksOf(p.outcome) : []}
 					/>
 				{:else}
 					<Tally
@@ -237,12 +271,9 @@
 
 				{#if p.outcome}
 					<Note>
-						{#if p.outcome.startsWith('Chosen:')}
+						{#if p.outcome.startsWith('Chosen')}
 							Decided: <span class="text-green"
-								>{said(
-									p.outcome.replace('Chosen:', 'Pick:'),
-									p.effect.kind === 'choose' ? p.effect.options : []
-								)}</span
+								>{said(p.outcome, p.effect.kind === 'choose' ? p.effect.options : [])}</span
 							>.
 						{:else}
 							Settled as <span class={p.outcome === 'Passed' ? 'text-green' : 'text-red'}
@@ -272,7 +303,43 @@
 										p.eligible
 									)}%.{/if}
 							</p>
-							{#if p.effect.kind === 'choose'}
+							{#if p.effect.kind === 'choose' && p.effect.several}
+								<div class="grid gap-2">
+									{#each p.effect.options as o, i (i)}
+										<label
+											class="flex cursor-pointer items-center gap-3 border px-3 py-2 text-[13px] transition-colors {picks.includes(
+												i
+											)
+												? 'border-orange bg-orange-dim text-ink'
+												: 'border-border text-ink-mid hover:border-border-hover'}"
+										>
+											<input
+												type="checkbox"
+												class="accent-orange"
+												checked={picks.includes(i)}
+												disabled={store.busy}
+												onchange={() => toggle(i)}
+											/>
+											{o}
+										</label>
+									{/each}
+								</div>
+								<Button
+									variant="accent"
+									class="w-full"
+									disabled={store.busy || picks.length === 0}
+									onclick={() => vote(`PickMany:${picks.join(',')}`)}
+								>
+									{#if casting?.startsWith('PickMany:')}<Loader
+											size={14}
+											class="animate-spin"
+										/>{/if}Cast for {picks.length || 'the options ticked'}{picks.length === 1
+										? ' option'
+										: picks.length > 1
+											? ' options'
+											: ''}
+								</Button>
+							{:else if p.effect.kind === 'choose'}
 								<div class="grid gap-2">
 									{#each p.effect.options as o, i (i)}
 										<Button

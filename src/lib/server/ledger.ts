@@ -9,10 +9,13 @@ import type { Rule, Settings } from '$lib/rules';
  * map lookup. A page waits on the keys it shows (`nextChange`); a transaction wakes only those.
  */
 
-/** Yes, no, abstain — or `Pick:<n>`, the option picked on a choice among options. */
-export type Vote = 'Yes' | 'No' | 'Abstain' | `Pick:${number}`;
-/** Passed, failed — or `Chosen:<n>`, the option a choice decided on. */
-export type Outcome = 'Passed' | 'Failed' | `Chosen:${number}`;
+/**
+ * Yes, no, abstain — or `Pick:<n>`, the option picked on a choice among options, or
+ * `PickMany:<n>,<m>` where the choice takes several.
+ */
+export type Vote = 'Yes' | 'No' | 'Abstain' | `Pick:${number}` | `PickMany:${string}`;
+/** Passed, failed — or `Chosen:<n>` / `ChosenMany:<n>,<m>`, the options a choice decided on. */
+export type Outcome = 'Passed' | 'Failed' | `Chosen:${number}` | `ChosenMany:${string}`;
 /** The option a vote picked, or a choice decided on. */
 export const pickOf = (v: string | null): number | null =>
 	v?.startsWith('Pick:')
@@ -20,11 +23,23 @@ export const pickOf = (v: string | null): number | null =>
 		: v?.startsWith('Chosen:')
 			? Number(v.slice(7))
 			: null;
+/** The options a vote picked or a choice decided on: one, several, or none at all. */
+export const picksOf = (v: string | null): number[] => {
+	const one = pickOf(v);
+	if (one !== null) return [one];
+	const many = v?.startsWith('PickMany:')
+		? v.slice(9)
+		: v?.startsWith('ChosenMany:')
+			? v.slice(11)
+			: null;
+	return many ? many.split(',').filter(Boolean).map(Number) : [];
+};
 /** Whether an outcome is a decision in favour: passed, or an option chosen. */
-export const passed = (o: Outcome | null): boolean => o === 'Passed' || !!o?.startsWith('Chosen:');
+export const passed = (o: Outcome | null): boolean =>
+	o === 'Passed' || !!o?.startsWith('Chosen:') || !!o?.startsWith('ChosenMany:');
 export type Effect =
 	| { kind: 'signal' }
-	| { kind: 'choose'; options: string[] }
+	| { kind: 'choose'; options: string[]; several: boolean }
 	| { kind: 'shares'; changes: { party: string; share: number }[] }
 	| { kind: 'info'; name: string; description: string; image: string | null }
 	| { kind: 'dissolve' }
@@ -87,6 +102,10 @@ export type Proposal = {
 	/** Entries of the effect carried out so far. */
 	executed: number;
 	executedAt: string | null;
+	/** Who voted how is not shown by the app. */
+	secret: boolean;
+	/** Units of the ballots that picked options, on a choice that takes several picks. */
+	picked: number | null;
 };
 export type Ballot = {
 	contractId: string;
@@ -283,11 +302,13 @@ const tagged = (value: unknown): string => {
 	if (typeof value === 'string') return value;
 	const v = value as { tag?: unknown; value?: unknown };
 	const tag = text(v?.tag);
-	return typeof v?.value === 'object' && v.value !== null && !Array.isArray(v.value)
-		? tag
-		: v?.value == null
+	return Array.isArray(v?.value)
+		? `${tag}:${v.value.map(num).join(',')}`
+		: typeof v?.value === 'object' && v.value !== null
 			? tag
-			: `${tag}:${num(v.value)}`;
+			: v?.value == null
+				? tag
+				: `${tag}:${num(v.value)}`;
 };
 
 const settings = (v: unknown): Settings => {
@@ -316,7 +337,8 @@ const effect = (v: unknown): Effect => {
 		case 'Choose':
 			return {
 				kind: 'choose',
-				options: ((t.value as { options: unknown[] }).options ?? []).map(text)
+				options: ((t.value as { options: unknown[] }).options ?? []).map(text),
+				several: (t.value as { several?: unknown }).several === true
 			};
 		case 'Dissolve':
 			return { kind: 'dissolve' };
@@ -397,7 +419,9 @@ function created({ contractId, templateId, createArgument: a }: Created) {
 				tallies: ((a.tallies as unknown[] | undefined) ?? []).map(num),
 				outcome: a.outcome == null ? null : (tagged(a.outcome) as Outcome),
 				executed: num(a.executed),
-				executedAt: optional(a.executedAt)
+				executedAt: optional(a.executedAt),
+				secret: a.secret === true,
+				picked: a.picked == null ? null : num(a.picked)
 			};
 			track(
 				contractId,

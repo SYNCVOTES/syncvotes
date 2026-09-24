@@ -23,7 +23,7 @@
 					: `${fmt(effect.changes.length)} ${effect.changes.length === 1 ? 'share' : 'shares'}`;
 			}
 			case 'choose':
-				return `${fmt(effect.options.length)} options`;
+				return `${fmt(effect.options.length)} options${effect.several ? ', pick any' : ''}`;
 			case 'info':
 				return `rename to ${effect.name}`;
 			case 'dissolve':

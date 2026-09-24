@@ -14,7 +14,7 @@
 	 */
 	export type Effect =
 		| { kind: 'signal' }
-		| { kind: 'choose'; options: string[] }
+		| { kind: 'choose'; options: string[]; several: boolean }
 		| { kind: 'shares'; changes: { party: string; share: number }[] }
 		| { kind: 'info'; name: string; description: string; image: string | null }
 		| { kind: 'dissolve' }
@@ -132,7 +132,11 @@
 			paid in for it is spent, and its record stays readable.
 		</p>
 	{:else if effect.kind === 'choose'}
-		<p class="text-[13px] text-ink-mid">Decides among these, and does nothing else:</p>
+		<p class="text-[13px] text-ink-mid">
+			{effect.several
+				? 'Decides which of these, any number, and does nothing else:'
+				: 'Decides among these, and does nothing else:'}
+		</p>
 		<ol class="list-decimal space-y-1 pl-5 text-[13px] text-ink">
 			{#each effect.options as o, i (i)}<li>{o}</li>{/each}
 		</ol>

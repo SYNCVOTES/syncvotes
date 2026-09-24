@@ -77,8 +77,8 @@ const preparing = () => working('Preparing the transaction');
 
 // ---- Proposals ----------------------------------------------------------------------------
 
-/** Yes, no, abstain — or `Pick:<n>` on a choice among options. */
-export type Choice = 'Yes' | 'No' | 'Abstain' | `Pick:${number}`;
+/** Yes, no, abstain — or `Pick:<n>` on a choice among options, `PickMany:<n>,<m>` on one that takes several. */
+export type Choice = 'Yes' | 'No' | 'Abstain' | `Pick:${number}` | `PickMany:${string}`;
 
 /**
  * A ballot is cast from the voter's own membership contract, which the proposal page names
@@ -101,7 +101,9 @@ export async function vote(
 	// A vote is a variant on the ledger (one constructor carries the option picked).
 	const vote = choice.startsWith('Pick:')
 		? { tag: 'Pick', value: choice.slice(5) }
-		: { tag: choice, value: {} };
+		: choice.startsWith('PickMany:')
+			? { tag: 'PickMany', value: choice.slice(9).split(',') }
+			: { tag: choice, value: {} };
 	const intent = {
 		choice: 'Member_Vote',
 		contractId: membership,
