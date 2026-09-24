@@ -145,7 +145,8 @@ the transfer's reason (`syncvotes:<dao id>` or `syncvotes:<fingerprint>`, shown 
 and the wallet page); the provider has a transfer pre-approval, so
 coin lands in one step, and accepts what a wallet sends as a transfer instruction instead.
 What arrived with a memo is read off the provider's own transactions (the token standard's
-view of them) and credited to the DAO's `Meter`, so the figure is the ledger's, recomputed on
+view of them); the provider itself credits an account by sending coin to itself with the memo,
+which the ledger records as a merge with the amount in the choice and credited to the DAO's `Meter`, so the figure is the ledger's, recomputed on
 a restart. What a DAO can spend is what was paid in less what it was charged; a write for a
 DAO with nothing left is refused. What is paid in is spent on traffic and is not paid back:
 the DAO holds no coin, and nothing leaves the provider on a DAO's behalf. Users hold no coin in
