@@ -75,7 +75,7 @@
 			value: 'choose',
 			title: 'Choice',
 			text: 'The DAO picks one of several options.',
-			more: 'Puts two to ten options to the vote; each member picks one, or abstains. The option with the most votes wins if it reaches what the rule you set asks of a yes — more than half of the whole vote, say — and stands alone at the top; a tie decides nothing. Nothing on the ledger changes but the record of the choice.',
+			more: 'Puts two to ten options to the vote; each member picks one, or abstains. The option with the most votes wins if it reaches what the rule you set asks of a yes — more than half of the whole vote, say — and stands alone at the top; a tie decides nothing. With several options allowed on the ballot, a member picks any number, and every option that reaches the rule is chosen. Nothing on the ledger changes but the record of the choice.',
 			icon: ListChecks
 		},
 		d?.equal
@@ -261,7 +261,7 @@
 			case 'dissolve':
 				return 'Dissolve the DAO';
 			case 'settings':
-				return 'Change the settings';
+				return 'Change the voting rules';
 			default:
 				return '';
 		}

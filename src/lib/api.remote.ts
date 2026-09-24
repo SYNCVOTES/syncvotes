@@ -871,7 +871,10 @@ function paceLookups() {
 	recentLookups.set(address, mine);
 }
 
-/** Parties made lately from one address: the provider pays for each, so a flood is refused. */
+/**
+ * Parties made lately from one address. Each is paid for by its owner before it is made, but
+ * every allocation is still work for the participant, so a flood is refused.
+ */
 const recentEnrols = new Map<string, number[]>();
 const ENROLS_PER_HOUR = 60;
 /**
