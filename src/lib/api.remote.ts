@@ -405,12 +405,14 @@ export const daoMembers = query.live(
 );
 
 /** The whole share table, for the editor: every member with their units. */
-export const daoShares = query(contractId, (id) => {
-	memberOnly(id);
-	return membersOf(id)
-		.sort((a, b) => b.share - a.share || a.party.localeCompare(b.party))
-		.map((m) => ({ party: m.party, share: m.share, who: who(m.party) }));
-});
+export const daoShares = query.live(contractId, (id) =>
+	live(ledger.keys.dao(id), () => {
+		memberOnly(id);
+		return membersOf(id)
+			.sort((a, b) => b.share - a.share || a.party.localeCompare(b.party))
+			.map((m) => ({ party: m.party, share: m.share, who: who(m.party) }));
+	})
+);
 
 /** Proposals, newest first, by status, filtered by a substring of the title or the proposer. */
 export const daoProposals = query.live(
