@@ -24,8 +24,15 @@ import { settingsToLedger, type Rule, type Settings } from './rules';
  * acting party's own signature. A DAO's writes are refused once its balance is spent.
  */
 
-/** Runs `load` now and whenever `key` changes, yielding only when the result changed. */
-async function* live<T>(key: string, load: () => T | Promise<T>): AsyncGenerator<T> {
+/**
+ * Runs `load` now and whenever `key` changes, yielding only when the result changed. `keys`
+ * names further keys to wake on, chosen afresh each round (the DAOs a party is in, say).
+ */
+async function* live<T>(
+	key: string,
+	load: () => T | Promise<T>,
+	keys: () => string[] = () => []
+): AsyncGenerator<T> {
 	let last = '';
 	for (;;) {
 		try {
@@ -42,7 +49,7 @@ async function* live<T>(key: string, load: () => T | Promise<T>): AsyncGenerator
 			if (last === '' || status === 401 || status === 403 || status === 404) throw e;
 			console.warn(`Live ${key} kept its last value:`, e instanceof Error ? e.message : e);
 		}
-		await ledger.nextChange(key);
+		await ledger.nextChange(key, ...keys());
 	}
 }
 
@@ -269,6 +276,21 @@ const proposalsOf = (daoId: string) =>
 		b.createdAt.localeCompare(a.createdAt)
 	);
 const openProposals = (daoId: string) => proposalsOf(daoId).filter((p) => !p.outcome).length;
+/**
+ * Whether a proposal still waits on this party's vote: open and not past its deadline, the party
+ * a member entitled to vote on it (in, with that share, when it was made), and no ballot cast.
+ */
+const awaitsVote = (p: ledger.Proposal, party: string) => {
+	if (p.outcome || ledger.time(p.closesAt) <= Date.now()) return false;
+	const m = ledger.members.get(p.daoId)?.get(party);
+	return (
+		!!m &&
+		ledger.eligible(p, { since: m.since, shareSince: m.shareSince, castAt: p.createdAt }) &&
+		!ledger.ballots.get(p.id)?.has(party)
+	);
+};
+const awaiting = (daoId: string, party: string) =>
+	proposalsOf(daoId).filter((p) => awaitsVote(p, party)).length;
 /** The caller's membership of this DAO, or 403. */
 const memberOnly = (daoId: string): ledger.Member => {
 	const membership = ledger.members.get(daoId)?.get(session.required());
@@ -293,20 +315,27 @@ const summarise = (d: ledger.Dao) => ({
 const card = async (d: ledger.Dao, party: string) => ({
 	...summarise(d),
 	balance: billing.balance(billing.daoAccount(d.id)),
-	myShare: ledger.members.get(d.id)?.get(party)?.share ?? 0
+	myShare: ledger.members.get(d.id)?.get(party)?.share ?? 0,
+	/** Open proposals this party is entitled to vote on and has not. */
+	awaiting: awaiting(d.id, party)
 });
 
 /** The DAOs a party belongs to, newest first. */
 export const myDaos = query.live(partyId, (party) =>
-	live(ledger.keys.party(party), () => {
-		session.required(party);
-		return Promise.all(
-			[...(ledger.memberships.get(party)?.keys() ?? [])]
-				.flatMap((id) => ledger.daos.get(id) ?? [])
-				.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-				.map((d) => card(d, party))
-		);
-	})
+	live(
+		ledger.keys.party(party),
+		() => {
+			session.required(party);
+			return Promise.all(
+				[...(ledger.memberships.get(party)?.keys() ?? [])]
+					.flatMap((id) => ledger.daos.get(id) ?? [])
+					.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+					.map((d) => card(d, party))
+			);
+		},
+		// A proposal made in one of them changes what waits on this party's vote.
+		() => [...(ledger.memberships.get(party)?.keys() ?? [])].map(ledger.keys.dao)
+	)
 );
 
 /** A DAO with its counts and the caller's standing in it. The lists are paged separately. */
@@ -388,16 +417,24 @@ export const daoProposals = query.live(
 	v.object({
 		id: contractId,
 		...paging,
-		status: v.optional(v.picklist(['open', 'closed'])),
+		/** `unvoted`: open, and still waiting on the caller's own vote. */
+		status: v.optional(v.picklist(['open', 'closed', 'unvoted'])),
 		q: filter
 	}),
 	({ id, offset, limit, status, q }) =>
 		live(ledger.keys.dao(id), () => {
 			readerOf(id);
+			const party = session.required();
 			const needle = q.trim().toLowerCase();
 			const all = proposalsOf(id).filter(
 				(p) =>
-					(status === 'open' ? !p.outcome : status === 'closed' ? !!p.outcome : true) &&
+					(status === 'open'
+						? !p.outcome
+						: status === 'closed'
+							? !!p.outcome
+							: status === 'unvoted'
+								? awaitsVote(p, party)
+								: true) &&
 					(!needle || p.title.toLowerCase().includes(needle) || matches(q)(p.proposer))
 			);
 			return page(all, offset, limit);

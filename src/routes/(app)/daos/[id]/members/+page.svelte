@@ -66,11 +66,10 @@
 						<Who who={m.who} me={m.party === me} size="md" class="min-w-0 flex-1 basis-60" />
 						<span class="flex shrink-0 items-center gap-3">
 							<span class="text-ink-dim">since {dateOf(m.since)}</span>
-							{#if !d.equal}
-								<span class="text-ink-dim">{fmt(m.share)} units</span>
-								<span class="w-14 text-right text-ink">{pct(m.share, d.units)}%</span>
-							{/if}
+							{#if !d.equal}<span class="text-ink-dim">{fmt(m.share)} units</span>{/if}
 							{#if m.party === d.creator}<RoleTag role="creator" />{/if}
+							{#if !d.equal}<span class="w-14 text-right text-ink">{pct(m.share, d.units)}%</span
+								>{/if}
 						</span>
 					</ListItem>
 				{/each}

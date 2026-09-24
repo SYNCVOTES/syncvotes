@@ -40,7 +40,7 @@
 	const dao = $derived(me ? remote.dao(id) : null);
 
 	// The proposal list is paged and filtered on the server; more pages append below.
-	let status = $state<'open' | 'closed' | undefined>(undefined);
+	let status = $state<'open' | 'closed' | 'unvoted' | undefined>(undefined);
 	let limit = $state(20);
 	let q = $state('');
 	const proposals = $derived(me ? remote.daoProposals({ id, offset: 0, limit, status, q }) : null);
@@ -182,7 +182,7 @@
 							<SearchInput bind:value={q} placeholder="Filter by title or proposer" />
 						</div>
 						<div class="flex gap-1">
-							{#each [[undefined, 'All'], ['open', 'Open'], ['closed', 'Closed']] as [value, label] (label)}
+							{#each [[undefined, 'All'], ['open', 'Open'], ['closed', 'Closed'], ...(d.me.membership ? [['unvoted', 'Not voted']] : [])] as [value, label] (label)}
 								<button
 									type="button"
 									class="rounded-full px-3 py-1 font-mono text-[0.6875rem] tracking-[0.14em] uppercase transition-colors {status ===
@@ -203,7 +203,13 @@
 				{:else if !proposals?.ready}
 					<Skeleton height="h-24" />
 				{:else if proposals.current.total === 0}
-					<EmptyState>{status ? `No ${status} proposals.` : 'Nothing proposed yet.'}</EmptyState>
+					<EmptyState
+						>{status === 'unvoted'
+							? 'Nothing waits on your vote.'
+							: status
+								? `No ${status} proposals.`
+								: 'Nothing proposed yet.'}</EmptyState
+					>
 				{:else}
 					<List>
 						{#each proposals.current.items as p (p.id)}
@@ -284,9 +290,11 @@
 							{#each preview.current.items.slice(0, 6) as m (m.party)}
 								<ListItem class="flex items-center justify-between gap-3 font-mono text-xs">
 									<Who who={m.who} me={m.party === me} class="min-w-0 flex-1" />
-									<span class="flex shrink-0 items-center gap-2">
-										{#if !d.equal}<span class="text-ink">{pct(m.share, d.units)}%</span>{/if}
+									<span class="flex shrink-0 items-center gap-3">
 										{#if m.party === d.creator}<RoleTag role="creator" />{/if}
+										{#if !d.equal}<span class="w-14 text-right text-ink"
+												>{pct(m.share, d.units)}%</span
+											>{/if}
 									</span>
 								</ListItem>
 							{/each}

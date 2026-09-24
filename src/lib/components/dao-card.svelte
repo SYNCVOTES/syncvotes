@@ -11,7 +11,9 @@
 		balance = null,
 		actorPays = false,
 		share = null,
-		equal = false
+		equal = false,
+		isPublic = null,
+		awaiting = null
 	}: {
 		id: string;
 		name: string;
@@ -28,6 +30,10 @@
 		/** The viewer's share of the vote, in percent. */
 		share?: number | null;
 		equal?: boolean;
+		/** Whether anyone signed in may read it; null where the list already says so. */
+		isPublic?: boolean | null;
+		/** Open proposals still waiting on the viewer's vote; null for a DAO they only read. */
+		awaiting?: number | null;
 	} = $props();
 	import { excerpt } from '$lib/markdown';
 	import { coin } from '$lib/format';
@@ -49,13 +55,16 @@
 				{monogram}
 			</div>
 		{/if}
-		{#if role}
-			<span
-				class="pt-1 font-mono text-xs font-bold tracking-[0.18em] uppercase {role === 'creator'
-					? 'text-amber'
-					: 'text-orange'}">{role}</span
-			>
-		{/if}
+		<span class="flex items-center gap-2 pt-1 font-mono text-xs tracking-[0.18em] uppercase">
+			{#if isPublic !== null}
+				<span class={isPublic ? 'text-green' : 'text-ink-dim'}
+					>{isPublic ? 'public' : 'private'}</span
+				>
+			{/if}
+			{#if role}
+				<span class="font-bold {role === 'creator' ? 'text-amber' : 'text-orange'}">{role}</span>
+			{/if}
+		</span>
 	</div>
 
 	<div
@@ -80,6 +89,16 @@
 			</div>
 			<div class="mt-0.5 font-mono text-xs tracking-[0.14em] text-ink-dim uppercase">Open</div>
 		</div>
+		{#if awaiting !== null}
+			<div>
+				<div class="font-mono text-[15px] font-bold {awaiting > 0 ? 'text-orange' : ''}">
+					{awaiting}
+				</div>
+				<div class="mt-0.5 font-mono text-xs tracking-[0.14em] text-ink-dim uppercase">
+					Your vote due
+				</div>
+			</div>
+		{/if}
 		{#if actorPays}
 			<div>
 				<div class="font-mono text-[15px] font-bold">members</div>

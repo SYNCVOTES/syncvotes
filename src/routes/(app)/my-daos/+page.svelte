@@ -21,9 +21,14 @@
 	// A member of hundreds of DAOs finds one by name; the grid grows on request.
 	let q = $state('');
 	let shown = $state(30);
+	// Only the DAOs with a proposal still waiting on the viewer's vote, when asked.
+	let due = $state(false);
 	const found = $derived(
-		(daos?.current ?? []).filter((d) => !q || d.name.toLowerCase().includes(q.toLowerCase()))
+		(daos?.current ?? []).filter(
+			(d) => (!due || d.awaiting > 0) && (!q || d.name.toLowerCase().includes(q.toLowerCase()))
+		)
 	);
+	const awaiting = $derived(daos?.current?.filter((d) => d.awaiting > 0).length ?? 0);
 </script>
 
 <svelte:head><title>My DAOs — SyncVotes</title></svelte:head>
@@ -64,11 +69,25 @@
 				<span class="inline-block"><PartyId party={who.party} /></span>
 			</EmptyState>
 		{:else}
-			{#if daos.current.length > 12}
-				<div class="mb-4 w-full max-w-sm">
-					<SearchInput bind:value={q} placeholder="Filter by name" />
+			<div class="mb-4 flex flex-wrap items-center gap-3">
+				{#if daos.current.length > 12}
+					<div class="w-full max-w-sm">
+						<SearchInput bind:value={q} placeholder="Filter by name" />
+					</div>
+				{/if}
+				<div class="flex gap-1">
+					{#each [[false, 'All'], [true, `Your vote due (${awaiting})`]] as [value, label] (label)}
+						<button
+							type="button"
+							class="rounded-full px-3 py-1 font-mono text-[0.6875rem] tracking-[0.14em] uppercase transition-colors {due ===
+							value
+								? 'bg-orange-dim text-orange'
+								: 'text-ink-dim hover:text-ink'}"
+							onclick={() => (due = value as boolean)}>{label}</button
+						>
+					{/each}
 				</div>
-			{/if}
+			</div>
 			<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
 				{#each found.slice(0, shown) as dao (dao.contractId)}
 					<DaoCard
@@ -82,10 +101,15 @@
 						actorPays={dao.actorPays}
 						share={dao.units > 0 ? Math.round((dao.myShare / dao.units) * 1000) / 10 : 0}
 						equal={dao.equal}
+						isPublic={!!dao.public}
+						awaiting={dao.awaiting}
 						role={dao.creator === who.party ? 'creator' : 'member'}
 					/>
 				{/each}
 			</div>
+			{#if found.length === 0}
+				<EmptyState>{due ? 'Nothing waits on your vote.' : 'No DAO matches that.'}</EmptyState>
+			{/if}
 			{#if found.length > shown || daos.current.length > 12}
 				<LoadMore
 					shown={Math.min(shown, found.length)}

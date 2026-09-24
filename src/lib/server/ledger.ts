@@ -190,11 +190,18 @@ const waiting = new Map<string, Set<() => void>>();
 const touched = new Set<string>([keys.all]);
 
 /** Resolves the next time a transaction touches `key`. */
-export const nextChange = (key: string) =>
+/** Resolves when any of these keys changes; its place under the other keys is given up then. */
+export const nextChange = (...keys: string[]) =>
 	new Promise<void>((resolve) => {
-		let set = waiting.get(key);
-		if (!set) waiting.set(key, (set = new Set()));
-		set.add(resolve);
+		const done = () => {
+			for (const key of keys) waiting.get(key)?.delete(done);
+			resolve();
+		};
+		for (const key of keys) {
+			let set = waiting.get(key);
+			if (!set) waiting.set(key, (set = new Set()));
+			set.add(done);
+		}
 	});
 
 const wake = () => {
