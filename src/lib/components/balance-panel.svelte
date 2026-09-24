@@ -34,7 +34,14 @@
 			<dt class="text-ink-dim">Spent</dt>
 			<dd class="text-ink">{coin(b.charged)}</dd>
 			<dt class="text-ink-dim">Price</dt>
-			<dd class="text-ink">{coin(b.coinPerMb)} per MB{b.factor !== 1 ? ` (${b.factor}×)` : ''}</dd>
+			<dd
+				class="text-ink"
+				title="The network's traffic price, less what the network pays back for this traffic in rewards"
+			>
+				{coin(b.coinPerMb)} per MB{b.factor !== 1
+					? ` (${b.factor}× the network's, net of rewards)`
+					: ''}
+			</dd>
 		</dl>
 		{#if b.balance <= 0}
 			<p class="text-[13px] text-red">

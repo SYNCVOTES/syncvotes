@@ -35,12 +35,32 @@ const pending = new Map<Account, number>();
 const dirty = new Set<Account>();
 let writing = false;
 
-const factor = () => Number(BILLING_FACTOR ?? '1');
+/** The traffic charged lately, for how much of it there is per round (ten minutes). */
+const recent: { at: number; bytes: number }[] = [];
+const HOUR = 3600_000;
+const bytesPerRound = () => {
+	const since = Date.now() - HOUR;
+	while (recent.length && recent[0].at < since) recent.shift();
+	return recent.reduce((s, r) => s + r.bytes, 0) / 6;
+};
+
+/**
+ * What a byte is charged at, as a fraction of what it costs: what does not come back as rewards
+ * (the validator's for the traffic it buys; the provider's where it earns app rewards for it,
+ * enough per round to clear the threshold), times `BILLING_FACTOR`, below one to subsidise.
+ */
+async function factor(): Promise<number> {
+	const [back, { usdPerMb }] = await Promise.all([splice.rewards(), splice.prices()]);
+	const appUsdPerRound = (bytesPerRound() / 1_000_000) * usdPerMb * back.featuredApp;
+	const app = appUsdPerRound >= back.thresholdUsd ? back.featuredApp : 0;
+	const net = Math.max(0, 1 - back.validator - app);
+	return net * Number(BILLING_FACTOR ?? '1');
+}
 
 /** Coin per byte of traffic, right now. */
 async function coinPerByte(): Promise<number> {
 	const { usdPerMb, usdPerCoin } = await splice.prices();
-	return (usdPerMb / 1_000_000 / usdPerCoin) * factor();
+	return (usdPerMb / 1_000_000 / usdPerCoin) * (await factor());
 }
 /** What this many bytes cost, in coin. */
 export const coinFor = async (bytes: number) => bytes * (await coinPerByte());
@@ -125,15 +145,16 @@ export async function statement(a: Account): Promise<Statement> {
 	const { usdPerMb, usdPerCoin } = await splice.prices();
 	const credited = f.exists ? f.credited : (deposited.get(a) ?? 0);
 	const charged = f.charged + (pending.get(a) ?? 0);
+	const now = await factor();
 	return {
 		payTo: payeeParty(),
 		memo: deposits.memoFor(a),
 		credited,
 		charged,
 		balance: credited - charged,
-		coinPerMb: (usdPerMb / usdPerCoin) * factor(),
+		coinPerMb: (usdPerMb / usdPerCoin) * now,
 		usdPerCoin,
-		factor: factor(),
+		factor: Math.round(now * 100) / 100,
 		updatedAt: row?.updatedAt ?? null
 	};
 }
@@ -141,6 +162,7 @@ export async function statement(a: Account): Promise<Statement> {
 /** The traffic a transaction cost, charged to the account that caused it. */
 export async function charge(a: Account, bytes: number): Promise<void> {
 	if (!bytes) return;
+	recent.push({ at: Date.now(), bytes });
 	const coin = bytes * (await coinPerByte());
 	pending.set(a, (pending.get(a) ?? 0) + coin);
 	dirty.add(a);

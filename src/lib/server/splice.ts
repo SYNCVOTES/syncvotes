@@ -1,4 +1,4 @@
-import { scanUrl, type DisclosedContract } from './participant';
+import { providerParty, scanUrl, type DisclosedContract } from './participant';
 
 export { scanUrl };
 
@@ -76,6 +76,45 @@ export const openRound = cached(60_000, async () => {
 	if (open.length === 0) throw new Error('No open mining round');
 	const last = open[open.length - 1];
 	return disclosed(last.contract, last.domain_id);
+});
+
+/**
+ * What comes back of what traffic costs, as fractions of it, from the latest issuing round: the
+ * validator is minted `validator` coin per coin it burns buying traffic, and a featured app's
+ * provider `featuredApp` per coin of its transactions' traffic, but only where the network mints
+ * app rewards by traffic (CIP-0104; MainNet still mints by activity markers) and only above the
+ * per-round threshold, in USD, below which a party's reward is burned.
+ */
+export const rewards = cached(10 * 60_000, async () => {
+	const r = await scan<{
+		issuing_mining_rounds: Record<string, { contract: ScanContract }>;
+	}>('/api/scan/v0/open-and-issuing-mining-rounds', {
+		cached_open_mining_round_contract_ids: [],
+		cached_issuing_round_contract_ids: []
+	});
+	const latest = Object.values(r.issuing_mining_rounds)
+		.map((x) => x.contract.payload as { round: { number: string } } & Record<string, string>)
+		.sort((a, b) => Number(b.round.number) - Number(a.round.number))[0];
+	const config = (
+		(await amuletRules()).payload as {
+			configSchedule: {
+				initialValue: {
+					rewardConfig?: { mintingVersion?: string; appRewardCouponThreshold?: string };
+				};
+			};
+		}
+	).configSchedule.initialValue.rewardConfig;
+	const featured = await scan<{ featured_app_right: unknown }>(
+		`/api/scan/v0/featured-apps/${encodeURIComponent(providerParty())}`
+	).then((x) => x.featured_app_right !== null);
+	return {
+		validator: Number(latest?.issuancePerValidatorRewardCoupon ?? 0),
+		featuredApp:
+			featured && config?.mintingVersion === 'RewardVersion_TrafficBasedAppRewards'
+				? Number(latest?.issuancePerFeaturedAppRewardCoupon ?? 0)
+				: 0,
+		thresholdUsd: Number(config?.appRewardCouponThreshold ?? 0.5)
+	};
 });
 
 /** What the network charges for traffic, in USD per megabyte, and what a coin is worth in USD. */

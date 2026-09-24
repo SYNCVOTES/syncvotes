@@ -58,7 +58,8 @@ export const variables = defineEnvVars({
 		schema: required
 	},
 	BILLING_FACTOR: {
-		description: 'What a payer is charged per byte of traffic, as a multiple of the network price',
+		description:
+			'A multiple of the net cost of traffic (its price less the rewards it earns) a payer is charged; below one subsidises',
 		schema: v.optional(v.string(), '1')
 	},
 	INVITE_CODES: {

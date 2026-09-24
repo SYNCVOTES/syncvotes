@@ -94,7 +94,12 @@ whoever asks.
 ### The balances
 
 The validator pays the network for every byte of traffic. The participant reports what each
-transaction cost, and the payer is charged that times `BILLING_FACTOR` (one). Two kinds of
+transaction cost, and the payer is charged what does not come back of it: the network mints the
+validator 0.2 coin per coin it burns on traffic (the latest issuing round's rate, read from Scan),
+and a featured app's provider its share per coin of its transactions' traffic where the network
+mints app rewards by traffic (CIP-0104; not yet on MainNet) and the app's traffic per round clears
+the reward threshold. That net cost is multiplied by `BILLING_FACTOR` (one; below one subsidises
+from the validator's wallet). Two kinds of
 account, paid in the same way: a DAO's (`Meter`) and a party's own (`Purse`, by fingerprint).
 A DAO founded with "the DAO pays" pays for everything done in it; one founded with "each
 member pays" has no balance, and a proposal, a vote or a comment costs the member who signs
