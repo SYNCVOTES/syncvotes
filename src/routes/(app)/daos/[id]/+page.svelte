@@ -196,6 +196,7 @@
 						</p>
 						<Button
 							size="sm"
+							variant="accent"
 							onclick={() => {
 								status = 'unvoted';
 								limit = 20;
@@ -263,7 +264,7 @@
 								</div>
 								{#if due}
 									<span
-										class="rounded-full bg-orange px-3 py-1 font-mono text-label tracking-[0.14em] text-background uppercase"
+										class="rounded-full bg-orange-dim px-3 py-1 font-mono text-label tracking-[0.14em] text-orange uppercase"
 										>Vote</span
 									>
 								{:else}

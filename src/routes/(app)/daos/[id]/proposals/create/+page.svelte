@@ -640,9 +640,9 @@
 
 			<!-- What passing would do, who votes, and the button: kept in view along the bottom. -->
 			<div
-				class="sticky bottom-0 z-10 -mx-6 space-y-3 border-t border-border bg-[rgba(var(--bg-rgb),0.95)] px-6 py-4 backdrop-blur md:-mx-10 md:px-10"
+				class="sticky bottom-0 z-10 -mx-6 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-t border-border bg-[rgba(var(--bg-rgb),0.95)] px-6 py-3 backdrop-blur md:-mx-10 md:px-10"
 			>
-				<div class="space-y-1">
+				<div class="min-w-0 flex-1 basis-72 space-y-1">
 					<p class="text-body-sm {kind === 'dissolve' ? 'text-red' : 'text-ink'}">
 						<span class="eyebrow mr-1">If it passes</span>
 						{outcome}

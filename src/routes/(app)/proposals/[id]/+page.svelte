@@ -160,7 +160,7 @@
 						<div class="mb-4 flex flex-wrap items-center justify-between gap-3">
 							<h2 class="eyebrow">Ballots</h2>
 							{#if !p.secret}
-								<div class="w-full sm:w-56">
+								<div class="w-full sm:w-64">
 									<SearchInput bind:value={q} placeholder="Search by name or party ID" />
 								</div>
 							{/if}
