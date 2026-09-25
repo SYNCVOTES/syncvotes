@@ -567,13 +567,16 @@ async function loadActiveContracts(): Promise<number> {
 	return offset;
 }
 
-async function followUpdates(from: number): Promise<number> {
-	let offset = from;
+/** The offset of the last transaction applied: a broken stream resumes from here. */
+let appliedAt: number | undefined;
+
+async function followUpdates(from: number): Promise<void> {
+	appliedAt = from;
 	const ledger = await sdk();
 	for await (const update of ledger.events.updates({
 		partyId: providerParty(),
 		templateIds: TEMPLATES,
-		beginOffset: offset,
+		beginOffset: from,
 		verbose: false
 	})) {
 		const tx = (update as Update).update?.Transaction?.value;
@@ -584,9 +587,8 @@ async function followUpdates(from: number): Promise<number> {
 		}
 		if (recent.push(tx.updateId) > RECENT) recent.shift();
 		wake();
-		if (tx.offset) offset = tx.offset;
+		if (tx.offset) appliedAt = tx.offset;
 	}
-	return offset;
 }
 
 let started = false;
@@ -601,12 +603,11 @@ export function start(): void {
 	if (started) return;
 	started = true;
 	void (async () => {
-		let offset: number | undefined;
 		for (;;) {
 			try {
-				offset ??= await loadActiveContracts();
+				appliedAt ??= await loadActiveContracts();
 				loaded();
-				offset = await followUpdates(offset);
+				await followUpdates(appliedAt);
 				console.warn('Ledger update stream ended; reconnecting');
 			} catch (e) {
 				console.warn(

@@ -394,7 +394,15 @@ export type Prepared = {
  */
 const prepared = new Map<
 	string,
-	{ party: string; payer: string | null; marked: boolean; at: number }
+	{
+		party: string;
+		payer: string | null;
+		marked: boolean;
+		at: number;
+		/** What the participant prepared: executed as is, whatever the caller sends back. */
+		preparedTransaction: string;
+		hashingSchemeVersion: string;
+	}
 >();
 const PREPARED_TTL = 10 * 60 * 1000;
 
@@ -445,7 +453,9 @@ export async function prepare(
 			party,
 			payer: options.payer ?? null,
 			marked: options.marked ?? false,
-			at: now
+			at: now,
+			preparedTransaction: response.preparedTransaction,
+			hashingSchemeVersion: response.hashingSchemeVersion
 		});
 		return {
 			preparedTransaction: response.preparedTransaction,
@@ -479,8 +489,11 @@ export async function execute(
 			'/v2/interactive-submission/executeAndWait',
 			{
 				userId: await userId(),
-				preparedTransaction: tx.preparedTransaction,
-				hashingSchemeVersion: tx.hashingSchemeVersion,
+				// The transaction this server prepared under that hash, never the caller's copy: a
+				// transaction of the caller's own making, signed with their key, would pass the
+				// participant's signature check while skipping every rule applied at prepare.
+				preparedTransaction: known.preparedTransaction,
+				hashingSchemeVersion: known.hashingSchemeVersion,
 				submissionId: crypto.randomUUID(),
 				deduplicationPeriod: { Empty: {} },
 				partySignatures: { signatures: [{ party, signatures: signatures.map(wire) }] }
