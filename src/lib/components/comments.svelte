@@ -23,8 +23,16 @@
 	let {
 		proposal,
 		member,
-		actorPays = false
-	}: { proposal: string; member: boolean; actorPays?: boolean } = $props();
+		actorPays = false,
+		closed = false
+	}: {
+		proposal: string;
+		member: boolean;
+		actorPays?: boolean;
+		/** The vote is over: the editor waits behind a button rather than open at full size. */
+		closed?: boolean;
+	} = $props();
+	let writing = $state(false);
 	let limit = $state(20);
 	const comments = $derived(store.who ? remote.proposalComments({ id: proposal, limit }) : null);
 
@@ -52,7 +60,7 @@
 	{:else if !comments?.ready}
 		<Skeleton height="h-16" />
 	{:else if comments.current.total === 0}
-		<p class="text-body-sm text-ink-dim">Nothing said yet.</p>
+		<p class="text-body-sm text-ink-dim">No comments yet.</p>
 	{:else}
 		{#if comments.current.total > comments.current.items.length}
 			<button
@@ -94,6 +102,8 @@
 				<p class="text-body-sm text-ink-dim">Unlock your wallet to comment.</p>
 				<UnlockForm />
 			</div>
+		{:else if store.who && closed && !writing}
+			<Button variant="outline" size="sm" onclick={() => (writing = true)}>Write a comment</Button>
 		{:else if store.who}
 			<form {...enhanced} class="space-y-2">
 				<input {...f.fields.proposal.as('hidden', proposal)} />
@@ -102,7 +112,7 @@
 					bind:value={body}
 					compact
 					maxlength={5000}
-					placeholder="Say something about this proposal…"
+					placeholder="Add a comment…"
 					disabled={store.busy}
 				/>
 				<Problem message={store.problem} />
@@ -111,9 +121,7 @@
 						{store.busy ? 'Signing…' : 'Comment'}
 					</Button>
 					<span class="font-mono text-label text-ink-dim"
-						>Signed with your key; {actorPays
-							? 'you pay the traffic from your balance'
-							: 'the DAO pays the traffic'} — a few CC per write at today's prices.</span
+						>Signed with your key. Charged to {actorPays ? 'your balance' : 'the DAO'}.</span
 					>
 				</div>
 			</form>

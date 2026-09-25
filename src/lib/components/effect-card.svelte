@@ -73,14 +73,14 @@
 <Panel padding="sm" class="space-y-3">
 	<h2 class="eyebrow">
 		{title}{executedAt
-			? ' · carried out'
+			? ' · executed'
 			: executed > 0
-				? ` · ${fmt(executed)} of ${fmt(rows.length)} carried out`
+				? ` · ${fmt(executed)} of ${fmt(rows.length)} executed`
 				: ''}
 	</h2>
 	{#if effect.kind === 'shares'}
 		{#if rows.length > 30}
-			<SearchInput bind:value={q} placeholder="Filter by party id" />
+			<SearchInput bind:value={q} placeholder="Search by party ID" />
 		{/if}
 		<ul class="divide-y divide-border">
 			{#each found.slice(0, shown) as d (d.party)}
@@ -110,46 +110,44 @@
 			all={2000}
 			onmore={(n) => (shown = n)}
 		/>
-		{#if executedAt}<p class="font-mono text-xs text-ink-dim">This is the table now.</p>{/if}
+		{#if executedAt}<p class="font-mono text-xs text-ink-dim">Current membership.</p>{/if}
 	{:else if effect.kind === 'info'}
-		<div class="space-y-2 text-body-sm text-ink-mid">
-			<p>
-				Renames the DAO to <span class="font-display font-bold text-ink">{effect.name}</span
-				>{effect.image ? ', with a new picture' : ''}{effect.description
-					? ' and describes it as:'
-					: ' and clears its description.'}
-			</p>
-			{#if effect.image}<img
-					src={effect.image}
-					alt=""
-					class="h-32 w-full border border-border object-cover"
-				/>{/if}
-			{#if effect.description}<Markdown text={effect.description} />{/if}
-		</div>
+		<!-- What the proposal sets, field by field; it does not claim a rename when the name stays. -->
+		<dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-body-sm">
+			<dt class="font-mono text-xs text-ink-dim">Name</dt>
+			<dd class="font-display font-bold text-ink">{effect.name}</dd>
+			<dt class="font-mono text-xs text-ink-dim">Picture</dt>
+			<dd class="text-ink-mid">
+				{#if effect.image}<img
+						src={effect.image}
+						alt=""
+						class="h-32 w-full border border-border object-cover"
+					/>{:else}None{/if}
+			</dd>
+			<dt class="font-mono text-xs text-ink-dim">Description</dt>
+			<dd class="min-w-0 text-ink-mid">
+				{#if effect.description}<Markdown text={effect.description} />{:else}Cleared{/if}
+			</dd>
+		</dl>
 	{:else if effect.kind === 'dissolve'}
 		<p class="text-body-sm text-ink-mid">
-			The DAO is archived the moment this passes: nothing more can be proposed or voted on, what was
-			paid in for it is spent, and its record stays readable.
+			Closes the DAO permanently. The remaining balance is lost; the record stays readable.
 		</p>
 	{:else if effect.kind === 'choose'}
 		<p class="text-body-sm text-ink-mid">
-			{effect.several
-				? 'Decides which of these, any number, and does nothing else:'
-				: 'Decides among these, and does nothing else:'}
+			{effect.several ? 'Options (pick any):' : 'Options:'}
 		</p>
 		<ol class="list-decimal space-y-1 pl-5 text-body-sm text-ink">
 			{#each effect.options as o, i (i)}<li>{o}</li>{/each}
 		</ol>
 	{:else if effect.kind === 'visibility'}
 		<p class="text-body-sm text-ink-mid">
-			{#if effect.public}The DAO becomes public: listed, and readable by anyone signed in —
-				proposals, outcomes, members, comments. Only members act; who voted how stays with the
-				members.{:else}The DAO becomes private: only its members see it exists.{/if}
+			{effect.public ? 'Makes the DAO public.' : 'Makes the DAO private.'}
 		</p>
 	{:else if effect.kind === 'settings'}
 		<p class="text-body-sm text-ink-mid">From then on:</p>
 		<SettingsSummary sensitive={effect.sensitive} />
 	{:else}
-		<p class="text-body-sm text-ink-mid">Decides, and does nothing else.</p>
+		<p class="text-body-sm text-ink-mid">Records a decision only.</p>
 	{/if}
 </Panel>

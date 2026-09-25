@@ -507,10 +507,10 @@ export function ledgerError(e: unknown): never {
 				: String(e);
 	const message = typeof code === 'string' && !text.includes(code) ? `${code}: ${text}` : text;
 	if (/CONTRACT_NOT_ACTIVE|INACTIVE_CONTRACT|LOCKED_CONTRACT|CONTRACT_NOT_FOUND/.test(message)) {
-		error(409, 'This changed while you were looking at it — reload and try again');
+		error(409, 'This changed since you opened it. Reload and try again.');
 	}
 	if (/NOT_SEQUENCED_TIMEOUT/.test(message)) {
-		error(409, 'The signatures took too long; the transaction has to be prepared again');
+		error(409, 'Signing took too long. Try again.');
 	}
 	const reason =
 		message.match(/DAML_INTERPRETATION_ERROR[^:]*: [^\n]*?Error: ([^\n"]{1,200})/)?.[1] ??

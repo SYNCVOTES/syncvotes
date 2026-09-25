@@ -183,11 +183,25 @@ export function transient(error: unknown): boolean {
 	);
 }
 
+/**
+ * The ledger's own words for what a user can run into, said the way the app says things. The
+ * Daml strings stay as they are (package lineage), and the server still reads them as they are.
+ */
+const PLAIN: Record<string, string> = {
+	'Already voted; votes on this proposal cannot be changed':
+		'You have already voted. Votes on this proposal are final.',
+	'Already settled': 'This proposal is already decided.',
+	'Already counted': 'This proposal is already decided.',
+	'Cast after the deadline': 'Voting has closed.',
+	'Joined after the vote opened': 'You have no vote on this proposal.',
+	'The share changed after the vote opened': 'You have no vote on this proposal.'
+};
+
 /** Remote functions rethrow server errors as HttpError; the message is in the body. */
 export function describe(error: unknown): string {
 	if (transient(error)) return "Can't reach SyncVotes. Try again in a moment.";
 	const body = (error as { body?: { message?: string } })?.body;
-	if (body?.message) return body.message;
+	if (body?.message) return PLAIN[body.message.trim()] ?? body.message;
 	// WebAuthn's one error for "cancelled", "timed out" and "no such passkey here".
 	if (error instanceof DOMException && error.name === 'NotAllowedError') {
 		return 'Passkey cancelled or timed out. Try again.';

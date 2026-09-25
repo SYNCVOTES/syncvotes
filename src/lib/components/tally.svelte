@@ -1,5 +1,4 @@
 <script lang="ts">
-	import Panel from './panel.svelte';
 	import Hint from './hint.svelte';
 	import { fmt } from '$lib/format';
 	import { describe, standing, type Rule } from '$lib/rules';
@@ -31,15 +30,24 @@
 	const s = $derived(standing(rule, yes, no, abstain, eligible));
 	const pct = (n: number) => (eligible > 0 ? (n / eligible) * 100 : 0);
 	const w = (n: number) => `${Math.round(pct(n) * 100) / 100}%`;
+	const timing = $derived(
+		rule.early
+			? '; settles early once sure'
+			: rule.changeable
+				? '; votes may change, so decided at the deadline'
+				: '; decided at the deadline'
+	);
 </script>
 
-<Panel padding="sm">
-	<h2 class="eyebrow mb-4 flex items-center gap-1.5">
+<section class="space-y-3">
+	<h2 class="eyebrow flex items-center gap-1.5">
 		Tally <Hint
-			text="Everything is a share of the whole vote as it stood when the proposal was made. The bar fills with yes, no and abstentions; the figure in the middle is what yes has to reach under this proposal's rule — of the whole vote, or of the yes and no cast so far. Ballots are checked and counted by the ledger; the page shows what is cast until then."
+			text="Shares of the whole vote at the time the proposal opened. The middle figure is what yes must reach. Passes when {describe(
+				rule
+			)}{timing}. The app counts ballots; the ledger checks each one."
 		/>
 	</h2>
-	<div class="mb-2 flex h-2 overflow-hidden bg-surface-active">
+	<div class="flex h-2 overflow-hidden bg-surface-active">
 		<div class="bg-green" style="width: {pct(yes)}%"></div>
 		<div class="bg-red" style="width: {pct(no)}%"></div>
 		<div class="bg-ink-dim" style="width: {pct(abstain)}%"></div>
@@ -55,16 +63,9 @@
 		</span>
 		<span class="text-red">{w(no)} no</span>
 	</div>
-	<p class="mt-3 font-mono text-xs text-ink-dim">
+	<p class="font-mono text-xs text-ink-dim">
 		{fmt(cast)} voted, {w(taken)} of the vote{abstain ? `, ${w(abstain)} abstaining` : ''}{counted
 			? ''
-			: ' (cast, not yet counted)'}.
+			: ' (not yet counted)'}.{s.note ? ` Now ${s.note}.` : ''}
 	</p>
-	<p class="mt-2 text-xs text-ink-dim">
-		Passes when {describe(rule)}{rule.early
-			? ''
-			: rule.changeable
-				? '; votes may change, so decided at the deadline only'
-				: '; decided at the deadline only'}.{s.note ? ` Now ${s.note}.` : ''}
-	</p>
-</Panel>
+</section>

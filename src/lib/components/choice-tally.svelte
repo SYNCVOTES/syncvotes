@@ -1,5 +1,4 @@
 <script lang="ts">
-	import Panel from './panel.svelte';
 	import Hint from './hint.svelte';
 	import { fmt } from '$lib/format';
 	import { describe, standing, type Rule } from '$lib/rules';
@@ -42,6 +41,15 @@
 	const s = $derived(standing(rule, lead, picked - lead, abstain, eligible));
 	const pct = (n: number) => (eligible > 0 ? (n / eligible) * 100 : 0);
 	const w = (n: number) => `${Math.round(pct(n) * 100) / 100}%`;
+	const decidedWhen = $derived(
+		`Decided when ${several ? 'an option' : 'the leading option'} has ${describe(rule).replace(/ say yes/, '')}${
+			rule.early
+				? ''
+				: rule.changeable
+					? '; votes may change, so decided at the deadline only'
+					: '; decided at the deadline only'
+		}.`
+	);
 	const tied = $derived(!several && lead > 0 && tallies.filter((t) => t === lead).length > 1);
 	// An option's colour: leading (or, with several picks, reaching the rule as it stands).
 	const ahead = (t: number) =>
@@ -50,12 +58,12 @@
 			: t > 0 && t === lead && !tied;
 </script>
 
-<Panel padding="sm">
-	<h2 class="eyebrow mb-4 flex items-center gap-1.5">
+<section class="space-y-3">
+	<h2 class="eyebrow flex items-center gap-1.5">
 		Tally <Hint
 			text={several
-				? "Each bar is an option's share of the whole vote as it stood when the proposal was made. Each member picks any number of options; every option that reaches what a yes would have to under this proposal's rule is chosen. Where the rule counts the votes cast, an option is measured against the ballots that picked anything. Ballots are checked and counted by the ledger; the page shows what is cast until then."
-				: "Each bar is an option's share of the whole vote as it stood when the proposal was made. The option with the most votes wins if it reaches what a yes would have to under this proposal's rule, and stands alone at the top; a tie decides nothing. Ballots are checked and counted by the ledger; the page shows what is cast until then."}
+				? `Each bar is an option's share of the whole vote. Every option that meets the rule wins. ${decidedWhen} The app counts ballots; the ledger checks each one.`
+				: `Each bar is an option's share of the whole vote. The top option wins if it meets the rule and is not tied. ${decidedWhen}`}
 		/>
 	</h2>
 	<ol class="space-y-2">
@@ -72,25 +80,20 @@
 			</li>
 		{/each}
 	</ol>
-	<p class="mt-3 font-mono text-xs text-ink-dim">
+	<p class="font-mono text-xs text-ink-dim">
 		{fmt(cast)} voted, {w(picked + abstain)} of the vote{abstain
 			? `, ${w(abstain)} abstaining`
-			: ''}{counted ? '' : ' (cast, not yet counted)'}. {several ? 'An option' : 'The leader'} needs {w(
+			: ''}{counted ? '' : ' (not yet counted)'}. {several ? 'An option' : 'The leader'} needs {w(
 			s.needed
 		)}{rule.basis === 'all'
 			? ''
 			: several
 				? ' of the ballots that picked'
-				: ' of the votes for options'}{tied ? '; tied at the top now' : ''}.
+				: ' of the votes for options'}{tied ? '; tied at the top now' : ''}.{s.note
+			? ` Now ${s.note}.`
+			: ''}
 	</p>
-	<p class="mt-2 text-xs text-ink-dim">
-		Decided when {several ? 'an option' : 'the leading option'} has {describe(rule).replace(
-			/ say yes/,
-			''
-		)}{rule.early
-			? ''
-			: rule.changeable
-				? '; votes may change, so decided at the deadline only'
-				: '; decided at the deadline only'}.{s.note ? ` Now ${s.note}.` : ''}
-	</p>
-</Panel>
+	{#if chosen.length === 0}
+		<p class="text-xs text-ink-dim">{decidedWhen}</p>
+	{/if}
+</section>
