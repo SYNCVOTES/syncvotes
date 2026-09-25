@@ -1,5 +1,6 @@
 <script lang="ts">
 	import * as wallet from '$lib/wallet';
+	import { NETWORK } from '$app/env/public';
 	import { store, flow, lock } from '$lib/wallet-store.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
@@ -73,7 +74,7 @@
 			? checking
 				? 2
 				: 1
-			: screen.at === 'hint'
+			: screen.at === 'hint' && !screen.restored
 				? 3
 				: screen.at === 'protect' && screen.pending
 					? 4
@@ -234,6 +235,16 @@
 			}}
 		>
 			<Panel class="space-y-5">
+				{#if screen.restored}
+					<div class="border-l-2 border-amber pl-4">
+						<p class="text-sm text-ink">No party on {NETWORK} uses this key.</p>
+						<p class="mt-1 text-sm text-ink-mid">
+							The phrase is valid. Each network has its own parties, so a key used on another
+							network starts with none here. To create one on {NETWORK}, choose a hint below;
+							otherwise go back and check the phrase or the network.
+						</p>
+					</div>
+				{/if}
 				<h2 class="eyebrow flex items-center gap-1.5">
 					Choose a party hint <Hint
 						text="Party ID = hint::fingerprint. Others see the hint; the fingerprint ties the ID to your key."
@@ -273,12 +284,15 @@
 					{/if}
 				{/await}
 				<Problem message={store.problem} />
-				<Button
-					type="submit"
-					disabled={store.busy || !setup.current || !hintInput.trim() || hintIssue !== null}
-				>
-					{store.busy ? 'Checking…' : 'Continue'}
-				</Button>
+				<div class="flex flex-wrap gap-3">
+					<Button
+						type="submit"
+						disabled={store.busy || !setup.current || !hintInput.trim() || hintIssue !== null}
+					>
+						{store.busy ? 'Checking…' : 'Continue'}
+					</Button>
+					<Button type="button" variant="ghost" onclick={flow.back}>Back</Button>
+				</div>
 			</Panel>
 		</form>
 	{:else if screen.at === 'fund'}
@@ -318,6 +332,12 @@
 		</Panel>
 	{:else if screen.at === 'protect'}
 		<Panel class="space-y-5">
+			{#if screen.found}
+				<div class="border-l-2 border-green pl-4">
+					<p class="text-sm text-ink">Your party was found.</p>
+					<PartyId party={screen.who.party} class="mt-1" />
+				</div>
+			{/if}
 			<h2 class="eyebrow">Keep the key on this device?</h2>
 			<p class="text-sm text-ink-mid">
 				The key is stored encrypted and unlocked with a passkey or password. If you don't keep it,

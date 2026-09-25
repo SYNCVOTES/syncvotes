@@ -16,7 +16,13 @@ export type Screen =
 	| { at: 'welcome' }
 	| { at: 'create'; phrase: string }
 	| { at: 'restore' }
-	| { at: 'hint'; signer: wallet.Signer; fingerprint: string }
+	| {
+			at: 'hint';
+			signer: wallet.Signer;
+			fingerprint: string;
+			/** A restored phrase whose key has no party on this network: said so, not made to look new. */
+			restored?: boolean;
+	  }
 	| {
 			at: 'fund';
 			signer: wallet.Signer;
@@ -32,6 +38,8 @@ export type Screen =
 			who: actions.Identity;
 			/** Set while the party is not made yet: the key is kept first, paid for next. */
 			pending?: { hint: string; invite: string; fingerprint: string };
+			/** A restored phrase whose party was found on this network. */
+			found?: boolean;
 	  }
 	| { at: 'locked'; lock: 'passkey' | 'password' }
 	| { at: 'home'; signer: wallet.Signer; who: actions.Identity };
@@ -201,11 +209,11 @@ async function identify(signer: wallet.Signer, andThen: 'protect' | 'enter') {
 			const hint = kept.party.slice(0, -found.fingerprint.length - 2);
 			// The invite code is not kept: the fund screen asks for it again where one is needed.
 			screen = { at: 'fund', signer, fingerprint: found.fingerprint, hint, invite: '', kept: true };
-		} else screen = { at: 'hint', signer, fingerprint: found.fingerprint };
+		} else screen = { at: 'hint', signer, fingerprint: found.fingerprint, restored: true };
 		return;
 	}
 	const who = { party: found.party, account: found.account };
-	if (andThen === 'protect') screen = { at: 'protect', signer, who };
+	if (andThen === 'protect') screen = { at: 'protect', signer, who, found: true };
 	else await enter(signer, who);
 }
 
