@@ -14,6 +14,8 @@
 		.filter(([name, url]) => name && url && name !== NETWORK)
 		.map(([name, url]) => ({ name, url: url.replace(/\/$/, '') }));
 	const KEEP = ['/', '/my-daos', '/daos', '/wallet'];
+	// On MainNet the beta tag is the environment signal; the pill stays as the way to switch.
+	const mainnet = NETWORK.toLowerCase() === 'mainnet';
 	const path = $derived(KEEP.includes(page.url.pathname) ? page.url.pathname : '/my-daos');
 	let open = $state(false);
 	let root: HTMLElement | undefined = $state();
@@ -28,24 +30,29 @@
 	}}
 />
 
-<div class="relative hidden sm:block" bind:this={root}>
+<div class="relative" bind:this={root}>
 	<button
 		type="button"
-		class="flex h-8 items-center gap-2 rounded-full border border-amber/30 bg-amber/5 px-3 font-mono text-label tracking-[0.14em] text-amber uppercase {others.length
-			? 'cursor-pointer hover:border-amber/60'
+		class="flex h-7 items-center gap-1.5 rounded-full border px-2.5 font-mono text-label tracking-[0.14em] uppercase md:h-8 md:gap-2 md:px-3 {mainnet
+			? 'border-border text-ink-mid'
+			: 'border-amber/30 bg-amber/5 text-amber'} {others.length
+			? mainnet
+				? 'cursor-pointer hover:border-border-hover'
+				: 'cursor-pointer hover:border-amber/60'
 			: 'cursor-default'}"
+		aria-label="Network: {NETWORK}"
 		aria-haspopup={others.length ? 'menu' : undefined}
 		aria-expanded={others.length ? open : undefined}
 		onclick={() => others.length && (open = !open)}
 	>
-		<span class="size-1.5 rounded-full bg-amber"></span>
+		<span class="size-1.5 rounded-full {mainnet ? 'bg-green' : 'bg-amber'}"></span>
 		{NETWORK}
 		{#if others.length}<ChevronDown size={12} aria-hidden="true" />{/if}
 	</button>
 	{#if open}
 		<div
 			role="menu"
-			class="absolute right-0 z-50 mt-2 w-64 border border-border bg-surface p-2 shadow-lg"
+			class="absolute left-0 z-50 mt-2 w-64 max-w-[calc(100vw-2rem)] border border-border bg-surface p-2 shadow-lg"
 		>
 			{#each others as n (n.name)}
 				<a
@@ -58,8 +65,7 @@
 				</a>
 			{/each}
 			<p class="mt-1 border-t border-border px-3 pt-2 text-label leading-relaxed text-ink-dim">
-				Each network is a site of its own, with its own parties and DAOs. A key kept on this one is
-				not on the others: restore your phrase there.
+				Each network has its own parties and DAOs. To use your key there, restore your phrase.
 			</p>
 		</div>
 	{/if}

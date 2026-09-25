@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { store } from '$lib/wallet-store.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import Page from '$lib/components/page.svelte';
 	import PageHeader from '$lib/components/page-header.svelte';
@@ -10,13 +11,19 @@
 <Page width="narrow">
 	<PageHeader
 		eyebrow={String(page.status)}
-		title={page.status === 404 ? 'Nothing here' : 'Something went wrong'}
+		title={page.status === 404 ? 'Page Not Found' : 'Something Went Wrong'}
 		description={page.status === 404
-			? 'That address does not point at anything in SyncVotes.'
-			: (page.error?.message ?? 'The page could not be shown.')}
+			? "This page doesn't exist."
+			: (page.error?.message ?? "This page couldn't load.")}
 	/>
-	<div class="flex gap-3">
-		<Button href="/my-daos">My DAOs</Button>
-		<Button href="/" variant="outline">Home</Button>
+	<!-- My DAOs asks a signed-out visitor to sign in first; home is the way on for them. -->
+	<div class="flex flex-wrap gap-3">
+		{#if store.who}
+			<Button href="/my-daos">My DAOs</Button>
+			<Button href="/" variant="outline">Home</Button>
+		{:else}
+			<Button href="/">Home</Button>
+			<Button href="/my-daos" variant="outline">My DAOs</Button>
+		{/if}
 	</div>
 </Page>

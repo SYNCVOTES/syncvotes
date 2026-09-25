@@ -18,9 +18,12 @@
 	const GITHUB = 'https://github.com/SYNCVOTES/syncvotes';
 	const X = 'https://x.com/syncvotes';
 	const links = [
-		{ href: GITHUB, label: 'GitHub' },
-		{ href: X, label: 'X' },
-		{ href: 'https://docs.canton.network', label: 'Canton docs' }
+		{ href: '/#moves', label: 'How it works' },
+		{ href: '/terms', label: 'Terms' },
+		{ href: '/privacy', label: 'Privacy' },
+		{ href: '/brand', label: 'Brand kit' },
+		{ href: '/version', label: 'Build' },
+		{ href: 'https://docs.canton.network', label: 'Canton docs', external: true }
 	];
 </script>
 
@@ -29,11 +32,6 @@
 	<main class="flex-1">
 		{@render children()}
 	</main>
-	<SiteFooter
-		nav={[...nav, { href: '/#moves', label: 'How it works' }]}
-		{links}
-		github={GITHUB}
-		x={X}
-	/>
+	<SiteFooter {links} github={GITHUB} x={X} />
 	<Activity />
 </div>

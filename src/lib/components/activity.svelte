@@ -33,9 +33,7 @@
 			<div class="font-bold text-ink">{store.phase ?? 'Working'}…</div>
 			{#if elapsed >= 4}
 				<div class="mt-0.5 text-ink-dim">
-					{elapsed}s{elapsed >= 12
-						? ' · the network is taking its time; nothing to do but wait'
-						: ''}
+					{elapsed}s{elapsed >= 12 ? ' · still waiting for the network' : ''}
 				</div>
 			{/if}
 		</div>
