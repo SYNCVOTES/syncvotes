@@ -293,6 +293,7 @@ const awaitsVote = (p: ledger.Proposal, party: string) => {
 };
 /** A dissolution passed and waiting for the rest of the DAO's proposals: nothing new is proposed. */
 const dissolving = (daoId: string) =>
+	!!ledger.daos.get(daoId)?.dissolving ||
 	proposalsOf(daoId).some(
 		(p) => p.effect.kind === 'dissolve' && p.outcome === 'Passed' && !p.executedAt
 	);
@@ -910,27 +911,35 @@ export const prepareVote = command(
 				if (new Set(picks).size !== picks.length) error(400, 'An option picked twice');
 			}
 		} else if (picks.length > 0) error(400, 'This proposal takes yes or no');
-		const previous = ledger.ballots.get(proposal)?.get(me.party)?.contractId ?? null;
+		// A vote that replaces one hands it in by its kind: a `BallotV2`, or a `Ballot` cast
+		// before there were any.
+		const mine = ledger.ballots.get(proposal)?.get(me.party) ?? null;
 		const right = await markers.right();
 		const args = {
 			proposalId: proposal,
 			closesAt: p.closesAt,
 			changeable: p.rule.changeable,
 			vote: voteWire(vote as ledger.Vote),
-			previous,
+			previous: mine?.v2 ? mine.contractId : null,
+			previousV1: mine && !mine.v2 ? mine.contractId : null,
 			featuredAppRight: right?.contractId ?? null
 		};
 		const prepared = await prepare(
 			me.party,
 			Templates.Member,
 			me.contractId,
-			'Member_Vote',
+			'Member_Cast',
 			args,
 			p.daoId,
 			right
 		);
-		// The browser names the same right in what it checks before signing.
-		return { ...prepared, featuredAppRight: args.featuredAppRight };
+		// The browser names the same right and the same ballot in what it checks before signing.
+		return {
+			...prepared,
+			featuredAppRight: args.featuredAppRight,
+			previous: args.previous,
+			previousV1: args.previousV1
+		};
 	}
 );
 

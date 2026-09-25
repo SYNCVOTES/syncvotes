@@ -139,7 +139,11 @@ async function count(id: string) {
 								templateId: Templates.Proposal.templateId,
 								contractId: p.contractId,
 								choice: 'Proposal_Tally',
-								choiceArgument: { ballots: batch.map((b) => b.contractId), final }
+								choiceArgument: {
+									ballots: batch.filter((b) => !b.v2).map((b) => b.contractId),
+									final,
+									cast: batch.filter((b) => b.v2).map((b) => b.contractId)
+								}
 							}
 						}
 					],
@@ -191,6 +195,34 @@ async function execute(p: ledger.Proposal) {
 	const dao = ledger.daos.get(p.daoId);
 	if (!dao || executing.has(p.id) || !due(p.id)) return;
 	if (consumedDao.get(p.daoId) === dao.contractId) return;
+	if (p.effect.kind === 'dissolve' && !dao.dissolving) {
+		// First the ledger learns the DAO is winding up, so nothing new is proposed meanwhile.
+		executing.add(p.id);
+		try {
+			const updateId = await submitAsProvider(
+				[
+					{
+						ExerciseCommand: {
+							templateId: Templates.DAO.templateId,
+							contractId: dao.contractId,
+							choice: 'DAO_BeginDissolving',
+							choiceArgument: { proposal: p.contractId }
+						}
+					}
+				],
+				`dissolving-${p.daoId}-${Date.now()}`
+			);
+			consumedDao.set(p.daoId, dao.contractId);
+			await ledger.applied(updateId);
+			void billing.settle(payer(p), updateId);
+			succeeded(p.id);
+		} catch (e) {
+			failed(p.id, e);
+		} finally {
+			executing.delete(p.id);
+		}
+		return;
+	}
 	if (p.effect.kind === 'dissolve') {
 		const others = [...(ledger.proposalsOf.get(p.daoId)?.values() ?? [])].filter(
 			(o) => o.id !== p.id && o.effect.kind !== 'dissolve'

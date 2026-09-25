@@ -8,6 +8,7 @@ export const Templates = {
 	Member: SyncVotes.Governance.Member,
 	Proposal: SyncVotes.Governance.Proposal,
 	Ballot: SyncVotes.Governance.Ballot,
+	BallotV2: SyncVotes.Governance.BallotV2,
 	Comment: SyncVotes.Governance.Comment,
 	Meter: SyncVotes.Billing.Meter,
 	Purse: SyncVotes.Billing.Purse

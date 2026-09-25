@@ -70,6 +70,8 @@ export type Dao = {
 	actorPays: boolean;
 	/** Readable by anyone signed in, through the app; only members act. */
 	public: boolean;
+	/** Since when a passed dissolution waits; nothing new is proposed meanwhile. */
+	dissolving: string | null;
 };
 export type Member = {
 	contractId: string;
@@ -121,6 +123,8 @@ export type Ballot = {
 	changeable: boolean;
 	castAt: string;
 	counted: boolean;
+	/** A `BallotV2` (voter and provider only), counted through `Proposal_Tally`'s `cast`. */
+	v2: boolean;
 };
 export type Comment = {
 	contractId: string;
@@ -382,7 +386,8 @@ function created({ contractId, templateId, createArgument: a }: Created) {
 				members: num(a.members),
 				units: num(a.units),
 				actorPays: a.actorPays === true,
-				public: a.public === true
+				public: a.public === true,
+				dissolving: optional(a.dissolving)
 			};
 			track(contractId, [keys.dao(row.id), keys.party(row.creator)], put(daos, row.id, row));
 			break;
@@ -436,7 +441,8 @@ function created({ contractId, templateId, createArgument: a }: Created) {
 			);
 			break;
 		}
-		case 'Ballot': {
+		case 'Ballot':
+		case 'BallotV2': {
 			const row: Ballot = {
 				contractId,
 				proposalId: text(a.proposalId),
@@ -449,7 +455,8 @@ function created({ contractId, templateId, createArgument: a }: Created) {
 				closesAt: text(a.closesAt),
 				changeable: a.changeable === true,
 				castAt: text(a.castAt),
-				counted: a.counted === true
+				counted: a.counted === true,
+				v2: templateName(templateId) === 'BallotV2'
 			};
 			track(
 				contractId,
@@ -526,6 +533,7 @@ const TEMPLATES = [
 	Templates.Member,
 	Templates.Proposal,
 	Templates.Ballot,
+	Templates.BallotV2,
 	Templates.Comment,
 	Templates.Profile,
 	Templates.Meter,

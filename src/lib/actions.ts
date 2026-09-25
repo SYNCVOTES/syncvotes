@@ -99,15 +99,20 @@ export async function vote(
 		: choice.startsWith('PickMany:')
 			? { tag: 'PickMany', value: choice.slice(9).split(',') }
 			: { tag: choice, value: {} };
+	// The ballot handed in is the one this page knows to be ours, whichever kind it is.
+	if ((prepared.previous ?? prepared.previousV1) !== previous) {
+		throw new Error('The ballot to replace is not the one on record. Reload and try again.');
+	}
 	const intent = {
-		choice: 'Member_Vote',
+		choice: 'Member_Cast',
 		contractId: membership,
 		args: {
 			proposalId,
 			closesAt,
 			changeable,
 			vote,
-			previous,
+			previous: prepared.previous,
+			previousV1: prepared.previousV1,
 			// The provider's featured app right, known to the server only; it records a marker.
 			featuredAppRight: prepared.featuredAppRight
 		}

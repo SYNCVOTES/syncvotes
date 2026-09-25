@@ -138,6 +138,11 @@ services:
       traefik.http.routers.syncvotes-http.rule: 'Host(`${APP_DOMAIN}`)'
       traefik.http.routers.syncvotes-http.entrypoints: web
       traefik.http.services.syncvotes.loadbalancer.server.port: '80'
+      # Only Cloudflare's edges reach the site, so the visitor's address it forwards is theirs to
+      # say, and nobody skips its protection or reaches the site in plain HTTP.
+      traefik.http.middlewares.syncvotes-cloudflare.ipallowlist.sourcerange: '173.245.48.0/20,103.21.244.0/22,103.22.200.0/22,103.31.4.0/22,141.101.64.0/18,108.162.192.0/18,190.93.240.0/20,188.114.96.0/20,197.234.240.0/22,198.41.128.0/17,162.158.0.0/15,104.16.0.0/13,104.24.0.0/14,172.64.0.0/13,131.0.72.0/22,2400:cb00::/32,2606:4700::/32,2803:f800::/32,2405:b500::/32,2405:8100::/32,2a06:98c0::/29,2c0f:f248::/32'
+      traefik.http.routers.syncvotes.middlewares: syncvotes-cloudflare
+      traefik.http.routers.syncvotes-http.middlewares: syncvotes-cloudflare
     depends_on:
       - app
 
@@ -164,6 +169,12 @@ configs:
         # Prerendered docs carry no CSP header of their own, so framing is refused here.
         header /docs* X-Frame-Options DENY
         header /docs* Content-Security-Policy "frame-ancestors 'none'"
+        # Where Caddy faces the internet itself, only Cloudflare's edges (and the host's own
+        # networks) are served: CADDY_ALLOWED_PEERS. Unset, anyone is.
+        @outside not remote_ip ${CADDY_ALLOWED_PEERS:-0.0.0.0/0 ::/0}
+        handle @outside {
+          respond 403
+        }
         # Only the canton realm's login and keys are for the public: the admin console, the master
         # realm and the account console are reached over an SSH tunnel to keycloak:8080.
         @keycloakPrivate path /auth/admin* /auth/realms/master* /auth/realms/canton/account*

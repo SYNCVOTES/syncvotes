@@ -74,13 +74,21 @@ thousands of members, and one member's vote touches no contract another's does.
   (the last two exclude each other). Nobody cancels a proposal. A rule may make the ballot
   `secret`: the app shows nobody a vote but their own; the ballots are on the ledger all the
   same, and the provider, which counts them, sees them.
-- `Ballot` — one vote weighing the voter's units. The provider counts in batches
-  (`Proposal_Tally`; a final count three minutes after the deadline) and `Ballot_Count` checks
+- `BallotV2` — one vote weighing the voter's units, cast with `Member_Cast` and signed by the
+  voter and the provider only, so the DAO creator's validator never holds it (`Ballot`, which
+  the creator signed too, is what `Member_Vote` cast before 1.0.1; both still count). While a
+  proposal on a secret ballot is open the app shows no totals and no turnout, and hands out no
+  member's contract id, which changes as they vote. The provider counts in batches
+  (`Proposal_Tally`; a final count three minutes after the deadline) and the count checks
   each ballot: right DAO and proposal, cast in time, under the same rule, by a member of the
   time whose share has not changed since. The provider cannot forge a ballot; what it can do by
   leaving ballots out is under the trust model below.
 - `Comment` — said once and kept as said; nobody edits or removes it. Comments and proposals
-  are paced by the app (thirty writes an hour per party).
+  are paced by the app (thirty writes an hour per party). The ledger itself holds texts to the
+  app's lengths (a name 60 characters, a title 120, a description 10 000 or 20 000, a comment
+  5000, a bio 2000, pictures as https links of 2000) and, once a dissolution has passed
+  (`DAO_BeginDissolving` sets `dissolving`), refuses new proposals in that DAO. What stays the
+  app's alone: pacing, and one open membership change per party.
 - `Meter` and `Purse` — the provider's statement of a DAO's and a party's account: paid in,
   charged.
 
@@ -249,7 +257,8 @@ change to it needs `compose up -d --force-recreate caddy`. A deploy takes nothin
 holds a request until the new app container answers.
 
 The DAR is built inside the image and uploaded by the app at startup, which then checks the
-package is on the participant. The package is a lineage, `syncvotes` (1.0.0 replaced
+package is on the participant. The package is a lineage, `syncvotes` (1.0.1 is an upgrade of
+1.0.0, whose DAR is in `daml/upgrades/`; 1.0.0 replaced
 `syncvotes-options`, whose contracts the app no longer sees), and its name never changes again:
 every release is a Canton Smart Contract Upgrade of the one before, checked by the compiler
 against the previous DAR (`upgrades:` in `daml/daml.yaml`), so live contracts carry over.

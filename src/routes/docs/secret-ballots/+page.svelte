@@ -48,7 +48,7 @@
 <h2 id="what-it-does-not-hide">What It Does Not Hide</h2>
 <p>
 	A secret ballot is secret in the app, not on the ledger. Each ballot is still a contract signed by
-	you, the app and the DAO's creator, and it stays on the ledger after it is counted.
+	you and the app, and it stays on the ledger after it is counted.
 </p>
 <ul>
 	<li>
@@ -60,8 +60,9 @@
 		DAO it hosts.
 	</li>
 	<li>
-		<strong>The DAO's creator can obtain every ballot.</strong> The creator signs each ballot, so a creator
-		who hosts their party on a validator of their own receives every ballot there, secret ones included.
+		<strong>Ballots cast before 25 September 2026 carry the DAO creator's signature too</strong>, so
+		a creator who hosts their party on a validator of their own could obtain those. Ballots cast
+		since are signed by the voter and the app only.
 	</li>
 	<li>
 		<strong>The final totals can give votes away.</strong> In a small DAO, or when only a few members
@@ -71,9 +72,7 @@
 <DocNote>
 	<p>
 		Use a secret ballot to keep members from seeing each other's votes. Do not rely on it to hide
-		votes from whoever runs the app or created the DAO. See <a href="/docs/trust-model"
-			>Trust Model</a
-		>.
+		votes from whoever runs the app. See <a href="/docs/trust-model">Trust Model</a>.
 	</p>
 </DocNote>
 

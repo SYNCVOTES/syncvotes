@@ -40,6 +40,8 @@ template Account
       do
         now <- getTime
         assertMsg "A DAO needs a name" (daoName /= "")
+        assertMsg "A name of one to 60 characters, a description of at most 10 000, an https picture"
+          (validInfo daoName description image)
         assertMsg "The settings' numbers are out of range" (validSettings rules && validSettings decisions)
         assertMsg "The founding shares must be whole" (validChanges equal (shares ++ more))
         assertMsg "The first batch is one to a batch" (not (null shares) && length shares <= batch)
@@ -64,7 +66,7 @@ template Account
         create DAO with
           provider; creator = user; id; name = daoName; description; image; equal; rules
           decisions; createdAt = now; members = length shares; units = sum (map snd shares)
-          actorPays; public
+          actorPays; public; dissolving = None
 
     -- How a party presents itself: a name, a picture, a few words. One per party; replacing it
     -- hands in the old one.
@@ -77,6 +79,8 @@ template Account
       controller user
       do
         assertMsg "A profile needs a name" (name /= "")
+        assertMsg "A name of one to 60 characters, a bio of at most 2000, an https picture"
+          (validLabel 60 name && within 2000 bio && validImage avatar)
         forA_ previous \cid -> do
           old <- fetch cid
           assertMsg "Not this party's profile" (old.user == user)

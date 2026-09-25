@@ -6,13 +6,15 @@
 -- every transaction, while the user's own key is the only one that ever signs a submission. A
 -- DAO is signed by the party that created it as well, and that pair, creator and provider, is
 -- the DAO's own authority: every member, proposal, ballot and comment carries both signatures,
--- so neither can invent one alone. The creator has no say of their own beyond that signature:
--- everything a DAO changes about itself, it decides by vote.
+-- so neither can invent one alone. A ballot is the exception: the voter's and the provider's
+-- (`BallotV2`), so the creator's validator never holds who voted how. The creator has no say of
+-- their own beyond that signature: everything a DAO changes about itself, it decides by vote.
 --
 -- Built for large DAOs: a vote touches only the voter's own membership, so thousands can vote
 -- at once, and a proposal holds counters rather than lists. The provider counts the ballots in
--- batches and the ledger checks each one it is handed, so the provider can delay a result but
--- never change it. Nothing here grows with history.
+-- batches and the ledger checks each one it is handed, so the provider cannot count a ballot
+-- that was not cast; what leaving ballots out can do is in the README's trust model. Nothing
+-- here grows with history.
 module SyncVotes.Governance where
 
 import DA.Action (foldlA, void)
@@ -50,10 +52,26 @@ template DAO
     actorPays : Bool
     -- Anyone signed in to the app may read it through the app; only members act.
     public : Bool
+    -- Since when a passed dissolution waits for the DAO's other proposals; nothing new is
+    -- proposed meanwhile, so the wait has an end.
+    dissolving : Optional Time
   where
     signatory creator, provider
 
     ensure name /= "" && members > 0 && units > 0
+
+    -- A dissolution passed: the DAO takes no new proposals while it waits for the rest.
+    choice DAO_BeginDissolving : ContractId DAO
+      with
+        proposal : ContractId Proposal
+      controller provider
+      do
+        p <- fetch proposal
+        assertMsg "Not this DAO's proposal" (p.daoId == id && p.creator == creator)
+        assertMsg "Not a dissolution that passed" (p.action == Dissolve && p.outcome == Some Passed)
+        assertMsg "Already dissolving" (isNone dissolving)
+        now <- getTime
+        create this with dissolving = Some now
 
     -- A passed proposal is carried out by the provider with the DAO's authority, once the
     -- ledger has checked that it passed. A share change goes a batch at a time from where the
@@ -168,6 +186,9 @@ template Member
         now <- getTime
         found <- fetch dao
         assertMsg "Not this member's DAO" (found.id == daoId && found.creator == creator)
+        assertMsg "The DAO is being dissolved; nothing new can be proposed" (isNone found.dissolving)
+        assertMsg "A title of one to 120 characters" (validLabel 120 title)
+        assertMsg "A description of at most 20 000 characters" (within 20000 description)
         let change = changesDao action
             base = if change then found.rules else found.decisions
         assertMsg "A proposal that changes the DAO runs under the DAO's voting rules"
@@ -181,7 +202,9 @@ template Member
             assertMsg "Two to ten distinct options, eighty characters each at most" (validOptions options)
           SetRules rules ->
             assertMsg "The voting rules' numbers are out of range" (validSettings rules)
-          SetInfo daoName _ _ -> assertMsg "A DAO needs a name" (daoName /= "")
+          SetInfo newName newDescription newImage ->
+            assertMsg "A name of one to 60 characters, a description of at most 10 000, an https picture"
+              (validInfo newName newDescription newImage)
           SetShares changes ->
             assertMsg "The share change must be whole" (validChanges found.equal changes)
           _ -> pure ()
@@ -233,6 +256,45 @@ template Member
           provider; creator; daoId; proposalId; voter = party; since; vote; weight = share
           shareSince; closesAt; changeable; castAt = now; counted = False
 
+    -- As `Member_Vote`, casting a `BallotV2`: signed by the voter and the provider only. A vote
+    -- that may change hands in the ballot it replaces, of either kind.
+    choice Member_Cast : ContractId BallotV2
+      with
+        proposalId : Text
+        closesAt : Time
+        changeable : Bool
+        vote : Vote
+        previous : Optional (ContractId BallotV2)
+        previousV1 : Optional (ContractId Ballot)
+        featuredAppRight : Optional (ContractId FeaturedAppRight)
+      controller party
+      do
+        now <- getTime
+        let open = filter (\(_, deadline) -> deadline > now) voted
+        if proposalId `elem` map fst open
+          then do
+            assertMsg "Already voted; votes on this proposal cannot be changed" changeable
+            case (previous, previousV1) of
+              (Some cid, None) -> do
+                old <- fetch cid
+                assertMsg "Not this member's ballot on this proposal"
+                  (old.voter == party && old.proposalId == proposalId && old.daoId == daoId)
+                assertMsg "Not the ballot on record" (old.closesAt == closesAt && old.changeable)
+                exercise cid BallotV2_Withdraw
+              (None, Some cid) -> do
+                old <- fetch cid
+                assertMsg "Not this member's ballot on this proposal"
+                  (old.voter == party && old.proposalId == proposalId && old.daoId == daoId)
+                assertMsg "Not the ballot on record" (old.closesAt == closesAt && old.changeable)
+                exercise cid Ballot_Withdraw
+              _ -> abort "Already voted; hand in the one ballot to replace"
+            void (create this with voted = open)
+          else void (create this with voted = (proposalId, closesAt) :: open)
+        mark provider featuredAppRight
+        create BallotV2 with
+          provider; creator; daoId; proposalId; voter = party; since; vote; weight = share
+          shareSince; closesAt; changeable; castAt = now; counted = False
+
     -- A word on a proposal, from a member; anyone in the DAO reads it through the app.
     nonconsuming choice Member_Comment : ContractId Comment
       with
@@ -241,7 +303,7 @@ template Member
         body : Text
       controller party
       do
-        assertMsg "A comment says something" (body /= "")
+        assertMsg "A comment of one to 5000 characters" (validLabel 5000 body)
         now <- getTime
         create Comment with
           provider; creator; daoId; proposalId; author = party; id = cid; body; createdAt = now
@@ -285,17 +347,25 @@ template Proposal
       with
         ballots : [ContractId Ballot]
         final : Bool
+        -- Ballots cast with `Member_Cast`.
+        cast : Optional [ContractId BallotV2]
       controller provider
       do
         assertMsg "Already settled" (isNone outcome)
         now <- getTime
         assertMsg "Votes may change until the deadline" (not rule.changeable || now >= closesAt)
-        counts <- foldlA
+        older <- foldlA
           (\c cid -> do
             (vote, weight) <- exercise cid Ballot_Count with proposal = this
             pure (add weight vote c))
           (Counts with yes; no; abstain; tallies; picked)
           ballots
+        counts <- foldlA
+          (\c cid -> do
+            (vote, weight) <- exercise cid BallotV2_Count with proposal = this
+            pure (add weight vote c))
+          older
+          (fromOptional [] cast)
         create this with
           yes = counts.yes; no = counts.no; abstain = counts.abstain
           tallies = counts.tallies; picked = counts.picked
@@ -350,32 +420,76 @@ template Ballot
         proposal : Proposal
       controller provider
       do
-        assertMsg "Already counted" (not counted)
-        assertMsg "A ballot for another proposal" (proposalId == proposal.id && daoId == proposal.daoId)
-        assertMsg "A ballot under another authority" (creator == proposal.creator)
-        assertMsg "Cast after the deadline" (castAt < proposal.closesAt)
-        assertMsg "Cast against another deadline" (closesAt == proposal.closesAt)
-        assertMsg "Cast against another rule" (changeable == proposal.rule.changeable)
-        assertMsg "Joined after the vote opened" (since <= proposal.createdAt)
-        assertMsg "The share changed after the vote opened" (shareSince <= proposal.createdAt)
-        case (proposal.action, vote) of
-          (Choose options _, Pick i) -> assertMsg "No such option" (i >= 0 && i < length options)
-          (Choose options several, PickMany is) -> do
-            assertMsg "This proposal takes one option" several
-            assertMsg "Pick at least one option" (not (null is))
-            assertMsg "No such option" (all (\i -> i >= 0 && i < length options) is)
-            assertMsg "An option picked twice" (length (dedup is) == length is)
-          (Choose {}, Abstain) -> pure ()
-          (Choose {}, _) -> abort "This proposal is a choice among options, not yes or no"
-          (_, Pick _) -> abort "This proposal takes yes or no, not an option"
-          (_, PickMany _) -> abort "This proposal takes yes or no, not options"
-          _ -> pure ()
+        countable proposal counted proposalId daoId creator castAt closesAt changeable since shareSince vote
         create this with counted = True
         pure (vote, weight)
 
     -- The voter takes it back to cast another: only where votes may change, and before it was
     -- counted.
     choice Ballot_Withdraw : ()
+      controller voter
+      do
+        assertMsg "Votes on this proposal cannot be changed" changeable
+        assertMsg "Already counted" (not counted)
+        pure ()
+
+-- | Whether a ballot counts on this proposal: not counted before, for this proposal of this DAO,
+-- cast in time against its deadline and rule, by a member of the time with the share of the
+-- time, for something the proposal asks.
+countable : Proposal -> Bool -> Text -> Text -> Party -> Time -> Time -> Bool -> Time -> Time -> Vote -> Update ()
+countable proposal counted proposalId daoId creator castAt closesAt changeable since shareSince vote = do
+  assertMsg "Already counted" (not counted)
+  assertMsg "A ballot for another proposal" (proposalId == proposal.id && daoId == proposal.daoId)
+  assertMsg "A ballot under another authority" (creator == proposal.creator)
+  assertMsg "Cast after the deadline" (castAt < proposal.closesAt)
+  assertMsg "Cast against another deadline" (closesAt == proposal.closesAt)
+  assertMsg "Cast against another rule" (changeable == proposal.rule.changeable)
+  assertMsg "Joined after the vote opened" (since <= proposal.createdAt)
+  assertMsg "The share changed after the vote opened" (shareSince <= proposal.createdAt)
+  case (proposal.action, vote) of
+    (Choose options _, Pick i) -> assertMsg "No such option" (i >= 0 && i < length options)
+    (Choose options several, PickMany is) -> do
+      assertMsg "This proposal takes one option" several
+      assertMsg "Pick at least one option" (not (null is))
+      assertMsg "No such option" (all (\i -> i >= 0 && i < length options) is)
+      assertMsg "An option picked twice" (length (dedup is) == length is)
+    (Choose {}, Abstain) -> pure ()
+    (Choose {}, _) -> abort "This proposal is a choice among options, not yes or no"
+    (_, Pick _) -> abort "This proposal takes yes or no, not an option"
+    (_, PickMany _) -> abort "This proposal takes yes or no, not options"
+    _ -> pure ()
+
+-- | A ballot as `Ballot`, signed by the voter and the provider only: the DAO's creator is named,
+-- for the count's check, but is not a stakeholder, so a secret ballot stays between the voter
+-- and the app.
+template BallotV2
+  with
+    provider : Party
+    creator : Party
+    daoId : Text
+    proposalId : Text
+    voter : Party
+    since : Time
+    vote : Vote
+    weight : Int
+    shareSince : Time
+    closesAt : Time
+    changeable : Bool
+    castAt : Time
+    counted : Bool
+  where
+    signatory voter, provider
+
+    choice BallotV2_Count : (Vote, Int)
+      with
+        proposal : Proposal
+      controller provider
+      do
+        countable proposal counted proposalId daoId creator castAt closesAt changeable since shareSince vote
+        create this with counted = True
+        pure (vote, weight)
+
+    choice BallotV2_Withdraw : ()
       controller voter
       do
         assertMsg "Votes on this proposal cannot be changed" changeable

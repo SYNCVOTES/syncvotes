@@ -44,6 +44,7 @@ const CHOICES: Record<string, Home> = {
 	Account_SetProfile: { template: 'SyncVotes.Account:Account', pkg: PACKAGE_NAME },
 	Member_Propose: { template: 'SyncVotes.Governance:Member', pkg: PACKAGE_NAME },
 	Member_Vote: { template: 'SyncVotes.Governance:Member', pkg: PACKAGE_NAME },
+	Member_Cast: { template: 'SyncVotes.Governance:Member', pkg: PACKAGE_NAME },
 	Member_Comment: { template: 'SyncVotes.Governance:Member', pkg: PACKAGE_NAME }
 };
 

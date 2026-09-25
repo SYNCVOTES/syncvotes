@@ -48,3 +48,24 @@ validChanges equal changes =
     && length changes <= maxChanges
     && all (\(_, units) -> units >= 0 && (not equal || units <= 1)) changes
     && dedup (map fst changes) == map fst changes
+
+-- | A name or a title: something, and at most `n` characters.
+validLabel : Int -> Text -> Bool
+validLabel n t = t /= "" && T.length t <= n
+
+-- | At most `n` characters.
+within : Int -> Text -> Bool
+within n t = T.length t <= n
+
+-- | A picture is a link the app will show: https, no spaces, not too long.
+validImage : Optional Text -> Bool
+validImage None = True
+validImage (Some url) =
+  T.isPrefixOf "https://" (T.asciiToLower url)
+    && T.length url <= 2000
+    && not (any (`T.isInfixOf` url) [" ", "\n", "\t"])
+
+-- | What the app accepts for a DAO's name, description and picture.
+validInfo : Text -> Text -> Optional Text -> Bool
+validInfo name description image =
+  validLabel 60 name && within 10000 description && validImage image
