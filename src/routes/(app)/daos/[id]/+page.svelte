@@ -3,7 +3,6 @@
 	import * as remote from '$lib/api.remote';
 	import { store } from '$lib/wallet-store.svelte';
 	import { Button } from '$lib/components/ui/button';
-	import { Badge } from '$lib/components/ui/badge';
 	import Page from '$lib/components/page.svelte';
 	import StatusBadge from '$lib/components/status-badge.svelte';
 	import QueryError from '$lib/components/query-error.svelte';
@@ -11,7 +10,6 @@
 	import PartyId from '$lib/components/party-id.svelte';
 	import Monogram from '$lib/components/monogram.svelte';
 	import Who from '$lib/components/who.svelte';
-	import Facts from '$lib/components/facts.svelte';
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import List from '$lib/components/list.svelte';
 	import ListItem from '$lib/components/list-item.svelte';
@@ -29,11 +27,15 @@
 	import SettingsSummary from '$lib/components/settings-summary.svelte';
 	import Problem from '$lib/components/problem.svelte';
 	import BalancePanel from '$lib/components/balance-panel.svelte';
-	import Panel from '$lib/components/panel.svelte';
 	import CopyField from '$lib/components/copy-field.svelte';
+	import EntityHeader from '$lib/components/entity-header.svelte';
+	import Tag from '$lib/components/tag.svelte';
+	import FilterTabs from '$lib/components/filter-tabs.svelte';
 	import Plus from '@lucide/svelte/icons/plus';
 	import ArrowRight from '@lucide/svelte/icons/arrow-right';
-	import { relative, dateOf, fmt, coin } from '$lib/format';
+	import Lock from '@lucide/svelte/icons/lock';
+	import Globe from '@lucide/svelte/icons/globe';
+	import { relative, dateOf, fmt, coin, hintOf } from '$lib/format';
 
 	const id = $derived(page.params.id!);
 	const me = $derived(store.who?.party ?? null);
@@ -52,12 +54,22 @@
 	let limit = $state(20);
 	let q = $state('');
 	const proposals = $derived(me ? remote.daoProposals({ id, offset: 0, limit, status, q }) : null);
+	// What waits on the viewer's vote: the strip over the list, and a Vote chip on its rows.
+	const unvoted = $derived(
+		me && dao?.current?.me.membership
+			? remote.daoProposals({ id, offset: 0, limit: 100, status: 'unvoted', q: '' })
+			: null
+	);
+	const waiting = $derived(new Set(unvoted?.current?.items.map((p) => p.id) ?? []));
 	const preview = $derived(me ? remote.daoMembers({ id, offset: 0, limit: 8, q: '' }) : null);
+	// One balance, from one source: the figure in the header is the one the Balance section shows.
+	const billing = $derived(
+		me && dao?.current && !dao.current.actorPays ? remote.daoBilling(id) : null
+	);
 
 	const pct = (units: number, of: number) => (of > 0 ? Math.round((units / of) * 1000) / 10 : 0);
-	// The facts of a proposal as small tags, so a list scans instead of reads.
-	const tag =
-		'inline-flex items-center rounded-full border border-border bg-surface-hover px-2 py-0.5 font-mono text-label text-ink-mid';
+	// A long description is clamped to three lines until asked for.
+	let expanded = $state(false);
 </script>
 
 <svelte:head><title>{dao?.current?.name ?? 'DAO'} — SyncVotes</title></svelte:head>
@@ -78,131 +90,137 @@
 		<Skeleton />
 	{:else}
 		{@const d = dao.current}
+		{@const empty = !d.actorPays && d.balance <= 0}
 
 		{#if d.image}
-			<div class="-mt-2 mb-8 h-44 w-full overflow-hidden border border-border md:h-56">
+			<div class="-mt-2 mb-6 h-40 w-full overflow-hidden border border-border md:h-52">
 				<img src={d.image} alt="" class="size-full object-cover" />
 			</div>
 		{/if}
 
-		<div class="flex flex-wrap items-start justify-between gap-6">
-			<div class="flex items-start gap-5">
+		<EntityHeader title={d.name}>
+			{#snippet media()}
 				{#if !d.image}<Monogram name={d.name} size="lg" />{/if}
-				<div class="min-w-0">
-					<h1 class="display text-3xl md:text-4xl">{d.name}</h1>
-					<div class="mt-3 flex flex-wrap items-center gap-2">
-						{#if d.public}
-							<Badge variant="green" class="overflow-visible pr-1.5">
-								Public
-								<Hint
-									text="Anyone signed in to the app can read this DAO — its proposals, outcomes, members and comments — and pay in to its balance. Only members act, and who voted how stays with the members. Nothing about it is public on the Canton network itself."
-								/>
-							</Badge>
-						{:else}
-							<Badge variant="accent" class="overflow-visible pr-1.5">
-								Private
-								<Hint
-									text="Only its members and the app see this DAO, its proposals, votes and comments; nothing about it is public on the network."
-								/>
-							</Badge>
-						{/if}
-						<Badge>{d.equal ? 'By membership' : 'By shares'}</Badge>
-						{#if d.me.creator}<Badge variant="amber">You created it</Badge
-							>{:else if d.me.membership}<Badge variant="green">Member</Badge>{:else}<Badge
-								>Reading</Badge
-							>{/if}
-					</div>
-					{#if !d.me.membership}
-						<p class="mt-3 font-mono text-xs text-ink-dim">
-							You are not a member: this DAO is public, so you can read it. How to join, if at all,
-							is for its description to say.
-						</p>
-					{:else if d.balance <= 0 && !d.actorPays}
-						<p class="mt-3 font-mono text-xs text-red">
-							Nothing can be signed for this DAO until someone pays in.
-						</p>
-					{/if}
-				</div>
-			</div>
-			<div class="flex shrink-0 items-center gap-2">
-				{#if !d.me.membership || (d.balance <= 0 && !d.actorPays)}
-					<!-- Nothing to press: the line under the badges says why. -->
+			{/snippet}
+			{#snippet tags()}
+				{#if d.public}
+					<Tag icon={Globe} class="overflow-visible pr-1.5"
+						>Public <Hint
+							text="Anyone signed in can read this DAO. Only members act, and ballots stay visible to members only."
+						/></Tag
+					>
 				{:else}
+					<Tag icon={Lock} class="overflow-visible pr-1.5"
+						>Private <Hint text="Only members can see this DAO." /></Tag
+					>
+				{/if}
+				<Tag>{d.equal ? 'By membership' : 'By shares'}</Tag>
+				{#if d.me.creator}<Tag>Creator</Tag>{:else if !d.me.membership}<Tag>Reader</Tag>{/if}
+			{/snippet}
+			{#snippet meta()}
+				<span>{fmt(d.members)} {d.members === 1 ? 'member' : 'members'}</span>
+				<span aria-hidden="true">·</span>
+				<span class={d.openProposals > 0 ? 'text-ink' : ''}>{fmt(d.openProposals)} open</span>
+				{#if d.actorPays}
+					<span aria-hidden="true">·</span><span>members pay</span>
+				{:else if billing?.ready}
+					<span aria-hidden="true">·</span>
+					<a
+						href="#balance"
+						class="hover:text-orange {billing.current.balance <= 0 ? 'text-red' : ''}"
+						>{coin(billing.current.balance)}</a
+					>
+				{/if}
+				{#if d.me.membership}
+					<span aria-hidden="true">·</span>
+					<span
+						>your voting power {d.equal
+							? `1 of ${fmt(d.units)}`
+							: `${pct(d.me.share, d.units)}%`}</span
+					>
+				{/if}
+				<span aria-hidden="true">·</span>
+				<span class="inline-flex items-center gap-1.5"
+					>Created {dateOf(d.createdAt)} by <PartyId party={d.creator} /></span
+				>
+			{/snippet}
+			{#snippet action()}
+				{#if d.me.membership && !empty}
 					<Button href="/daos/{d.id}/proposals/create"
 						><Plus strokeWidth={2.5} /> New proposal</Button
 					>
 				{/if}
-			</div>
-		</div>
-
-		<div class="mt-6 max-w-[720px]">
-			<Markdown text={d.description} fallback="No description provided." />
-			<p class="mt-3 font-mono text-xs text-ink-dim">
-				Established {dateOf(d.createdAt)} · created by <PartyId
-					party={d.creator}
-					class="align-middle"
-				/>
-			</p>
-			{#if d.public}
-				<!-- Nothing here vouches for who is behind a DAO: the organisation does, from outside. -->
-				<div class="mt-4 max-w-[720px]">
-					<CopyField label="DAO id" value={d.id} />
-					<p class="mt-2 text-xs leading-relaxed text-ink-dim">
-						Anyone can found a DAO under any name. The real DAO of an organisation is the one the
-						organisation itself points to — this id, or this page's address — from a site or channel
-						it controls. Nothing here vouches for it; that is for them to do.
+			{/snippet}
+			<div class="mt-4 max-w-[720px] space-y-3">
+				{#if !d.me.membership}
+					<p class="font-mono text-xs text-ink-dim">
+						You're viewing a public DAO. See its description for how to join.
 					</p>
-				</div>
-			{/if}
-		</div>
-
-		<div class="mt-8"><Problem message={store.problem} /></div>
-		{#if d.founding}
-			<div class="mt-4">
-				<Note mono={false}
-					>The founding table is still being carried out; members are joining in batches.</Note
-				>
+				{:else if empty}
+					<p class="flex flex-wrap items-center gap-3 font-mono text-xs text-red">
+						The DAO's balance is empty. Top it up to act.
+						<Button href="#balance" variant="outline" size="sm">Top up</Button>
+					</p>
+				{/if}
+				{#if d.description.trim()}
+					<div class={expanded ? '' : 'line-clamp-3'}>
+						<Markdown text={d.description} />
+					</div>
+					{#if d.description.length > 240 || d.description.split('\n').length > 3}
+						<button
+							type="button"
+							class="font-mono text-xs text-ink-dim underline hover:text-ink"
+							onclick={() => (expanded = !expanded)}>{expanded ? 'Less' : 'More'}</button
+						>
+					{/if}
+				{:else}
+					<p class="text-sm text-ink-dim">No description.</p>
+				{/if}
 			</div>
-		{/if}
+		</EntityHeader>
 
-		<Facts
-			items={[
-				{ label: 'Members', value: fmt(d.members) },
-				{ label: 'Open proposals', value: fmt(d.openProposals), accent: d.openProposals > 0 },
-				d.actorPays
-					? { label: 'Who pays', value: 'members', accent: false }
-					: { label: 'Balance', value: coin(d.balance), accent: d.balance <= 0 },
-				d.me.membership
-					? {
-							label: 'Your vote',
-							value: d.equal ? '1 of ' + fmt(d.units) : `${pct(d.me.share, d.units)}%`
-						}
-					: { label: 'Visibility', value: 'public' }
-			]}
-		/>
+		<Problem message={store.problem} />
+		{#if d.founding}
+			<Note class="mb-6">Adding founding members…</Note>
+		{/if}
 
 		<div class="grid gap-10 lg:grid-cols-[1fr_320px]">
 			<section class="min-w-0">
-				<div class="mb-4 flex items-center justify-between gap-4">
+				{#if waiting.size > 0 && status !== 'unvoted'}
+					<div
+						class="mb-6 flex flex-wrap items-center justify-between gap-3 border-l-2 border-orange bg-orange/[0.04] py-3 pr-3 pl-4"
+					>
+						<p class="text-body-sm text-ink">
+							{fmt(waiting.size)}
+							{waiting.size === 1 ? 'proposal waits' : 'proposals wait'} on your vote
+						</p>
+						<Button
+							size="sm"
+							onclick={() => {
+								status = 'unvoted';
+								limit = 20;
+							}}>Vote <ArrowRight size={14} /></Button
+						>
+					</div>
+				{/if}
+				<div class="mb-4 flex flex-wrap items-center justify-between gap-3">
 					<h2 class="eyebrow">Proposals</h2>
 					<div class="flex flex-wrap items-center gap-3">
-						<div class="w-56">
-							<SearchInput bind:value={q} placeholder="Filter by title or proposer" />
-						</div>
-						<div class="flex gap-1">
-							{#each [[undefined, 'All'], ['open', 'Open'], ['closed', 'Closed'], ...(d.me.membership ? [['unvoted', 'Not voted']] : [])] as [value, label] (label)}
-								<button
-									type="button"
-									class="rounded-full px-3 py-1 font-mono text-label tracking-[0.14em] uppercase transition-colors {status ===
-									value
-										? 'bg-orange-dim text-orange'
-										: 'text-ink-dim hover:text-ink'}"
-									onclick={() => {
-										status = value as typeof status;
-										limit = 20;
-									}}>{label}</button
-								>
-							{/each}
+						<FilterTabs
+							label="Show proposals"
+							bind:value={status}
+							onchange={() => (limit = 20)}
+							options={[
+								{ value: undefined, label: 'All' },
+								{ value: 'open', label: 'Open' },
+								{ value: 'closed', label: 'Closed' },
+								...(d.me.membership
+									? [{ value: 'unvoted' as const, label: 'Not voted', count: waiting.size }]
+									: [])
+							]}
+						/>
+						<div class="w-full sm:w-56">
+							<SearchInput bind:value={q} placeholder="Search by title or proposer" />
 						</div>
 					</div>
 				</div>
@@ -213,38 +231,51 @@
 				{:else if proposals.current.total === 0}
 					<StateMessage variant="dashed"
 						>{status === 'unvoted'
-							? 'Nothing waits on your vote.'
+							? 'Nothing to vote on.'
 							: status
 								? `No ${status} proposals.`
-								: 'Nothing proposed yet.'}</StateMessage
+								: 'No proposals yet.'}</StateMessage
 					>
 				{:else}
 					<List>
 						{#each proposals.current.items as p (p.id)}
+							{@const due = waiting.has(p.id)}
 							<ListItem href="/proposals/{p.id}" padding="md" class="min-w-0">
 								<div class="min-w-0 flex-1">
-									<div class="truncate font-display text-body font-bold">{p.title}</div>
+									<div class="flex min-w-0 items-center gap-2">
+										<span class="truncate font-display text-body font-bold">{p.title}</span>
+										{#if categoryOf(p.effect.kind) === 'sensitive'}
+											<Tag class="hidden sm:inline-flex">changes the DAO</Tag>
+										{/if}
+									</div>
 									<div
 										class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-xs text-ink-dim"
 									>
-										<PartyId party={p.proposer} />
-										<span>{dateOf(p.createdAt)}</span>
-									</div>
-									<div class="mt-2 flex flex-wrap items-center gap-1.5">
-										<span class={tag}><EffectLabel effect={p.effect} equal={d.equal} /></span>
-										<span class={tag}>{categoryOf(p.effect.kind)}</span>
-										<span class={tag}
-											>{castOf(p) === 0
+										<EffectLabel effect={p.effect} equal={d.equal} />
+										{#if !p.outcome}<span>· closes {relative(p.closesAt)}</span>{/if}
+										<span
+											>· {castOf(p) === 0
 												? 'no votes yet'
 												: `${pct(castOf(p), p.eligible)}% voted`}</span
 										>
-										{#if !p.outcome}<span class={tag}>closes {relative(p.closesAt)}</span>{/if}
+										<span>· by {hintOf(p.proposer)}</span>
 									</div>
 								</div>
-								<StatusBadge outcome={p.outcome} closesAt={p.closesAt} executedAt={p.executedAt} />
+								{#if due}
+									<span
+										class="rounded-full bg-orange px-3 py-1 font-mono text-label tracking-[0.14em] text-background uppercase"
+										>Vote</span
+									>
+								{:else}
+									<StatusBadge
+										outcome={p.outcome}
+										closesAt={p.closesAt}
+										executedAt={p.executedAt}
+									/>
+								{/if}
 								<ArrowRight
 									size={16}
-									class="text-ink-dim transition-all group-hover:translate-x-0.5 group-hover:text-orange"
+									class="shrink-0 text-ink-dim transition-all group-hover:translate-x-0.5 group-hover:text-orange"
 									aria-hidden="true"
 								/>
 							</ListItem>
@@ -259,27 +290,7 @@
 				{/if}
 			</section>
 
-			<aside class="min-w-0 space-y-6">
-				{#if d.actorPays}
-					<Panel padding="sm" class="space-y-2">
-						<h2 class="eyebrow flex items-center gap-1.5">
-							Who pays <Hint
-								text="This DAO has no balance of its own: a proposal, a vote or a comment costs the member who signs it, from the balance on their Wallet page, and the counting and carrying out of a proposal cost its proposer."
-							/>
-						</h2>
-						<p class="text-body-sm text-ink-mid">
-							Each member pays for what they sign, from their own balance on their Wallet page.
-						</p>
-					</Panel>
-				{:else}
-					<BalancePanel dao={d.id} />
-				{/if}
-
-				<div>
-					<SectionTitle title="Voting rules" />
-					<SettingsSummary sensitive={d.sensitive} eligible={d.units} equal={d.equal} compact />
-				</div>
-
+			<aside class="min-w-0 space-y-8">
 				<div>
 					<SectionTitle title={d.equal ? 'Members' : 'Shares of the vote'} count={fmt(d.members)} />
 					{#if preview?.ready}
@@ -302,13 +313,43 @@
 							{/each}
 						</List>
 					{:else}
-						<Skeleton height="h-24" />
+						<div class="space-y-1">
+							{#each [1, 2, 3] as i (i)}<Skeleton height="h-11" />{/each}
+						</div>
 					{/if}
 					<Button href="/daos/{d.id}/members" variant="outline" size="sm" class="mt-3 w-full">
 						All members
 						<ArrowRight size={14} />
 					</Button>
 				</div>
+
+				<div>
+					<h2 class="eyebrow">Voting rules</h2>
+					<SettingsSummary sensitive={d.sensitive} eligible={d.units} equal={d.equal} compact />
+				</div>
+
+				{#if d.actorPays}
+					<section class="space-y-2">
+						<h2 class="eyebrow flex items-center gap-1.5">
+							Who pays <Hint
+								text="Proposers also pay for counting and executing their proposals."
+							/>
+						</h2>
+						<p class="text-body-sm text-ink-mid">
+							Each member pays for what they sign, from their own balance on their Wallet page.
+						</p>
+					</section>
+				{:else}
+					<BalancePanel dao={d.id} />
+				{/if}
+
+				{#if d.public}
+					<CopyField
+						label="DAO ID"
+						value={d.id}
+						hint="Anyone can create a DAO under any name. Check this ID against the organization's own site."
+					/>
+				{/if}
 			</aside>
 		</div>
 	{/if}

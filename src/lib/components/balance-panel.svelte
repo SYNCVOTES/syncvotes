@@ -1,64 +1,47 @@
 <script lang="ts">
 	import * as remote from '$lib/api.remote';
 	import { store } from '$lib/wallet-store.svelte';
-	import Panel from './panel.svelte';
 	import Skeleton from './skeleton.svelte';
-	import CopyField from './copy-field.svelte';
 	import QueryError from './query-error.svelte';
 	import Hint from './hint.svelte';
+	import PayIn from './pay-in.svelte';
 	import { coin } from '$lib/format';
 
 	/**
-	 * The DAO's balance with the app: what was paid in, what its transactions have cost, what
-	 * that leaves — and how to pay in: the app's address and the memo that credits this DAO.
+	 * The DAO's balance with the app: what it has, what was topped up and spent, the price, and
+	 * how anyone tops it up (the app's address and the memo that credits this DAO). The same
+	 * words as a party's own balance on the Wallet page.
 	 */
 	let { dao }: { dao: string } = $props();
 	const billing = $derived(store.who ? remote.daoBilling(dao) : null);
 </script>
 
-<Panel padding="sm" class="space-y-3">
+<section id="balance" class="scroll-mt-24 space-y-3">
 	<h2 class="eyebrow flex items-center gap-1.5">
 		Balance <Hint
-			text="Every transaction the DAO makes costs network traffic, charged to the DAO at the price shown. The balance is what was paid in for the DAO less what its transactions have cost. When it reaches zero, nothing can be signed for this DAO until someone pays in. What is paid in is spent on traffic and is not paid back."
+			text="Pays for everything done in this DAO. Every transaction costs network traffic at the price shown. Top-ups are not refunded."
 		/>
 	</h2>
 	{#if billing?.ready}
 		{@const b = billing.current}
-		<div class="font-mono text-2xl font-bold {b.balance > 0 ? 'text-ink' : 'text-red'}">
+		<div class="font-mono text-figure font-bold {b.balance > 0 ? 'text-ink' : 'text-red'}">
 			{coin(b.balance)}
-			<span class="text-xs font-normal text-ink-dim">to spend</span>
+			<span class="text-xs font-normal text-ink-dim">available</span>
 		</div>
-		<dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 font-mono text-xs">
-			<dt class="text-ink-dim">Paid in</dt>
-			<dd class="text-ink">{coin(b.credited)}</dd>
-			<dt class="text-ink-dim">Spent</dt>
-			<dd class="text-ink">{coin(b.charged)}</dd>
-			<dt class="text-ink-dim">Price</dt>
-			<dd
-				class="text-ink"
-				title="The network's traffic price, less what the network pays back for this traffic in rewards"
+		<p class="flex flex-wrap gap-x-3 gap-y-1 font-mono text-xs text-ink-dim">
+			<span>Topped up <span class="text-ink">{coin(b.credited)}</span></span>
+			<span>Spent <span class="text-ink">{coin(b.charged)}</span></span>
+			<span title="Network traffic price, net of app rewards."
+				>Price <span class="text-ink">{coin(b.coinPerMb)} per MB</span></span
 			>
-				{coin(b.coinPerMb)} per MB{b.factor !== 1
-					? ` (${b.factor}× the network's, net of rewards)`
-					: ''}
-			</dd>
-		</dl>
+		</p>
 		{#if b.balance <= 0}
-			<p class="text-body-sm text-red">
-				Empty: nothing can be signed for this DAO until someone pays in.
-			</p>
+			<p class="text-body-sm text-red">Balance empty. Top up to act.</p>
 		{/if}
-		<div class="space-y-3 border-t border-border pt-3">
-			<p class="text-body-sm text-ink-mid">
-				Anyone pays in by sending Canton Coin to this address from any wallet, with this memo as the
-				transfer's reason. Coin without the memo is not credited to anyone.
-			</p>
-			<CopyField label="Address" value={b.payTo} />
-			<CopyField label="Memo" value={b.memo} />
-		</div>
+		<PayIn payTo={b.payTo} memo={b.memo} open={b.balance <= 0} anyone />
 	{:else if billing?.error}
 		<QueryError error={billing.error} refresh={() => billing?.reconnect()} />
 	{:else}
 		<Skeleton height="h-16" />
 	{/if}
-</Panel>
+</section>
