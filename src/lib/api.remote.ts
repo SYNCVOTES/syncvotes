@@ -291,6 +291,11 @@ const awaitsVote = (p: ledger.Proposal, party: string) => {
 		!ledger.ballots.get(p.id)?.has(party)
 	);
 };
+/** A dissolution passed and waiting for the rest of the DAO's proposals: nothing new is proposed. */
+const dissolving = (daoId: string) =>
+	proposalsOf(daoId).some(
+		(p) => p.effect.kind === 'dissolve' && p.outcome === 'Passed' && !p.executedAt
+	);
 const awaiting = (daoId: string, party: string) =>
 	proposalsOf(daoId).filter((p) => awaitsVote(p, party)).length;
 /** The caller's membership of this DAO, or 403. */
@@ -354,6 +359,7 @@ export const dao = query.live(contractId, (id) =>
 			founding:
 				!!ledger.proposals.get(`${id}-founding`) &&
 				!ledger.proposals.get(`${id}-founding`)?.executedAt,
+			dissolving: dissolving(id),
 			me: {
 				creator: d.creator === session.required(),
 				/** Null for a reader of a public DAO who is not in it. */
@@ -753,6 +759,7 @@ export const createProposalForm = form(schemas.createProposalForm, async (f) => 
 	paced(party);
 	const membership = memberOnly(f.dao).contractId;
 	const d = daoOf(f.dao);
+	if (dissolving(f.dao)) error(409, 'This DAO is being dissolved. No new proposals.');
 	const pid = crypto.randomUUID();
 	let action: { tag: string; value: unknown };
 	switch (f.kind) {

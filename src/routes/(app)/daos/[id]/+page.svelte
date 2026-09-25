@@ -148,7 +148,7 @@
 				>
 			{/snippet}
 			{#snippet action()}
-				{#if d.me.membership && !empty}
+				{#if d.me.membership && !empty && !d.dissolving}
 					<Button href="/daos/{d.id}/proposals/create"
 						><Plus strokeWidth={2.5} /> New proposal</Button
 					>
@@ -158,6 +158,11 @@
 				{#if !d.me.membership}
 					<p class="font-mono text-xs text-ink-dim">
 						You're viewing a public DAO. See its description for how to join.
+					</p>
+				{:else if d.dissolving}
+					<p class="font-mono text-xs text-red">
+						A dissolution passed. It takes effect once the open proposals are decided; nothing new
+						can be proposed.
 					</p>
 				{:else if empty}
 					<p class="flex flex-wrap items-center gap-3 font-mono text-xs text-red">
