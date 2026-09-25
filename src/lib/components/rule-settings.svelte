@@ -27,7 +27,10 @@
 		eligible = 0,
 		equal = false,
 		part = 'passing',
-		extra
+		collapsed = false,
+		bare = false,
+		extra,
+		ballot
 	}: {
 		settings: Settings;
 		prefix: string;
@@ -38,8 +41,17 @@
 		 * `ballot`: how members vote, secret or not, changeable or not. Both bind the same settings.
 		 */
 		part?: 'passing' | 'ballot';
+		/**
+		 * `passing` only: show the preset and what it comes to, with every other dial (and the
+		 * `ballot` snippet) behind "Customise". The fields travel either way.
+		 */
+		collapsed?: boolean;
+		/** `ballot` only: the rows without a frame of their own, to sit inside another. */
+		bare?: boolean;
 		/** More ballot rows, such as picking several options on a choice. */
 		extra?: import('svelte').Snippet;
+		/** With `collapsed`: the ballot rows, shown inside the same disclosure. */
+		ballot?: import('svelte').Snippet;
 	} = $props();
 
 	// What screen readers hear before each control: whose rule this is.
@@ -66,7 +78,7 @@
 				? ` At least ${fmt(Math.ceil((eligible * rule.quorum) / 100))} of ${of} must vote.`
 				: '';
 		if (rule.basis === 'all')
-			return `Here: ${fmt(standing(rule, 0, 0, 0, eligible).needed)} of ${of} must say yes.${quorum}`;
+			return `In this DAO: ${fmt(standing(rule, 0, 0, 0, eligible).needed)} of ${of} must say yes.${quorum}`;
 		const t = rule.threshold;
 		const need =
 			t.kind === 'majority'
@@ -74,33 +86,29 @@
 				: t.kind === 'percent'
 					? `at least ${t.percent}% yes`
 					: `at least ${fractionWords(t.num, t.den)} yes`;
-		return `Here: ${need} among those who vote.${quorum}`;
+		return `In this DAO: ${need} among those who vote.${quorum}`;
 	});
 	const help = {
-		preset:
-			'A starting point for the three settings below. Majority of the vote: more than half of everyone who could vote. Majority of votes cast: more yes than no among those who vote, a quarter taking part. Two thirds and unanimous: of the whole vote. Change any setting and it reads custom.',
-		basis:
-			'The whole vote: yes is compared with everyone who could vote, so a member who stays silent counts as a no, and the app, which hands the ballots to the ledger, cannot pass anything by leaving ballots out; it could still make a proposal fail by leaving out yes ballots. The votes cast: yes is compared with the yes and no actually cast, so a few voters can decide unless a quorum says how many must take part, and the app could sway it either way by leaving ballots out.',
-		threshold:
-			'More than half: strictly over 50% of what yes is compared with; 50 of 100 is not enough, 51 is. A fraction, say two thirds: at least that much, rounded up — two of three. A percentage: at least that share; 100% means everyone.',
+		preset: 'Common rules. Changing any setting below switches to Custom.',
+		basis: 'Whole vote: silence counts as no. Votes cast: only yes and no count, so set a quorum.',
+		threshold: "More than half means over 50%: 51 of 100 passes, 50 doesn't. Fractions round up.",
 		quorum:
-			'How much of the whole vote must take part, yes, no or abstain, for the result to count at all. Below it the proposal fails at the deadline whatever the yes count. 0 means no minimum. Matters most with "the votes cast"; note that a quorum is met or not by the ballots the app hands in.',
-		early:
-			'The proposal settles the moment its outcome can no longer change: yes has enough even if everyone still silent said no, or yes can no longer reach enough even if they all said yes. Otherwise it waits for the deadline.',
+			'Share of the whole vote that must take part (yes, no or abstain). Below it, the proposal fails.',
+		early: "Close as soon as the remaining votes can't change the outcome.",
 		changeable:
-			'A voter may replace their ballot any number of times until the deadline. Because a vote may still change, ballots are counted only at the deadline, and nothing settles early: turning this on turns settling early off.',
+			"Voters can recast until the deadline. Counting waits for the deadline, so the proposal can't settle early.",
 		secret:
-			'Members see the totals, not who voted how; each sees their own vote. The ballots are signed and on the ledger all the same, and the app, which counts them, sees them.',
-		days: 'How long a vote is open from the moment the proposal is signed, in days: 1 to 90.'
+			'Members see totals and their own vote only. The app still sees each ballot, because it counts them.',
+		days: 'Days the vote stays open, 1–90.'
 	};
 	const row = 'grid items-center gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]';
 	const label =
 		'flex items-center gap-1.5 font-mono text-xs tracking-[0.14em] text-ink-dim uppercase';
-	const select = 'block w-full border border-border bg-surface px-3 py-2 text-sm';
+	const select = 'block h-10 w-full min-w-0 border border-border bg-surface px-3 text-sm';
 </script>
 
 {#if part === 'ballot'}
-	<div class="divide-y divide-border border border-border">
+	<div class="divide-y divide-border {bare ? '' : 'border border-border'}">
 		<div class="{row} px-4 py-3">
 			<span class={label}>Secret ballot <Hint text={help.secret} /></span>
 			<label class="flex items-center gap-2 text-sm">
@@ -111,7 +119,7 @@
 					checked={!!rule.secret}
 					onchange={(e) => set({ secret: (e.currentTarget as HTMLInputElement).checked })}
 				/>
-				<span class="text-ink-mid">nobody is shown who voted how</span>
+				<span class="text-ink-mid">hide who voted how</span>
 			</label>
 		</div>
 		<div class="{row} px-4 py-3">
@@ -127,11 +135,7 @@
 						set({ changeable: on, early: on ? false : rule.early });
 					}}
 				/>
-				<span class="text-ink-mid"
-					>until the deadline; counted only then{rule.changeable
-						? ', so it does not settle early'
-						: ''}</span
-				>
+				<span class="text-ink-mid">until the deadline</span>
 			</label>
 		</div>
 		{@render extra?.()}
@@ -141,36 +145,27 @@
 		<input type="hidden" {name} {value} />
 	{/each}
 
-	<div class="divide-y divide-border border border-border">
+	{#snippet dials()}
 		<div class="{row} px-4 py-3">
-			<span class={label}>Preset <Hint text={help.preset} /></span>
-			<select
-				class={select}
-				value={preset}
-				aria-label="{whose}: preset"
-				onchange={(e) => pick((e.currentTarget as HTMLSelectElement).value as Preset)}
-			>
-				{#each PRESETS as p (p.value)}<option value={p.value}>{p.title}</option>{/each}
-			</select>
-		</div>
-		<div class="{row} px-4 py-3">
-			<span class={label}>Yes measured against <Hint text={help.basis} /></span>
+			<span class={label}>Basis <Hint text={help.basis} /></span>
 			<select
 				class={select}
 				value={rule.basis}
+				aria-label="{whose}: basis"
 				onchange={(e) =>
 					set({ basis: (e.currentTarget as HTMLSelectElement).value as Rule['basis'] })}
 			>
-				<option value="all">the whole vote</option>
-				<option value="cast">the votes cast</option>
+				<option value="all">Whole vote</option>
+				<option value="cast">Votes cast</option>
 			</select>
 		</div>
 		<div class="{row} px-4 py-3">
-			<span class={label}>It takes <Hint text={help.threshold} /></span>
-			<div class="flex items-center gap-2">
+			<span class={label}>Threshold <Hint text={help.threshold} /></span>
+			<div class="flex min-w-0 items-center gap-2">
 				<select
-					class={select}
+					class="{select} flex-1"
 					value={rule.threshold.kind}
+					aria-label="{whose}: threshold"
 					onchange={(e) => {
 						const kind = (e.currentTarget as HTMLSelectElement).value;
 						set({
@@ -183,16 +178,16 @@
 						});
 					}}
 				>
-					<option value="majority">more than half</option>
-					<option value="fraction">at least a fraction of it (two thirds…)</option>
-					<option value="percent">at least a percentage</option>
+					<option value="majority">More than half</option>
+					<option value="fraction">Fraction</option>
+					<option value="percent">Percentage</option>
 				</select>
 				{#if rule.threshold.kind === 'percent'}
 					<Input
 						type="number"
 						min={1}
 						max={100}
-						class="w-24 text-right"
+						class="w-20 shrink-0 text-right"
 						aria-label="{whose}: percent of yes"
 						value={rule.threshold.percent}
 						oninput={(e) =>
@@ -209,7 +204,7 @@
 						type="number"
 						min={1}
 						max={100}
-						class="w-16 text-right"
+						class="w-14 shrink-0 px-2 text-right"
 						aria-label="{whose}: fraction, numerator"
 						value={rule.threshold.num}
 						oninput={(e) =>
@@ -226,7 +221,7 @@
 						type="number"
 						min={1}
 						max={100}
-						class="w-16 text-right"
+						class="w-14 shrink-0 px-2 text-right"
 						aria-label="{whose}: fraction, denominator"
 						value={rule.threshold.den}
 						oninput={(e) =>
@@ -259,7 +254,7 @@
 							)
 						})}
 				/>
-				<span class="font-mono text-xs text-ink-dim">% of the vote must take part; 0 for none</span>
+				<span class="font-mono text-xs text-ink-dim">% must take part (0 = none)</span>
 			</div>
 		</div>
 		<div class="{row} px-4 py-3">
@@ -276,9 +271,7 @@
 					}}
 				/>
 				<span class="text-ink-mid"
-					>{rule.changeable
-						? 'off while votes may change (under Ballot): the count waits for the deadline'
-						: 'the moment the outcome can no longer change'}</span
+					>{rule.changeable ? 'off while votes may change' : 'when the outcome is certain'}</span
 				>
 			</label>
 		</div>
@@ -304,10 +297,38 @@
 				<span class="font-mono text-xs text-ink-dim">days</span>
 			</div>
 		</div>
+	{/snippet}
+
+	<div class="divide-y divide-border border border-border">
+		<div class="{row} px-4 py-3">
+			<span class={label}>Preset <Hint text={help.preset} /></span>
+			<select
+				class={select}
+				value={preset}
+				aria-label="{whose}: preset"
+				onchange={(e) => pick((e.currentTarget as HTMLSelectElement).value as Preset)}
+			>
+				{#each PRESETS as p (p.value)}<option value={p.value}>{p.title}</option>{/each}
+			</select>
+		</div>
+		{#if collapsed}
+			<details class="group/custom">
+				<summary
+					class="flex cursor-pointer list-none items-center justify-between px-4 py-3 font-mono text-xs tracking-[0.14em] text-ink-mid uppercase hover:text-ink [&::-webkit-details-marker]:hidden"
+				>
+					Customise ballot and rule
+					<span class="transition-transform group-open/custom:rotate-45" aria-hidden="true">+</span>
+				</summary>
+				<div class="divide-y divide-border border-t border-border">
+					{@render ballot?.()}
+					{@render dials()}
+				</div>
+			</details>
+		{:else}
+			{@render dials()}
+		{/if}
 		{#if rule.threshold.kind === 'fraction' && rule.threshold.num > rule.threshold.den}
-			<p class="px-4 py-3 font-mono text-xs text-red">
-				A fraction is at most one: the top number no more than the bottom.
-			</p>
+			<p class="px-4 py-3 font-mono text-xs text-red">The fraction can't exceed 1.</p>
 		{:else}
 			<p class="px-4 py-3 font-mono text-xs text-ink">
 				Passes when {describe(rule)}; {rule.early

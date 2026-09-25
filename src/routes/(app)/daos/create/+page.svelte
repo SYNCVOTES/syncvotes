@@ -18,7 +18,10 @@
 	import Note from '$lib/components/note.svelte';
 	import Hint from '$lib/components/hint.svelte';
 	import RuleSettings from '$lib/components/rule-settings.svelte';
+	import Problem from '$lib/components/problem.svelte';
+	import { Button } from '$lib/components/ui/button';
 	import {
+		CATEGORIES,
 		DEFAULTS,
 		copySettings,
 		settingsFields,
@@ -29,7 +32,7 @@
 	} from '$lib/rules';
 	import Users from '@lucide/svelte/icons/users';
 	import PieChart from '@lucide/svelte/icons/pie-chart';
-	import { fmt } from '$lib/format';
+	import { fmt, coin } from '$lib/format';
 
 	const f = remote.createDaoForm;
 	/**
@@ -48,27 +51,27 @@
 			value: 'private',
 			title: 'Private',
 			text: 'Only its members see it exists.',
-			more: 'The DAO, its proposals, votes and comments reach its members and the app that hosts them; nothing about it is listed anywhere or readable by anyone else.'
+			more: "Only members and the app's validator receive its data."
 		},
 		{
 			value: 'public',
 			title: 'Public',
-			text: 'Listed for anyone signed in to read; only members act.',
-			more: 'Listed among the public DAOs: anyone signed in to the app can read its proposals, outcomes, members and comments, and pay in to its balance. Only members propose, vote and comment; who voted how stays with the members. Say in the description how one joins. Changed later by a Visibility proposal.'
+			text: 'Anyone signed in can read it. Only members act.',
+			more: 'Listed on Public DAOs. Readers can also top up its balance. Say in the description how to join. Change later with a Visibility proposal.'
 		}
 	] as const;
 	const payers = [
 		{
 			value: 'dao',
 			title: 'The DAO pays',
-			text: 'One balance, paid in by anyone; every transaction in the DAO comes out of it.',
-			more: 'The DAO gets a balance of its own with an address and a memo; anyone tops it up. Proposals, votes, comments and the counting are all paid from it, and when it is empty nothing can be signed until someone pays in.'
+			text: 'One shared balance that anyone can top up.',
+			more: 'When the balance is empty, nobody can act in the DAO until someone tops it up.'
 		},
 		{
 			value: 'members',
 			title: 'Each member pays',
-			text: 'Everyone pays for what they sign, from their own balance on their Wallet page.',
-			more: 'No DAO balance: a proposal, a vote or a comment costs the member who signs it, and the counting and carrying out of a proposal cost its proposer. A member whose own balance is empty cannot act here until they pay in. Cannot be changed later.'
+			text: 'Each member pays for their own actions from their Wallet balance.',
+			more: 'The proposer also pays for counting and executing their proposal.'
 		}
 	] as const;
 	const modes = [
@@ -76,14 +79,14 @@
 			value: 'equal',
 			title: 'By membership',
 			text: 'One member, one vote. A club, a committee, a collective.',
-			more: 'Every member holds exactly one unit of the vote, so a proposal is decided by heads. Members join and leave by vote. Simple, and impossible to skew: nobody can hold more than anyone else.',
+			more: 'Each member holds one vote. Members join and leave by vote.',
 			icon: Users
 		},
 		{
 			value: 'shares',
 			title: 'By shares',
-			text: 'Members hold units of the vote — 40 of 100, say. A company, a fund, a partnership.',
-			more: "Members hold units of the vote, whole numbers you set, like shares of a company: 60, 30 and 10 units give 60%, 30% and 10% of the vote. A ballot weighs the voter's units. Units move only by vote; paying the DAO's balance in does not change them.",
+			text: 'Members hold units of the vote (40 of 100, for example). A company, a fund, a partnership.',
+			more: "Voting power is units over the total. Units change only by vote; topping up the balance doesn't change them.",
 			icon: PieChart
 		}
 	] as const;
@@ -101,12 +104,28 @@
 		if (store.who && rows.length === 0) rows = [{ party: store.who.party, share: 1 }];
 	});
 	let description = $state('');
+	let daoName = $state('');
+	// Creating the DAO is charged to the creator: their balance sits next to the button.
+	const purse = $derived(store.who ? remote.myPurse(store.who.party) : null);
+	const covers = CATEGORIES.find((c) => c.value === 'sensitive')!.covers;
 	let image = $state('');
 	// The rule everything that changes the DAO passes by, starting from the founding default. A
 	// decision or a choice runs under a rule its proposer sets, so the DAO's routine settings go
 	// along unchanged, as the founding default a proposer's form starts from.
 	const routine = copySettings(DEFAULTS.routine);
 	let sensitive = $state<Settings>(copySettings(DEFAULTS.sensitive));
+	/** "2/3 of the whole vote · 14 days": the rule in a line, for the summary. */
+	const ruleLine = $derived.by(() => {
+		const r = sensitive.rule;
+		const t = r.threshold;
+		const amount =
+			t.kind === 'majority'
+				? 'Majority'
+				: t.kind === 'percent'
+					? `${t.percent}%`
+					: `${t.num}/${t.den}`;
+		return `${amount} ${r.basis === 'all' ? 'of the whole vote' : 'of votes cast'}${r.quorum ? ` · ${r.quorum}% quorum` : ''} · ${sensitive.votingDays} ${sensitive.votingDays === 1 ? 'day' : 'days'}`;
+	});
 
 	// The intent is the founding table as the ledger reads it: the first batch of rows, and the
 	// rest as a proposal already passed. The server orders the creator first; so does this.
@@ -144,188 +163,225 @@
 
 <svelte:head><title>Create DAO — SyncVotes</title></svelte:head>
 
-<Page width="narrow">
-	<PageHeader
-		eyebrow="New organisation"
-		title="Create DAO"
-		description="A DAO is private to its members unless it chooses to be public, in which case anyone signed in can read it and only members act. Everything it does costs network traffic, paid from a balance topped up by sending Canton Coin to the app with a memo. From here on, everything about it changes by vote."
-	/>
+<Page width="wide">
+	<PageHeader eyebrow="New DAO" title="Create DAO" />
 
 	{#if store.screen.at === 'loading'}
 		<Skeleton height="h-64" />
 	{:else if !store.who}
 		<ConnectPrompt what="create a DAO" />
 	{:else}
-		<form {...enhanced} class="space-y-8">
+		<form {...enhanced} class="grid gap-10 lg:grid-cols-[minmax(0,1fr)_300px]">
 			<input type="hidden" name="equal" value={mode === 'equal' ? 'yes' : 'no'} />
 			<input type="hidden" name="actorPays" value={payer === 'members' ? 'yes' : 'no'} />
 			<input type="hidden" name="public" value={visibility === 'public' ? 'yes' : 'no'} />
 
-			<FormSection title="Basic information">
-				<Field label="Name" id="daoName" issues={f.fields.daoName.issues()}>
-					<Input
-						{...f.fields.daoName.as('text')}
-						id="daoName"
-						placeholder="Canton Technical Committee"
-						maxlength={60}
-					/>
-				</Field>
-				<Field label="Description" id="description" issues={f.fields.description.issues()}>
-					<MarkdownEditor
-						name="description"
-						id="description"
-						bind:value={description}
-						maxlength={10_000}
-						placeholder="What this DAO is for, in Markdown. Pictures by link."
-						disabled={store.busy}
-					/>
-				</Field>
-				<Field label="Picture" id="image" issues={f.fields.image.issues()}>
-					<ImageField name="image" id="image" bind:value={image} disabled={store.busy} />
-				</Field>
-			</FormSection>
+			<div class="min-w-0 space-y-10">
+				<FormSection variant="plain" number="01" title="Basics">
+					<Field label="Name" id="daoName" issues={f.fields.daoName.issues()}>
+						<Input
+							{...f.fields.daoName.as('text')}
+							id="daoName"
+							placeholder="Canton Technical Committee"
+							maxlength={60}
+							oninput={(e) => (daoName = (e.currentTarget as HTMLInputElement).value)}
+						/>
+					</Field>
+					<Field label="Description" id="description" issues={f.fields.description.issues()}>
+						<MarkdownEditor
+							name="description"
+							id="description"
+							bind:value={description}
+							maxlength={10_000}
+							placeholder="What this DAO is for. Markdown supported."
+							disabled={store.busy}
+						/>
+					</Field>
+					<Field label="Picture" id="image" issues={f.fields.image.issues()}>
+						<ImageField name="image" id="image" bind:value={image} disabled={store.busy} />
+					</Field>
+				</FormSection>
 
-			<FormSection title="How it votes">
-				<div class="grid gap-3 sm:grid-cols-2">
-					{#each modes as m (m.value)}
-						{@const Icon = m.icon}
-						<label
-							class="flex cursor-pointer items-start gap-3 border p-4 transition-colors {mode ===
-							m.value
-								? 'border-orange bg-orange/5'
-								: 'border-border hover:border-border-hover'}"
-						>
-							<input type="radio" class="sr-only" value={m.value} bind:group={mode} />
-							<Icon
-								size={18}
-								class="mt-0.5 shrink-0 {mode === m.value ? 'text-orange' : 'text-ink-dim'}"
-								aria-hidden="true"
+				<FormSection variant="plain" number="02" title="How it votes" fixed>
+					<div class="grid gap-3 sm:grid-cols-2">
+						{#each modes as m (m.value)}
+							{@const Icon = m.icon}
+							<label
+								class="flex cursor-pointer items-start gap-3 border p-4 transition-colors {mode ===
+								m.value
+									? 'border-orange bg-orange/5'
+									: 'border-border hover:border-border-hover'}"
+							>
+								<input type="radio" class="sr-only" value={m.value} bind:group={mode} />
+								<Icon
+									size={18}
+									class="mt-0.5 shrink-0 {mode === m.value ? 'text-orange' : 'text-ink-dim'}"
+									aria-hidden="true"
+								/>
+								<span class="min-w-0">
+									<span class="flex items-center gap-1.5 font-display text-body font-bold"
+										>{m.title}
+										<Hint text={m.more} align={m.value === 'shares' ? 'end' : 'start'} /></span
+									>
+									<span class="mt-1 block text-xs leading-relaxed text-ink-mid">{m.text}</span>
+								</span>
+							</label>
+						{/each}
+					</div>
+				</FormSection>
+
+				<FormSection variant="plain" number="03" title="Who can see it">
+					<div class="grid gap-3 sm:grid-cols-2">
+						{#each visibilities as o (o.value)}
+							<label
+								class="flex cursor-pointer items-start gap-3 border p-4 transition-colors {visibility ===
+								o.value
+									? 'border-orange bg-orange/5'
+									: 'border-border hover:border-border-hover'}"
+							>
+								<input type="radio" class="sr-only" value={o.value} bind:group={visibility} />
+								<span class="min-w-0">
+									<span class="flex items-center gap-1.5 font-display text-body font-bold"
+										>{o.title}
+										<Hint text={o.more} align={o.value === 'public' ? 'end' : 'start'} /></span
+									>
+									<span class="mt-1 block text-xs leading-relaxed text-ink-mid">{o.text}</span>
+								</span>
+							</label>
+						{/each}
+					</div>
+				</FormSection>
+
+				<FormSection variant="plain" number="04" title="Who pays" fixed>
+					<div class="grid gap-3 sm:grid-cols-2">
+						{#each payers as p (p.value)}
+							<label
+								class="flex cursor-pointer items-start gap-3 border p-4 transition-colors {payer ===
+								p.value
+									? 'border-orange bg-orange/5'
+									: 'border-border hover:border-border-hover'}"
+							>
+								<input type="radio" class="sr-only" value={p.value} bind:group={payer} />
+								<span class="min-w-0">
+									<span class="flex items-center gap-1.5 font-display text-body font-bold"
+										>{p.title}
+										<Hint text={p.more} align={p.value === 'members' ? 'end' : 'start'} /></span
+									>
+									<span class="mt-1 block text-xs leading-relaxed text-ink-mid">{p.text}</span>
+								</span>
+							</label>
+						{/each}
+					</div>
+					<Note>Creating the DAO is charged to you.</Note>
+				</FormSection>
+
+				<FormSection variant="plain" number="05" title="Voting rules" hint={covers}>
+					<p class="text-body-sm leading-relaxed text-ink-mid">
+						Apply to changes to the DAO itself. Decisions and choices use a rule their proposer
+						sets.
+					</p>
+					{#each settingsFields('routine', routine) as [name, value] (name)}
+						<input type="hidden" {name} {value} />
+					{/each}
+					<RuleSettings
+						bind:settings={sensitive}
+						prefix="sensitive"
+						eligible={summary.units}
+						equal={mode === 'equal'}
+						collapsed
+					>
+						{#snippet ballot()}
+							<RuleSettings
+								bind:settings={sensitive}
+								prefix="sensitive"
+								part="ballot"
+								bare
+								eligible={summary.units}
+								equal={mode === 'equal'}
 							/>
-							<span class="min-w-0">
-								<span class="flex items-center gap-1.5 font-display text-body font-bold"
-									>{m.title}
-									<Hint text={m.more} align={m.value === 'shares' ? 'end' : 'start'} /></span
-								>
-								<span class="mt-1 block text-xs leading-relaxed text-ink-mid">{m.text}</span>
-							</span>
-						</label>
-					{/each}
-				</div>
-				<Note mono={false}>
-					This cannot be changed later: a DAO by membership stays one, and so does one by shares.
-					Who is in it, and with how many units, changes by vote.
-				</Note>
-			</FormSection>
+						{/snippet}
+					</RuleSettings>
+				</FormSection>
 
-			<FormSection title="Who can see it">
-				<div class="grid gap-3 sm:grid-cols-2">
-					{#each visibilities as o (o.value)}
-						<label
-							class="flex cursor-pointer items-start gap-3 border p-4 transition-colors {visibility ===
-							o.value
-								? 'border-orange bg-orange/5'
-								: 'border-border hover:border-border-hover'}"
-						>
-							<input type="radio" class="sr-only" value={o.value} bind:group={visibility} />
-							<span class="min-w-0">
-								<span class="flex items-center gap-1.5 font-display text-body font-bold"
-									>{o.title}
-									<Hint text={o.more} align={o.value === 'public' ? 'end' : 'start'} /></span
-								>
-								<span class="mt-1 block text-xs leading-relaxed text-ink-mid">{o.text}</span>
-							</span>
-						</label>
-					{/each}
-				</div>
-			</FormSection>
+				<FormSection variant="plain" number="06" title={mode === 'equal' ? 'Members' : 'Shares'}>
+					<Field
+						label={mode === 'equal' ? 'Members' : 'Members and their units'}
+						id="shares"
+						hint={mode === 'equal'
+							? 'You and the other founding members.'
+							: 'You and the other founding members. Units are whole numbers.'}
+						issues={f.fields.shares.issues()}
+					>
+						<MemberEditor
+							{mode}
+							name="shares"
+							busy={store.busy}
+							bind:rows
+							bind:summary
+							fixed={store.who ? [store.who.party] : []}
+						/>
+					</Field>
+					{#if summary.members > BATCH}
+						<Note>
+							The first {fmt(BATCH)} join at once; the other {fmt(summary.members - BATCH)} are added
+							in batches right after.
+						</Note>
+					{/if}
+				</FormSection>
 
-			<FormSection title="Who pays">
-				<div class="grid gap-3 sm:grid-cols-2">
-					{#each payers as p (p.value)}
-						<label
-							class="flex cursor-pointer items-start gap-3 border p-4 transition-colors {payer ===
-							p.value
-								? 'border-orange bg-orange/5'
-								: 'border-border hover:border-border-hover'}"
-						>
-							<input type="radio" class="sr-only" value={p.value} bind:group={payer} />
-							<span class="min-w-0">
-								<span class="flex items-center gap-1.5 font-display text-body font-bold"
-									>{p.title}
-									<Hint text={p.more} align={p.value === 'members' ? 'end' : 'start'} /></span
-								>
-								<span class="mt-1 block text-xs leading-relaxed text-ink-mid">{p.text}</span>
-							</span>
-						</label>
-					{/each}
-				</div>
-				<Note mono={false}>
-					Every transaction costs network traffic; this decides whose balance it comes out of.
-					Founding the DAO itself comes out of yours. Cannot be changed later.
-				</Note>
-			</FormSection>
+				<Problem message={store.problem} />
+			</div>
 
-			<FormSection title="Voting rules">
-				<p class="text-xs leading-relaxed text-ink-mid">
-					How the DAO votes on changes to itself: its members and shares, its name, these rules,
-					whether it is public, and winding it up. Changing them later is itself such a vote. A
-					decision or a choice changes nothing, so whoever proposes one sets its ballot and rule
-					then.
-				</p>
-				{#each settingsFields('routine', routine) as [name, value] (name)}
-					<input type="hidden" {name} {value} />
-				{/each}
-				<h3 class="eyebrow">Ballot</h3>
-				<RuleSettings
-					bind:settings={sensitive}
-					prefix="sensitive"
-					part="ballot"
-					eligible={summary.units}
-					equal={mode === 'equal'}
-				/>
-				<h3 class="eyebrow">How it passes</h3>
-				<RuleSettings
-					bind:settings={sensitive}
-					prefix="sensitive"
-					eligible={summary.units}
-					equal={mode === 'equal'}
-				/>
-			</FormSection>
-
-			<FormSection title={mode === 'equal' ? 'Founding members' : 'Founding shares'}>
-				<Field
-					label={mode === 'equal' ? 'Members' : 'Members and their units'}
-					id="shares"
-					hint={mode === 'equal'
-						? 'You, and whoever else is in from the start. Each has one vote.'
-						: 'You, and whoever else holds the vote. Units are whole numbers; a share is units over the total.'}
-					issues={f.fields.shares.issues()}
-				>
-					<MemberEditor
-						{mode}
-						name="shares"
-						busy={store.busy}
-						bind:rows
-						bind:summary
-						fixed={store.who ? [store.who.party] : []}
+			<!-- What is about to be signed and the button that signs it: beside the form on a wide
+			     screen, a bar along the bottom on a phone. -->
+			<aside class="lg:sticky lg:top-24 lg:self-start">
+				<div class="hidden space-y-4 border border-border bg-surface p-5 md:p-6 lg:block">
+					<h2 class="eyebrow">Summary</h2>
+					<p class="title text-xl">{daoName.trim() || 'Unnamed DAO'}</p>
+					<ul class="space-y-1.5 font-mono text-xs text-ink-mid">
+						<li>
+							{mode === 'equal' ? 'By membership' : 'By shares'} · {visibility === 'public'
+								? 'Public'
+								: 'Private'}
+						</li>
+						<li>{payer === 'dao' ? 'The DAO pays' : 'Each member pays'}</li>
+						<li>Changes pass: {ruleLine}</li>
+						<li>
+							{fmt(summary.members)} founding {summary.members === 1
+								? 'member'
+								: 'members'}{mode === 'shares' ? `, ${fmt(summary.units)} units` : ''}
+						</li>
+					</ul>
+					<p class="border-t border-border pt-3 font-mono text-xs text-ink-dim">
+						Charged to your balance{#if purse?.ready}: <span
+								class={purse.current.balance > 0 ? 'text-ink' : 'text-red'}
+								>{coin(purse.current.balance)}</span
+							>{/if}.
+					</p>
+					<FormActions
+						label="Create DAO"
+						busy={store.busy || f.pending > 0}
+						disabled={!summary.valid || !validRule(sensitive.rule)}
+						cancelHref="/my-daos"
 					/>
-				</Field>
-				{#if summary.members > BATCH}
-					<Note mono={false}>
-						The first {fmt(BATCH)} are in from the moment you sign; the other {fmt(
-							summary.members - BATCH
-						)} are added right after, in batches, as the founding table is carried out.
-					</Note>
-				{/if}
-			</FormSection>
-
-			<FormActions
-				label="Create DAO"
-				busy={store.busy || f.pending > 0}
-				disabled={!summary.valid || !validRule(sensitive.rule)}
-				cancelHref="/my-daos"
-				problem={store.problem}
-			/>
+				</div>
+				<div
+					class="sticky bottom-0 -mx-6 flex items-center justify-between gap-3 border-t border-border bg-[rgba(var(--bg-rgb),0.95)] px-6 py-3 backdrop-blur md:-mx-10 md:px-10 lg:hidden"
+				>
+					<span class="min-w-0 truncate font-mono text-xs text-ink-dim"
+						>{mode === 'equal' ? 'By membership' : 'By shares'} · {visibility === 'public'
+							? 'Public'
+							: 'Private'} · {fmt(summary.members)}
+						{summary.members === 1 ? 'member' : 'members'}</span
+					>
+					<Button
+						type="submit"
+						class="shrink-0"
+						disabled={store.busy || f.pending > 0 || !summary.valid || !validRule(sensitive.rule)}
+						>{store.busy || f.pending > 0 ? 'Signing…' : 'Create DAO'}</Button
+					>
+				</div>
+			</aside>
 		</form>
 	{/if}
 </Page>

@@ -55,8 +55,8 @@
 			{/if}
 		</div>
 		<p class="font-mono text-label text-ink-dim">
-			{#if failed}<span class="text-red">That link does not load as a picture.</span>{:else}A link
-				to a picture (https). The ledger keeps the link; the picture stays where it is.{/if}
+			{#if failed}<span class="text-red">This link isn't an image.</span>{:else}An https link to an
+				image.{/if}
 		</p>
 	</div>
 </div>

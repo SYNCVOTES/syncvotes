@@ -141,7 +141,7 @@
 			})
 			.filter((r) => r.party?.includes('::'));
 		if (parsed.length === 0) {
-			importNote = 'No party ids found.';
+			importNote = 'No party IDs found.';
 			return;
 		}
 		checking = true;
@@ -154,7 +154,7 @@
 				for (const p of chunk) if (found[p] === 'unknown') unknown.push(p);
 			}
 		} catch {
-			importNote = 'Could not check the list; try again.';
+			importNote = "Couldn't check the list. Try again.";
 			checking = false;
 			return;
 		}
@@ -167,7 +167,7 @@
 				.filter((r) => !rows.some((x) => x.party === r.party))
 				.map((r) => ({ party: r.party, share: taken.get(r.party)! }))
 		];
-		importNote = `${fmt(ok.length)} taken${unknown.length ? `, ${fmt(unknown.length)} not registered and left out` : ''}.`;
+		importNote = `${fmt(ok.length)} added.${unknown.length ? ` ${fmt(unknown.length)} not registered, skipped.` : ''}`;
 		pasted = unknown.join('\n');
 	}
 
@@ -241,26 +241,27 @@
 
 <div class="space-y-3">
 	<div class="flex flex-wrap items-center gap-2">
-		<label class="relative block min-w-[12rem] flex-1">
-			<Search
-				size={14}
-				class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-dim"
-				aria-hidden="true"
-			/>
-			<Input
-				class="pl-9"
-				placeholder="Find by name or id"
-				bind:value={q}
-				aria-label="Find a member"
-			/>
-		</label>
+		<!-- A short list needs no search: it shows from eight rows on. -->
+		{#if rows.length >= 8}<label class="relative block min-w-[12rem] flex-1">
+				<Search
+					size={14}
+					class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-dim"
+					aria-hidden="true"
+				/>
+				<Input
+					class="pl-9"
+					placeholder="Search by name or party ID"
+					bind:value={q}
+					aria-label="Find a member"
+				/>
+			</label>{/if}
 		{#if mode === 'shares'}
 			<Button
 				type="button"
 				variant="outline"
 				size="sm"
 				onclick={equalise}
-				disabled={busy || rows.length === 0}>One unit each</Button
+				disabled={busy || rows.length === 0}>Equal units</Button
 			>
 		{/if}
 		<Button
@@ -268,7 +269,7 @@
 			variant={importing ? 'default' : 'outline'}
 			size="sm"
 			onclick={() => (importing = !importing)}
-			disabled={busy}>Paste a list</Button
+			disabled={busy}>Paste list</Button
 		>
 	</div>
 
@@ -278,8 +279,8 @@
 				rows={5}
 				class="font-mono text-xs"
 				placeholder={mode === 'shares'
-					? 'One per line: party id, then units — e.g.\nalice::1220…  40\nbob::1220…  25'
-					: 'One party id per line'}
+					? 'One per line: party ID, then units. For example:\nalice::1220…  40\nbob::1220…  25'
+					: 'One party ID per line'}
 				bind:value={pasted}
 			/>
 			<div class="flex flex-wrap items-center gap-3">
@@ -287,7 +288,7 @@
 					type="button"
 					size="sm"
 					onclick={importList}
-					disabled={busy || checking || !pasted.trim()}>Take the list</Button
+					disabled={busy || checking || !pasted.trim()}>Add</Button
 				>
 				<span class="font-mono text-xs text-ink-dim">{importNote}</span>
 			</div>
@@ -297,7 +298,7 @@
 			bind:this={chips}
 			{dao}
 			{busy}
-			placeholder="Add party ids"
+			placeholder="Add party IDs"
 			bind:parties={added}
 			bind:checking
 		/>
@@ -347,9 +348,9 @@
 								oninput={(e) => set(r.party, (e.currentTarget as HTMLInputElement).value)}
 							/>
 						{/if}
-						<span class="w-16 text-right font-mono text-xs text-ink-dim"
-							>{gone ? '' : `${pct(r)}%`}</span
-						>
+						{#if mode === 'shares'}<span class="w-16 text-right font-mono text-xs text-ink-dim"
+								>{gone ? '' : `${pct(r)}%`}</span
+							>{/if}
 						{#if gone}
 							<button
 								type="button"

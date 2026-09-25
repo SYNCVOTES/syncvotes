@@ -176,7 +176,7 @@
 	<div
 		class="flex flex-wrap items-center justify-between gap-2 border-t border-border px-3 py-1.5 font-mono text-label text-ink-dim"
 	>
-		<span>Markdown. Pictures by link.</span>
+		<span>Markdown supported.</span>
 		{#if maxlength}<span class={value.length > maxlength ? 'text-red' : ''}
 				>{value.length.toLocaleString('en-US')} / {maxlength.toLocaleString('en-US')}</span
 			>{/if}

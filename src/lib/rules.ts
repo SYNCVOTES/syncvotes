@@ -22,11 +22,10 @@ export type Rule = {
 
 export type Preset = 'majority' | 'cast' | 'twoThirds' | 'unanimous' | 'custom';
 
-export const PRESETS: { value: Preset; title: string; text: string; rule?: Rule }[] = [
+export const PRESETS: { value: Preset; title: string; rule?: Rule }[] = [
 	{
 		value: 'majority',
 		title: 'Majority of the vote',
-		text: 'More than half of the whole vote says yes. Settles early once it is sure.',
 		rule: {
 			basis: 'all',
 			threshold: { kind: 'majority' },
@@ -38,7 +37,6 @@ export const PRESETS: { value: Preset; title: string; text: string; rule?: Rule 
 	{
 		value: 'cast',
 		title: 'Majority of votes cast',
-		text: 'More yes than no among those who vote, if at least a quarter take part.',
 		rule: {
 			basis: 'cast',
 			threshold: { kind: 'majority' },
@@ -50,7 +48,6 @@ export const PRESETS: { value: Preset; title: string; text: string; rule?: Rule 
 	{
 		value: 'twoThirds',
 		title: 'Two thirds of the vote',
-		text: 'At least two thirds of the whole vote say yes — two of three, rounded up.',
 		rule: {
 			basis: 'all',
 			threshold: { kind: 'fraction', num: 2, den: 3 },
@@ -62,7 +59,6 @@ export const PRESETS: { value: Preset; title: string; text: string; rule?: Rule 
 	{
 		value: 'unanimous',
 		title: 'Unanimous',
-		text: 'The whole vote says yes; one no or abstention fails it.',
 		rule: {
 			basis: 'all',
 			threshold: { kind: 'percent', percent: 100 },
@@ -73,8 +69,7 @@ export const PRESETS: { value: Preset; title: string; text: string; rule?: Rule 
 	},
 	{
 		value: 'custom',
-		title: 'Custom',
-		text: 'Your own basis, threshold, quorum, timing and whether votes may change.'
+		title: 'Custom'
 	}
 ];
 

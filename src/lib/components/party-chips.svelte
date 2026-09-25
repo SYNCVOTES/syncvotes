@@ -18,7 +18,7 @@
 		dao,
 		name,
 		busy = false,
-		placeholder = 'Party ids — type one, or paste a whole list',
+		placeholder = 'Party IDs: type or paste',
 		parties = $bindable([]),
 		checking = $bindable(false)
 	}: {
@@ -176,13 +176,13 @@
 			{#if tokens.filter((t) => status[t] !== 'checking' && !passes(t)).length}
 				<span class="text-red"
 					>{fmt(tokens.filter((t) => status[t] !== 'checking' && !passes(t)).length)}
-					not addable</span
+					invalid</span
 				>
 				<button
 					type="button"
 					class="underline hover:text-ink"
 					onclick={() => (tokens = tokens.filter((t) => status[t] === 'checking' || passes(t)))}
-					>drop them</button
+					>remove</button
 				>
 			{/if}
 			{#if by('checking').length}<span>checking {fmt(by('checking').length)}…</span>{/if}
