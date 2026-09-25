@@ -1,5 +1,11 @@
 <script lang="ts">
 	import ArrowRight from '@lucide/svelte/icons/arrow-right';
+	import Lock from '@lucide/svelte/icons/lock';
+	import Globe from '@lucide/svelte/icons/globe';
+	import Tag from './tag.svelte';
+	import { excerpt } from '$lib/markdown';
+	import { coin, fmt } from '$lib/format';
+
 	let {
 		id,
 		name,
@@ -26,103 +32,80 @@
 		balance?: number | null;
 		/** Each member pays for what they sign: the DAO has no balance of its own. */
 		actorPays?: boolean;
-		/** The viewer's share of the vote, in percent. */
+		/** The viewer's voting power, in percent; null where it says nothing (by membership). */
 		share?: number | null;
 		/** Whether anyone signed in may read it; null where the list already says so. */
 		isPublic?: boolean | null;
 		/** Open proposals still waiting on the viewer's vote; null for a DAO they only read. */
 		awaiting?: number | null;
 	} = $props();
-	import { excerpt } from '$lib/markdown';
-	import { coin } from '$lib/format';
 
 	const monogram = $derived(name.slice(0, 3).toUpperCase());
+	const meta = $derived(
+		[
+			`${fmt(members)} ${members === 1 ? 'member' : 'members'}`,
+			`${fmt(openProposals)} open`,
+			share !== null ? `${share}% of the vote` : ''
+		]
+			.filter(Boolean)
+			.join(' · ')
+	);
 </script>
 
 <a
 	href="/daos/{id}"
-	class="group flex flex-col border border-border bg-surface px-[26px] pt-[26px] pb-5 transition-colors hover:border-border-hover hover:bg-surface-hover"
+	class="group flex flex-col border bg-surface p-5 transition-colors hover:border-border-hover hover:bg-surface-hover md:p-6 {awaiting
+		? 'border-orange/40'
+		: 'border-border'}"
 >
-	<div class="mb-[18px] flex items-start justify-between gap-3">
+	<div class="mb-4 flex items-start justify-between gap-3">
 		{#if image}
 			<img src={image} alt="" class="size-[46px] shrink-0 border border-border object-cover" />
 		{:else}
 			<div
-				class="flex size-[46px] shrink-0 items-center justify-center border border-orange/30 bg-orange-dim font-mono text-xs font-bold tracking-[0.08em] text-orange"
+				class="flex size-[46px] shrink-0 items-center justify-center border border-border bg-surface-active font-mono text-xs font-bold tracking-[0.08em] text-ink-mid"
 			>
 				{monogram}
 			</div>
 		{/if}
-		<span class="flex items-center gap-2 pt-1 font-mono text-xs tracking-[0.18em] uppercase">
-			{#if isPublic !== null}
-				<span class={isPublic ? 'text-green' : 'text-ink-dim'}
-					>{isPublic ? 'public' : 'private'}</span
-				>
-			{/if}
-			{#if role}
-				<span class="font-bold {role === 'creator' ? 'text-amber' : 'text-orange'}">{role}</span>
-			{/if}
-		</span>
+		{#if awaiting}
+			<span
+				class="flex items-center gap-1.5 rounded-full bg-orange-dim px-2.5 py-1 font-mono text-label tracking-[0.12em] text-orange uppercase"
+			>
+				<span class="size-1.5 rounded-full bg-orange" aria-hidden="true"></span>
+				{fmt(awaiting)}
+				{awaiting === 1 ? 'vote' : 'votes'} due
+			</span>
+		{/if}
 	</div>
 
 	<div
-		class="mb-2 line-clamp-2 font-display text-item leading-tight font-bold tracking-[-0.01em] [overflow-wrap:anywhere]"
+		class="mb-2 line-clamp-2 font-display text-item leading-tight font-bold [overflow-wrap:anywhere]"
 	>
 		{name}
 	</div>
 	<div
-		class="mb-[22px] line-clamp-3 flex-1 text-body-sm leading-relaxed [overflow-wrap:anywhere] text-ink-mid"
+		class="mb-4 line-clamp-3 flex-1 text-body-sm leading-relaxed [overflow-wrap:anywhere] text-ink-mid"
 	>
-		{excerpt(description) || 'No description provided.'}
+		{excerpt(description) || 'No description.'}
 	</div>
 
-	<div class="flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-border pt-3.5">
-		<div>
-			<div class="font-mono text-body font-bold">{members}</div>
-			<div class="mt-0.5 font-mono text-xs tracking-[0.14em] text-ink-dim uppercase">Members</div>
-		</div>
-		<div>
-			<div class="font-mono text-body font-bold {openProposals > 0 ? 'text-orange' : ''}">
-				{openProposals}
-			</div>
-			<div class="mt-0.5 font-mono text-xs tracking-[0.14em] text-ink-dim uppercase">Open</div>
-		</div>
-		{#if awaiting !== null}
-			<div>
-				<div class="font-mono text-body font-bold {awaiting > 0 ? 'text-orange' : ''}">
-					{awaiting}
-				</div>
-				<div class="mt-0.5 font-mono text-xs tracking-[0.14em] text-ink-dim uppercase">
-					Your vote due
-				</div>
-			</div>
+	<p class="mb-3 font-mono text-xs text-ink-dim">{meta}</p>
+	<div class="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+		{#if isPublic !== null}
+			<Tag icon={isPublic ? Globe : Lock}>{isPublic ? 'Public' : 'Private'}</Tag>
 		{/if}
-		{#if actorPays}
-			<div>
-				<div class="font-mono text-body font-bold">members</div>
-				<div class="mt-0.5 font-mono text-xs tracking-[0.14em] text-ink-dim uppercase">
-					Who pays
-				</div>
-			</div>
-		{:else if balance !== null}
-			<div>
-				<div class="font-mono text-body font-bold {balance <= 0 ? 'text-red' : ''}">
-					{coin(balance)}
-				</div>
-				<div class="mt-0.5 font-mono text-xs tracking-[0.14em] text-ink-dim uppercase">Balance</div>
-			</div>
-		{/if}
-		{#if share !== null}
-			<div>
-				<div class="font-mono text-body font-bold">{share}%</div>
-				<div class="mt-0.5 font-mono text-xs tracking-[0.14em] text-ink-dim uppercase">
-					Your vote
-				</div>
-			</div>
+		{#if role}<Tag>{role}</Tag>{/if}
+		{#if !actorPays && balance !== null}
+			<span class="ml-auto font-mono text-xs {balance <= 0 ? 'text-red' : 'text-ink-mid'}"
+				>{coin(balance)}</span
+			>
 		{/if}
 		<ArrowRight
 			size={16}
-			class="ml-auto text-ink-dim transition-all group-hover:translate-x-0.5 group-hover:text-orange"
+			class="{!actorPays && balance !== null
+				? ''
+				: 'ml-auto'} text-ink-dim transition-all group-hover:translate-x-0.5 group-hover:text-orange"
 			aria-hidden="true"
 		/>
 	</div>

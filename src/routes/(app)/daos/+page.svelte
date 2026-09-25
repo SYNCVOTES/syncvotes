@@ -10,6 +10,9 @@
 	import StateMessage from '$lib/components/state-message.svelte';
 	import SearchInput from '$lib/components/search-input.svelte';
 	import LoadMore from '$lib/components/load-more.svelte';
+	import FilterTabs from '$lib/components/filter-tabs.svelte';
+	import Note from '$lib/components/note.svelte';
+	import { Button } from '$lib/components/ui/button';
 
 	/**
 	 * The public DAOs, for anyone signed in: found by name or description, biggest first or
@@ -28,7 +31,7 @@
 	<PageHeader
 		eyebrow="Open to read"
 		title="Public DAOs"
-		description="DAOs that chose to be readable by anyone signed in: their proposals, outcomes, members and comments. Only members act. How to join one, if at all, is for its description to say. Anyone can found a DAO under any name: the real DAO of an organisation is the one the organisation points to from a site or channel it controls."
+		description="DAOs anyone signed in can read. Only members can act."
 	/>
 
 	{#if store.screen.at === 'loading'}
@@ -42,33 +45,33 @@
 	{:else}
 		<div class="mb-6 flex flex-wrap items-center justify-between gap-3">
 			<div class="w-full max-w-sm">
-				<SearchInput bind:value={q} placeholder="Filter by name, description or DAO id" />
+				<SearchInput bind:value={q} placeholder="Search by name, description or DAO ID" />
 			</div>
-			<div class="flex gap-1">
-				{#each [['members', 'Biggest'], ['newest', 'Newest']] as [value, label] (value)}
-					<button
-						type="button"
-						class="rounded-full px-3 py-1 font-mono text-label tracking-[0.14em] uppercase transition-colors {sort ===
-						value
-							? 'bg-orange-dim text-orange'
-							: 'text-ink-dim hover:text-ink'}"
-						onclick={() => {
-							sort = value as typeof sort;
-							limit = 30;
-						}}>{label}</button
-					>
-				{/each}
-			</div>
+			<FilterTabs
+				label="Sort"
+				bind:value={sort}
+				onchange={() => (limit = 30)}
+				options={[
+					{ value: 'members', label: 'Biggest' },
+					{ value: 'newest', label: 'Newest' }
+				]}
+			/>
 		</div>
 		{#if !daos.ready}
 			<div class="grid gap-3 md:grid-cols-3">
 				{#each [1, 2, 3] as i (i)}<Skeleton height="h-24" />{/each}
 			</div>
 		{:else if daos.current.total === 0}
-			<StateMessage variant="dashed" title={q ? 'Nothing matches that.' : 'No public DAOs yet'}>
-				{q ? '' : 'A DAO goes public at its founding, or later by vote.'}
+			<StateMessage variant="dashed" title={q ? 'No matches.' : 'No public DAOs yet'}>
+				{#snippet actions()}
+					{#if !q}<Button href="/my-daos" variant="outline">Make one of yours public</Button>{/if}
+				{/snippet}
 			</StateMessage>
 		{:else}
+			<Note tone="warn" class="mb-6"
+				>Anyone can create a DAO under any name. Check a DAO's ID against the organization's own
+				site.</Note
+			>
 			<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
 				{#each daos.current.items as dao (dao.contractId)}
 					<DaoCard
