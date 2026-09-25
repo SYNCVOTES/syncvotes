@@ -12,7 +12,127 @@ export type DocPage = {
 
 export type DocSection = { title: string; pages: DocPage[] };
 
-export const SECTIONS: DocSection[] = [];
+export const SECTIONS: DocSection[] = [
+	{
+		title: 'Introduction',
+		pages: [
+			{
+				slug: 'what-is-syncvotes',
+				title: 'What Is SyncVotes',
+				description:
+					'DAOs, proposals and votes on the Canton Network, signed by keys only their members hold.'
+			},
+			{
+				slug: 'quickstart',
+				title: 'Quickstart',
+				description:
+					'Create a key, a party and a DAO on TestNet, then make a decision and vote on it.'
+			}
+		]
+	},
+	{
+		title: 'Step by step',
+		pages: [
+			{
+				slug: 'create-a-wallet',
+				title: 'Create a Wallet',
+				description: 'Make a key in your browser, choose your party hint and create your party.'
+			},
+			{
+				slug: 'create-a-dao',
+				title: 'Create a DAO',
+				description: 'Name the DAO, choose how it votes and who pays, and add its founding members.'
+			},
+			{
+				slug: 'create-a-proposal',
+				title: 'Create a Proposal',
+				description: 'Put a decision, a choice or a change to the DAO to its members.'
+			},
+			{
+				slug: 'vote',
+				title: 'Vote and See the Result',
+				description: 'Cast your ballot, follow the tally and see what the DAO decided.'
+			}
+		]
+	},
+	{
+		title: 'Concepts',
+		pages: [
+			{
+				slug: 'keys-and-parties',
+				title: 'Keys and Parties',
+				description:
+					'Your key signs, your party acts on the ledger, and the app’s validator hosts it.'
+			},
+			{
+				slug: 'recovery-phrase-and-devices',
+				title: 'Recovery Phrase and Devices',
+				description: 'How your key is kept on a device, locked and brought back from its phrase.'
+			},
+			{
+				slug: 'public-and-private-daos',
+				title: 'Public and Private DAOs',
+				description: 'Who can read a DAO, who can act in it, and how to tell the real one.'
+			},
+			{
+				slug: 'voting-rules',
+				title: 'Voting Rules',
+				description: 'What it takes for a proposal to pass, with worked examples.'
+			},
+			{
+				slug: 'proposal-types',
+				title: 'Proposal Types',
+				description:
+					'Every kind of proposal, what it does when it passes and which rules it runs under.'
+			},
+			{
+				slug: 'voting-and-counting',
+				title: 'Voting and Counting',
+				description: 'How ballots are counted, what the ledger checks and when a result is final.'
+			},
+			{
+				slug: 'secret-ballots',
+				title: 'Secret Ballots',
+				description: 'What a secret ballot hides, and from whom.'
+			},
+			{
+				slug: 'balances-and-traffic',
+				title: 'Balances and Traffic',
+				description: 'Why transactions cost Canton Coin (CC), who pays for what and how to top up.'
+			},
+			{
+				slug: 'profiles',
+				title: 'Profiles',
+				description: 'A display name, a picture and a few words shown next to your party ID.'
+			},
+			{
+				slug: 'networks',
+				title: 'Networks',
+				description: 'SyncVotes runs on DevNet, TestNet and MainNet, each a site of its own.'
+			}
+		]
+	},
+	{
+		title: 'Trust and reference',
+		pages: [
+			{
+				slug: 'trust-model',
+				title: 'Trust Model',
+				description: 'What the app can and cannot do with your party, your ballots and your DAO.'
+			},
+			{
+				slug: 'faq',
+				title: 'FAQ',
+				description: 'Answers to the questions people ask most.'
+			},
+			{
+				slug: 'glossary',
+				title: 'Glossary',
+				description: 'The terms SyncVotes uses, one line each.'
+			}
+		]
+	}
+];
 
 /** Every page in reading order, with its section. */
 export const PAGES = SECTIONS.flatMap((s) => s.pages.map((p) => ({ ...p, section: s.title })));
