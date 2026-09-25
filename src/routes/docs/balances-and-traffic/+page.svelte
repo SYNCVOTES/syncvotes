@@ -133,9 +133,10 @@
 <h3 id="activity-markers">Activity Markers</h3>
 <p>
 	Where the network rewards featured apps by <Ui kind="term">activity marker</Ui> instead, the app can
-	record one marker with each piece of its activity: creating a DAO, a proposal or a vote, and executing
-	a change. Such a transaction is charged less what its marker brings. The price per MB shown does not
-	include this, so these transactions cost less than the price suggests.
+	record one marker with each piece of its activity: creating a DAO, a proposal, a member's first vote
+	on a proposal (changing a vote records none), and executing a change. Such a transaction is charged
+	less what its marker brings. The price per MB shown does not include this, so these transactions cost
+	less than the price suggests.
 </p>
 <p>
 	All these inputs move with the network, so the price moves too. The app reads the prices about

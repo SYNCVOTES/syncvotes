@@ -931,7 +931,8 @@ export const prepareVote = command(
 		// A vote that replaces one hands it in by its kind: a `BallotV2`, or a `Ballot` cast
 		// before there were any.
 		const mine = ledger.ballots.get(proposal)?.get(me.party) ?? null;
-		const right = await markers.right();
+		// A member's first ballot on a proposal records a marker; a changed vote does not.
+		const right = mine ? null : await markers.right();
 		const args = {
 			proposalId: proposal,
 			closesAt: p.closesAt,

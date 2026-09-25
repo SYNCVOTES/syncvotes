@@ -122,8 +122,9 @@ has paid: the wallet page shows the memo of the key and what a party costs today
 is made once that much has arrived. Before signing anything, the participant's own estimate is
 checked against the payer's balance.
 
-Where the provider is a featured app and `MARKERS=true`, creating a DAO, proposing, voting and a
-change's last batch each also create a featured-app activity marker for the provider, in the
+Where the provider is a featured app and `MARKERS=true`, creating a DAO, proposing, a member's first
+vote on a proposal (a changed vote records none) and a change's last batch each also create a
+featured-app activity marker for the provider, in the
 same transaction (`SyncVotes.Markers`, the `splice-api-featured-app-v1` interface, weight one;
 the right is read from Scan and passed disclosed). Where the network mints by markers, each is
 worth `featuredAppActivityMarkerAmount` in coin at the round's rate, and that is taken off the

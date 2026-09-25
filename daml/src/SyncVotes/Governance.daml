@@ -17,7 +17,7 @@
 -- here grows with history.
 module SyncVotes.Governance where
 
-import DA.Action (foldlA, void)
+import DA.Action (foldlA, unless, void)
 import DA.List (dedup)
 import DA.Optional (fromOptional, isNone, isSome)
 import DA.Time (addRelTime, days)
@@ -253,7 +253,8 @@ template Member
                 exercise cid Ballot_Withdraw
             void (create this with voted = open)
           else void (create this with voted = (proposalId, closesAt) :: open)
-        mark provider featuredAppRight
+        -- One marker per member per proposal: a changed vote records none.
+        unless (proposalId `elem` map fst open) (mark provider featuredAppRight)
         create Ballot with
           provider; creator; daoId; proposalId; voter = party; since; vote; weight = share
           shareSince; closesAt; changeable; castAt = now; counted = False
@@ -292,7 +293,8 @@ template Member
               _ -> abort "Already voted; hand in the one ballot to replace"
             void (create this with voted = open)
           else void (create this with voted = (proposalId, closesAt) :: open)
-        mark provider featuredAppRight
+        -- One marker per member per proposal: a changed vote records none.
+        unless (proposalId `elem` map fst open) (mark provider featuredAppRight)
         create BallotV2 with
           provider; creator; daoId; proposalId; voter = party; since; vote; weight = share
           shareSince; closesAt; changeable; castAt = now; counted = False

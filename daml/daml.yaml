@@ -1,9 +1,9 @@
 sdk-version: 3.5.7
 name: syncvotes
 source: src
-version: 1.0.2
+version: 1.0.3
 # Checked by the compiler as an upgrade of what is live.
-upgrades: upgrades/syncvotes-1.0.1.dar
+upgrades: upgrades/syncvotes-1.0.2.dar
 # The package is a lineage: its name stays, and every release after this one is a Smart
 # Contract Upgrade of the one before, checked by the compiler against it with
 # `upgrades: upgrades/syncvotes-<previous>.dar` (keep that DAR in upgrades/).
