@@ -185,7 +185,7 @@
 						{:else if !ballots?.ready}
 							<Skeleton height="h-24" />
 						{:else if p.secret}
-							<p class="text-[13px] text-ink-dim">
+							<p class="text-body-sm text-ink-dim">
 								A secret ballot: the totals are shown, not who voted how; you see your own vote
 								{#if ballots.current.total > 0}below{:else}here once cast{/if}. The ballots are
 								signed and on the ledger all the same, and the app, which counts them, sees them.
@@ -203,7 +203,7 @@
 								</List>
 							{/if}
 						{:else if ballots.current.total === 0}
-							<p class="text-[13px] text-ink-dim">
+							<p class="text-body-sm text-ink-dim">
 								{q ? 'No ballot matches that.' : 'No votes yet.'}
 							</p>
 						{:else}
@@ -288,13 +288,13 @@
 				{#if !p.outcome && !ended}
 					{#if store.screen.at === 'locked'}
 						<Panel padding="sm" class="space-y-3">
-							<p class="text-[13px] text-ink-dim">Unlock your wallet to vote.</p>
+							<p class="text-body-sm text-ink-dim">Unlock your wallet to vote.</p>
 							<UnlockForm />
 						</Panel>
 					{:else if showBox}
 						<Panel padding="sm" class="space-y-3">
 							<Problem message={store.problem} />
-							<p class="text-[13px] text-ink-dim">
+							<p class="text-body-sm text-ink-dim">
 								{#if changing}You voted {said(
 										p.me.vote ?? '',
 										p.effect.kind === 'choose' ? p.effect.options : []
@@ -307,7 +307,7 @@
 								<div class="grid gap-2">
 									{#each p.effect.options as o, i (i)}
 										<label
-											class="flex cursor-pointer items-center gap-3 border px-3 py-2 text-[13px] transition-colors {picks.includes(
+											class="flex cursor-pointer items-center gap-3 border px-3 py-2 text-body-sm transition-colors {picks.includes(
 												i
 											)
 												? 'border-orange bg-orange-dim text-ink'

@@ -44,12 +44,12 @@
 			</dd>
 		</dl>
 		{#if b.balance <= 0}
-			<p class="text-[13px] text-red">
+			<p class="text-body-sm text-red">
 				Empty: nothing can be signed for this DAO until someone pays in.
 			</p>
 		{/if}
 		<div class="space-y-3 border-t border-border pt-3">
-			<p class="text-[13px] text-ink-mid">
+			<p class="text-body-sm text-ink-mid">
 				Anyone pays in by sending Canton Coin to this address from any wallet, with this memo as the
 				transfer's reason. Coin without the memo is not credited to anyone.
 			</p>

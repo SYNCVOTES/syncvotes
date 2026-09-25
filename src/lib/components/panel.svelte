@@ -15,7 +15,8 @@
 		children: Snippet;
 	} = $props();
 
-	const paddings = { sm: 'p-5', md: 'p-6', lg: 'p-8' };
+	// One padding for content; `lg` is for empty and dashed states. `sm` is kept as an alias.
+	const paddings = { sm: 'p-5 md:p-6', md: 'p-5 md:p-6', lg: 'p-8' };
 	const variants = {
 		solid: 'border-border bg-surface',
 		dashed: 'border-dashed border-border',

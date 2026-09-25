@@ -28,7 +28,7 @@
 		{#if who.name}
 			<a
 				{href}
-				class="block truncate font-display text-[13px] font-bold transition-colors hover:text-orange {me
+				class="block truncate font-display text-body-sm font-bold transition-colors hover:text-orange {me
 					? 'text-orange'
 					: ''}">{who.name}</a
 			>

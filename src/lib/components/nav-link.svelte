@@ -14,7 +14,7 @@
 <a
 	{href}
 	class="rounded-full font-mono tracking-[0.14em] uppercase transition-colors {size === 'sm'
-		? 'px-3 py-1.5 text-[0.6875rem]'
+		? 'px-3 py-1.5 text-label'
 		: 'px-4 py-[7px] text-xs'} {active
 		? 'bg-orange-dim text-orange'
 		: 'text-ink-mid hover:text-ink'}"

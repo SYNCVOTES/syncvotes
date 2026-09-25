@@ -42,13 +42,13 @@
 			<span class="text-xs font-normal text-ink-dim">of {coin(needed)} for a party</span>
 		</div>
 		{#if short > 0}
-			<p class="text-[13px] text-ink-mid">
+			<p class="text-body-sm text-ink-mid">
 				A party costs {coin(needed)} today — its allocation and its account, at the network's traffic
 				price. Send at least {coin(short)} more with the memo below; whatever is left over stays on your
 				balance.
 			</p>
 		{:else}
-			<p class="text-[13px] text-green">Enough has arrived; your party is being created.</p>
+			<p class="text-body-sm text-green">Enough has arrived; your party is being created.</p>
 		{/if}
 	{:else}
 		<div class="font-mono text-2xl font-bold {s.balance > 0 ? 'text-ink' : 'text-red'}">
@@ -71,14 +71,14 @@
 			</dd>
 		</dl>
 		{#if s.balance <= 0}
-			<p class="text-[13px] text-red">
+			<p class="text-body-sm text-red">
 				Empty: a profile, a new DAO, or anything in a DAO where members pay for themselves waits
 				until you pay in.
 			</p>
 		{/if}
 	{/if}
 	<div class="space-y-3 border-t border-border pt-3">
-		<p class="text-[13px] text-ink-mid">
+		<p class="text-body-sm text-ink-mid">
 			Pay in by sending Canton Coin to this address from any wallet, with this memo as the
 			transfer's reason. Coin without the memo is not credited to anyone.
 		</p>

@@ -29,8 +29,7 @@
 	--amber-rgb: 245, 166, 35;
 	--green: #7be0a3;
 	--green-rgb: 123, 224, 163;
-	--blue: #ff8a5c;
-	--blue-rgb: 255, 138, 92;
+	--accent-soft-rgb: 255, 138, 92;
 	--purple: #b48cff;
 }
 
@@ -58,8 +57,7 @@
 		--amber-rgb: 154, 106, 0;
 		--green: #177d4d;
 		--green-rgb: 23, 125, 77;
-		--blue: #b8461c;
-		--blue-rgb: 184, 70, 28;
+		--accent-soft-rgb: 184, 70, 28;
 		--purple: #6b3fc9;
 	}
 }
@@ -87,8 +85,7 @@
 	--amber-rgb: 154, 106, 0;
 	--green: #177d4d;
 	--green-rgb: 23, 125, 77;
-	--blue: #b8461c;
-	--blue-rgb: 184, 70, 28;
+	--accent-soft-rgb: 184, 70, 28;
 	--purple: #6b3fc9;
 }
 
@@ -128,7 +125,19 @@
 	--color-red: var(--red);
 	--color-red-dim: var(--red-dim);
 	--color-amber: var(--amber);
-	--color-blue: var(--blue);
+
+	/*
+	 * The type scale by role, so a size says what it is for: mono caps labels, mono meta,
+	 * helper text, body text, list and card titles, the names users give things, figures.
+	 * App page titles are .display; DAO names, proposal titles and profile names are .title.
+	 */
+	--text-label: 0.6875rem;
+	--text-meta: 0.75rem;
+	--text-body-sm: 0.8125rem;
+	--text-body: 0.9375rem;
+	--text-item: 1.0625rem;
+	--text-title: 1.75rem;
+	--text-figure: 1.5rem;
 
 	--font-display: 'Syne', sans-serif;
 	--font-sans: 'Inter', sans-serif;
@@ -203,7 +212,11 @@
 				rgba(var(--accent-rgb), 0.05) 0%,
 				transparent 60%
 			),
-			radial-gradient(ellipse 60% 50% at 90% 80%, rgba(var(--blue-rgb), 0.04) 0%, transparent 55%),
+			radial-gradient(
+				ellipse 60% 50% at 90% 80%,
+				rgba(var(--accent-soft-rgb), 0.04) 0%,
+				transparent 55%
+			),
 			radial-gradient(ellipse 50% 40% at 50% 0%, rgba(var(--amber-rgb), 0.025) 0%, transparent 50%);
 		pointer-events: none;
 	}
@@ -269,7 +282,7 @@
 		color: var(--text-dim);
 	}
 
-	/* Page titles: Syne, extrabold, uppercase, tight. */
+	/* App page titles (My DAOs, Wallet, Create DAO): Syne, extrabold, uppercase, tight. */
 	.display {
 		font-family: var(--font-display);
 		font-weight: 800;
@@ -278,11 +291,20 @@
 		line-height: 0.95;
 		overflow-wrap: anywhere;
 	}
+
+	/* What users named: a DAO, a proposal, a person. Syne bold in sentence case, never shouting. */
+	.title {
+		font-family: var(--font-display);
+		font-weight: 700;
+		letter-spacing: -0.01em;
+		line-height: 1.1;
+		overflow-wrap: anywhere;
+	}
 }
 
 /* Markdown, as descriptions and comments render it: the page's own type, kept quiet. */
 .markdown {
-	font-size: 0.875rem;
+	font-size: var(--text-body);
 	line-height: 1.65;
 	overflow-wrap: anywhere;
 }

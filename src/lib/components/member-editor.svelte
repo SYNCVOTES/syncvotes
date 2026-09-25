@@ -325,7 +325,7 @@
 						/>
 						{#if s}
 							<span
-								class="hidden font-mono text-[0.6875rem] tracking-[0.14em] uppercase sm:inline {s ===
+								class="hidden font-mono text-label tracking-[0.14em] uppercase sm:inline {s ===
 								'leaves'
 									? 'text-red'
 									: s === 'joins'

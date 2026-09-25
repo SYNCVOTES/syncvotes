@@ -96,7 +96,7 @@
 		}
 	];
 	const tabClass = (t: typeof tab) =>
-		`px-3 py-1.5 font-mono text-[0.6875rem] tracking-[0.14em] uppercase transition-colors ${
+		`px-3 py-1.5 font-mono text-label tracking-[0.14em] uppercase transition-colors ${
 			tab === t ? 'border-b-2 border-orange text-ink' : 'text-ink-dim hover:text-ink'
 		}`;
 </script>
@@ -142,13 +142,13 @@
 			/>
 			<button
 				type="button"
-				class="shrink-0 font-mono text-[0.6875rem] tracking-[0.14em] text-orange uppercase disabled:opacity-50"
+				class="shrink-0 font-mono text-label tracking-[0.14em] text-orange uppercase disabled:opacity-50"
 				disabled={!url.trim()}
 				onclick={takeUrl}>Insert</button
 			>
 			<button
 				type="button"
-				class="shrink-0 font-mono text-[0.6875rem] tracking-[0.14em] text-ink-dim uppercase"
+				class="shrink-0 font-mono text-label tracking-[0.14em] text-ink-dim uppercase"
 				onclick={() => (asking = null)}>Cancel</button
 			>
 		</div>
@@ -174,7 +174,7 @@
 	{/if}
 
 	<div
-		class="flex flex-wrap items-center justify-between gap-2 border-t border-border px-3 py-1.5 font-mono text-[0.6875rem] text-ink-dim"
+		class="flex flex-wrap items-center justify-between gap-2 border-t border-border px-3 py-1.5 font-mono text-label text-ink-dim"
 	>
 		<span>Markdown. Pictures by link.</span>
 		{#if maxlength}<span class={value.length > maxlength ? 'text-red' : ''}

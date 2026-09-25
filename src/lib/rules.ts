@@ -189,16 +189,14 @@ export const CATEGORIES: { value: Category; title: string; text: string; covers:
 	{
 		value: 'routine',
 		title: 'Decisions and choices',
-		text: 'A decision, yes or no, or a choice among options: the proposer sets the ballot and the rule.',
-		covers:
-			'A decision the DAO takes, or a choice among options. Nothing on the ledger changes, so whoever proposes it says what it takes to pass and for how long it is open.'
+		text: 'The proposer sets the ballot and rule.',
+		covers: 'Decisions and choices change nothing on the ledger, so the proposer sets the rule.'
 	},
 	{
 		value: 'sensitive',
 		title: 'Changes to the DAO',
 		text: 'Members and shares, the name and description, these rules, visibility, dissolution.',
-		covers:
-			'Who is in the DAO and with what share, its name, description and picture, these very rules, whether the DAO is public, and winding it up.'
+		covers: 'Members and shares, name, description, picture, voting rules, visibility, dissolution.'
 	}
 ];
 

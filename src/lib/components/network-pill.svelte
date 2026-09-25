@@ -31,7 +31,7 @@
 <div class="relative hidden sm:block" bind:this={root}>
 	<button
 		type="button"
-		class="flex h-8 items-center gap-2 rounded-full border border-amber/30 bg-amber/5 px-3 font-mono text-[0.6875rem] tracking-[0.14em] text-amber uppercase {others.length
+		class="flex h-8 items-center gap-2 rounded-full border border-amber/30 bg-amber/5 px-3 font-mono text-label tracking-[0.14em] text-amber uppercase {others.length
 			? 'cursor-pointer hover:border-amber/60'
 			: 'cursor-default'}"
 		aria-haspopup={others.length ? 'menu' : undefined}
@@ -57,7 +57,7 @@
 					{n.name}
 				</a>
 			{/each}
-			<p class="mt-1 border-t border-border px-3 pt-2 text-[11px] leading-relaxed text-ink-dim">
+			<p class="mt-1 border-t border-border px-3 pt-2 text-label leading-relaxed text-ink-dim">
 				Each network is a site of its own, with its own parties and DAOs. A key kept on this one is
 				not on the others: restore your phrase there.
 			</p>

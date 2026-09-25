@@ -14,12 +14,14 @@
 				accent: 'border-orange/40 bg-orange/5 text-orange hover:bg-orange/10',
 				amber: 'border-amber/40 bg-amber/5 text-amber hover:bg-amber/10',
 				ghost: 'border-transparent text-ink-mid hover:bg-surface-hover hover:text-ink',
+				// Yes on a ballot: green, the colour it fills the tally with.
+				yes: 'border-green/40 bg-green/5 text-green hover:bg-green/10',
 				destructive: 'border-red/40 bg-red/5 text-red hover:bg-red/10',
 				link: 'border-transparent text-ink-mid normal-case tracking-normal underline-offset-4 hover:text-orange hover:underline'
 			},
 			size: {
 				default: 'h-10 px-6',
-				sm: 'h-8 px-4 text-[0.6875rem]',
+				sm: 'h-8 px-4 text-label',
 				lg: 'h-12 px-8',
 				icon: 'size-[34px] rounded-full',
 				'icon-sm': 'size-7 rounded-full'

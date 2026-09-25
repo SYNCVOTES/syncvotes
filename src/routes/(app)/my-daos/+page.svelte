@@ -9,7 +9,7 @@
 	import Stat from '$lib/components/stat.svelte';
 	import QueryError from '$lib/components/query-error.svelte';
 	import Skeleton from '$lib/components/skeleton.svelte';
-	import EmptyState from '$lib/components/empty-state.svelte';
+	import StateMessage from '$lib/components/state-message.svelte';
 	import Plus from '@lucide/svelte/icons/plus';
 	import PartyId from '$lib/components/party-id.svelte';
 	import SearchInput from '$lib/components/search-input.svelte';
@@ -64,10 +64,10 @@
 		</div>
 
 		{#if daos.current.length === 0}
-			<EmptyState title="No DAOs yet">
+			<StateMessage variant="dashed" title="No DAOs yet">
 				Create one, or give a member your party id to be admitted by vote:
 				<span class="inline-block"><PartyId party={who.party} /></span>
-			</EmptyState>
+			</StateMessage>
 		{:else}
 			<div class="mb-4 flex flex-wrap items-center gap-3">
 				{#if daos.current.length > 12}
@@ -79,7 +79,7 @@
 					{#each [[false, 'All'], [true, `Your vote due (${awaiting})`]] as [value, label] (label)}
 						<button
 							type="button"
-							class="rounded-full px-3 py-1 font-mono text-[0.6875rem] tracking-[0.14em] uppercase transition-colors {due ===
+							class="rounded-full px-3 py-1 font-mono text-label tracking-[0.14em] uppercase transition-colors {due ===
 							value
 								? 'bg-orange-dim text-orange'
 								: 'text-ink-dim hover:text-ink'}"
@@ -107,7 +107,9 @@
 				{/each}
 			</div>
 			{#if found.length === 0}
-				<EmptyState>{due ? 'Nothing waits on your vote.' : 'No DAO matches that.'}</EmptyState>
+				<StateMessage variant="dashed"
+					>{due ? 'Nothing waits on your vote.' : 'No DAO matches that.'}</StateMessage
+				>
 			{/if}
 			{#if found.length > shown || daos.current.length > 12}
 				<LoadMore

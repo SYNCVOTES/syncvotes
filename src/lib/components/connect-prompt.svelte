@@ -3,31 +3,21 @@
 	import { store } from '$lib/wallet-store.svelte';
 	import UnlockForm from './unlock-form.svelte';
 	import Problem from './problem.svelte';
+	import StateMessage from './state-message.svelte';
 	import Lock from '@lucide/svelte/icons/lock';
 
-	let { what = 'see DAOs you participate in' }: { what?: string } = $props();
+	let { what = 'see your DAOs' }: { what?: string } = $props();
 	const locked = $derived(store.screen.at === 'locked');
 </script>
 
-<div class="flex flex-col items-center gap-4 py-20 text-center">
-	<div
-		class="flex size-16 items-center justify-center border border-border bg-surface text-ink-dim"
-	>
-		<Lock size={22} strokeWidth={1.6} aria-hidden="true" />
-	</div>
-	<p class="font-display text-[17px] font-bold">
-		{locked ? 'Your wallet is locked' : 'Connect your wallet'}
-	</p>
-	<p class="text-[13px] text-ink-dim">
-		This page shows what your party can see.<br />
-		{locked ? `Unlock it to ${what}.` : `Create or restore a key to ${what}.`}
-	</p>
-	{#if locked}
-		<div class="mt-2 flex w-full max-w-sm flex-col items-center gap-3">
+<StateMessage icon={Lock} title={locked ? 'Wallet locked' : 'Sign in to continue'}>
+	{locked ? `Unlock it to ${what}.` : `Create or restore a key to ${what}.`}
+	{#snippet actions()}
+		{#if locked}
 			<Problem message={store.problem} />
 			<UnlockForm />
-		</div>
-	{:else}
-		<Button href="/wallet" class="mt-2">Connect wallet</Button>
-	{/if}
-</div>
+		{:else}
+			<Button href="/wallet">Go to Wallet</Button>
+		{/if}
+	{/snippet}
+</StateMessage>

@@ -16,7 +16,7 @@
 	const widths = { narrow: 'max-w-[760px]', default: 'max-w-[900px]', wide: 'max-w-[1120px]' };
 </script>
 
-<div class="mx-auto {widths[width]} px-6 py-12 md:px-10">
+<div class="mx-auto {widths[width]} px-6 py-8 md:px-10 md:py-12">
 	{#if back}
 		<div class="mb-6"><BackLink href={back.href} label={back.label} /></div>
 	{/if}

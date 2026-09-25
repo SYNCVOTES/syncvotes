@@ -202,7 +202,7 @@
 								aria-hidden="true"
 							/>
 							<span class="min-w-0">
-								<span class="flex items-center gap-1.5 font-display text-[15px] font-bold"
+								<span class="flex items-center gap-1.5 font-display text-body font-bold"
 									>{m.title}
 									<Hint text={m.more} align={m.value === 'shares' ? 'end' : 'start'} /></span
 								>
@@ -228,7 +228,7 @@
 						>
 							<input type="radio" class="sr-only" value={o.value} bind:group={visibility} />
 							<span class="min-w-0">
-								<span class="flex items-center gap-1.5 font-display text-[15px] font-bold"
+								<span class="flex items-center gap-1.5 font-display text-body font-bold"
 									>{o.title}
 									<Hint text={o.more} align={o.value === 'public' ? 'end' : 'start'} /></span
 								>
@@ -250,7 +250,7 @@
 						>
 							<input type="radio" class="sr-only" value={p.value} bind:group={payer} />
 							<span class="min-w-0">
-								<span class="flex items-center gap-1.5 font-display text-[15px] font-bold"
+								<span class="flex items-center gap-1.5 font-display text-body font-bold"
 									>{p.title}
 									<Hint text={p.more} align={p.value === 'members' ? 'end' : 'start'} /></span
 								>

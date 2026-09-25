@@ -393,7 +393,7 @@
 								aria-hidden="true"
 							/>
 							<span class="min-w-0">
-								<span class="flex items-center gap-1.5 font-display text-[15px] font-bold"
+								<span class="flex items-center gap-1.5 font-display text-body font-bold"
 									>{k.title} <Hint text={k.more} /></span
 								>
 								<span class="mt-1 block text-xs leading-relaxed text-ink-mid">{k.text}</span>

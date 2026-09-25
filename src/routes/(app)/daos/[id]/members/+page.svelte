@@ -9,7 +9,7 @@
 	import Who from '$lib/components/who.svelte';
 	import List from '$lib/components/list.svelte';
 	import ListItem from '$lib/components/list-item.svelte';
-	import EmptyState from '$lib/components/empty-state.svelte';
+	import StateMessage from '$lib/components/state-message.svelte';
 	import Skeleton from '$lib/components/skeleton.svelte';
 	import LoadMore from '$lib/components/load-more.svelte';
 	import SearchInput from '$lib/components/search-input.svelte';
@@ -58,7 +58,7 @@
 		{:else if !members?.ready}
 			<Skeleton height="h-64" />
 		{:else if members.current.total === 0}
-			<EmptyState>{q ? 'No member matches that.' : 'No members.'}</EmptyState>
+			<StateMessage variant="dashed">{q ? 'No member matches that.' : 'No members.'}</StateMessage>
 		{:else}
 			<List>
 				{#each members.current.items as m (m.party)}

@@ -13,7 +13,7 @@
 </script>
 
 <div class="space-y-1">
-	<div class="font-mono text-[0.6875rem] tracking-[0.14em] text-ink-dim uppercase">{label}</div>
+	<div class="font-mono text-label tracking-[0.14em] text-ink-dim uppercase">{label}</div>
 	<div class="flex items-start gap-2 border border-border bg-surface-hover px-3 py-2">
 		<code class="min-w-0 flex-1 font-mono text-xs leading-relaxed break-all text-ink">{value}</code>
 		<button

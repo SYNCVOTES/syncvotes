@@ -15,7 +15,7 @@
 	import SectionTitle from '$lib/components/section-title.svelte';
 	import List from '$lib/components/list.svelte';
 	import ListItem from '$lib/components/list-item.svelte';
-	import EmptyState from '$lib/components/empty-state.svelte';
+	import StateMessage from '$lib/components/state-message.svelte';
 	import Skeleton from '$lib/components/skeleton.svelte';
 	import LoadMore from '$lib/components/load-more.svelte';
 	import SearchInput from '$lib/components/search-input.svelte';
@@ -57,7 +57,7 @@
 	const pct = (units: number, of: number) => (of > 0 ? Math.round((units / of) * 1000) / 10 : 0);
 	// The facts of a proposal as small tags, so a list scans instead of reads.
 	const tag =
-		'inline-flex items-center rounded-full border border-border bg-surface-hover px-2 py-0.5 font-mono text-[0.6875rem] text-ink-mid';
+		'inline-flex items-center rounded-full border border-border bg-surface-hover px-2 py-0.5 font-mono text-label text-ink-mid';
 </script>
 
 <svelte:head><title>{dao?.current?.name ?? 'DAO'} — SyncVotes</title></svelte:head>
@@ -193,7 +193,7 @@
 							{#each [[undefined, 'All'], ['open', 'Open'], ['closed', 'Closed'], ...(d.me.membership ? [['unvoted', 'Not voted']] : [])] as [value, label] (label)}
 								<button
 									type="button"
-									class="rounded-full px-3 py-1 font-mono text-[0.6875rem] tracking-[0.14em] uppercase transition-colors {status ===
+									class="rounded-full px-3 py-1 font-mono text-label tracking-[0.14em] uppercase transition-colors {status ===
 									value
 										? 'bg-orange-dim text-orange'
 										: 'text-ink-dim hover:text-ink'}"
@@ -211,19 +211,19 @@
 				{:else if !proposals?.ready}
 					<Skeleton height="h-24" />
 				{:else if proposals.current.total === 0}
-					<EmptyState
+					<StateMessage variant="dashed"
 						>{status === 'unvoted'
 							? 'Nothing waits on your vote.'
 							: status
 								? `No ${status} proposals.`
-								: 'Nothing proposed yet.'}</EmptyState
+								: 'Nothing proposed yet.'}</StateMessage
 					>
 				{:else}
 					<List>
 						{#each proposals.current.items as p (p.id)}
 							<ListItem href="/proposals/{p.id}" padding="md" class="min-w-0">
 								<div class="min-w-0 flex-1">
-									<div class="truncate font-display text-[15px] font-bold">{p.title}</div>
+									<div class="truncate font-display text-body font-bold">{p.title}</div>
 									<div
 										class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-xs text-ink-dim"
 									>
@@ -267,7 +267,7 @@
 								text="This DAO has no balance of its own: a proposal, a vote or a comment costs the member who signs it, from the balance on their Wallet page, and the counting and carrying out of a proposal cost its proposer."
 							/>
 						</h2>
-						<p class="text-[13px] text-ink-mid">
+						<p class="text-body-sm text-ink-mid">
 							Each member pays for what they sign, from their own balance on their Wallet page.
 						</p>
 					</Panel>

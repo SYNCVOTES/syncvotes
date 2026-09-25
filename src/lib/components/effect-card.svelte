@@ -112,7 +112,7 @@
 		/>
 		{#if executedAt}<p class="font-mono text-xs text-ink-dim">This is the table now.</p>{/if}
 	{:else if effect.kind === 'info'}
-		<div class="space-y-2 text-[13px] text-ink-mid">
+		<div class="space-y-2 text-body-sm text-ink-mid">
 			<p>
 				Renames the DAO to <span class="font-display font-bold text-ink">{effect.name}</span
 				>{effect.image ? ', with a new picture' : ''}{effect.description
@@ -127,29 +127,29 @@
 			{#if effect.description}<Markdown text={effect.description} />{/if}
 		</div>
 	{:else if effect.kind === 'dissolve'}
-		<p class="text-[13px] text-ink-mid">
+		<p class="text-body-sm text-ink-mid">
 			The DAO is archived the moment this passes: nothing more can be proposed or voted on, what was
 			paid in for it is spent, and its record stays readable.
 		</p>
 	{:else if effect.kind === 'choose'}
-		<p class="text-[13px] text-ink-mid">
+		<p class="text-body-sm text-ink-mid">
 			{effect.several
 				? 'Decides which of these, any number, and does nothing else:'
 				: 'Decides among these, and does nothing else:'}
 		</p>
-		<ol class="list-decimal space-y-1 pl-5 text-[13px] text-ink">
+		<ol class="list-decimal space-y-1 pl-5 text-body-sm text-ink">
 			{#each effect.options as o, i (i)}<li>{o}</li>{/each}
 		</ol>
 	{:else if effect.kind === 'visibility'}
-		<p class="text-[13px] text-ink-mid">
+		<p class="text-body-sm text-ink-mid">
 			{#if effect.public}The DAO becomes public: listed, and readable by anyone signed in —
 				proposals, outcomes, members, comments. Only members act; who voted how stays with the
 				members.{:else}The DAO becomes private: only its members see it exists.{/if}
 		</p>
 	{:else if effect.kind === 'settings'}
-		<p class="text-[13px] text-ink-mid">From then on:</p>
+		<p class="text-body-sm text-ink-mid">From then on:</p>
 		<SettingsSummary sensitive={effect.sensitive} />
 	{:else}
-		<p class="text-[13px] text-ink-mid">Decides, and does nothing else.</p>
+		<p class="text-body-sm text-ink-mid">Decides, and does nothing else.</p>
 	{/if}
 </Panel>

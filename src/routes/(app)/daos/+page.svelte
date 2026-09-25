@@ -7,7 +7,7 @@
 	import DaoCard from '$lib/components/dao-card.svelte';
 	import QueryError from '$lib/components/query-error.svelte';
 	import Skeleton from '$lib/components/skeleton.svelte';
-	import EmptyState from '$lib/components/empty-state.svelte';
+	import StateMessage from '$lib/components/state-message.svelte';
 	import SearchInput from '$lib/components/search-input.svelte';
 	import LoadMore from '$lib/components/load-more.svelte';
 
@@ -48,7 +48,7 @@
 				{#each [['members', 'Biggest'], ['newest', 'Newest']] as [value, label] (value)}
 					<button
 						type="button"
-						class="rounded-full px-3 py-1 font-mono text-[0.6875rem] tracking-[0.14em] uppercase transition-colors {sort ===
+						class="rounded-full px-3 py-1 font-mono text-label tracking-[0.14em] uppercase transition-colors {sort ===
 						value
 							? 'bg-orange-dim text-orange'
 							: 'text-ink-dim hover:text-ink'}"
@@ -65,9 +65,9 @@
 				{#each [1, 2, 3] as i (i)}<Skeleton height="h-24" />{/each}
 			</div>
 		{:else if daos.current.total === 0}
-			<EmptyState title={q ? 'Nothing matches that.' : 'No public DAOs yet'}>
+			<StateMessage variant="dashed" title={q ? 'Nothing matches that.' : 'No public DAOs yet'}>
 				{q ? '' : 'A DAO goes public at its founding, or later by vote.'}
-			</EmptyState>
+			</StateMessage>
 		{:else}
 			<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
 				{#each daos.current.items as dao (dao.contractId)}

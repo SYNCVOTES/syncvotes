@@ -66,30 +66,30 @@
 	</div>
 
 	<div
-		class="mb-2 line-clamp-2 font-display text-[17px] leading-tight font-bold tracking-[-0.01em] [overflow-wrap:anywhere]"
+		class="mb-2 line-clamp-2 font-display text-item leading-tight font-bold tracking-[-0.01em] [overflow-wrap:anywhere]"
 	>
 		{name}
 	</div>
 	<div
-		class="mb-[22px] line-clamp-3 flex-1 text-[12.5px] leading-relaxed [overflow-wrap:anywhere] text-ink-mid"
+		class="mb-[22px] line-clamp-3 flex-1 text-body-sm leading-relaxed [overflow-wrap:anywhere] text-ink-mid"
 	>
 		{excerpt(description) || 'No description provided.'}
 	</div>
 
 	<div class="flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-border pt-3.5">
 		<div>
-			<div class="font-mono text-[15px] font-bold">{members}</div>
+			<div class="font-mono text-body font-bold">{members}</div>
 			<div class="mt-0.5 font-mono text-xs tracking-[0.14em] text-ink-dim uppercase">Members</div>
 		</div>
 		<div>
-			<div class="font-mono text-[15px] font-bold {openProposals > 0 ? 'text-orange' : ''}">
+			<div class="font-mono text-body font-bold {openProposals > 0 ? 'text-orange' : ''}">
 				{openProposals}
 			</div>
 			<div class="mt-0.5 font-mono text-xs tracking-[0.14em] text-ink-dim uppercase">Open</div>
 		</div>
 		{#if awaiting !== null}
 			<div>
-				<div class="font-mono text-[15px] font-bold {awaiting > 0 ? 'text-orange' : ''}">
+				<div class="font-mono text-body font-bold {awaiting > 0 ? 'text-orange' : ''}">
 					{awaiting}
 				</div>
 				<div class="mt-0.5 font-mono text-xs tracking-[0.14em] text-ink-dim uppercase">
@@ -99,14 +99,14 @@
 		{/if}
 		{#if actorPays}
 			<div>
-				<div class="font-mono text-[15px] font-bold">members</div>
+				<div class="font-mono text-body font-bold">members</div>
 				<div class="mt-0.5 font-mono text-xs tracking-[0.14em] text-ink-dim uppercase">
 					Who pays
 				</div>
 			</div>
 		{:else if balance !== null}
 			<div>
-				<div class="font-mono text-[15px] font-bold {balance <= 0 ? 'text-red' : ''}">
+				<div class="font-mono text-body font-bold {balance <= 0 ? 'text-red' : ''}">
 					{coin(balance)}
 				</div>
 				<div class="mt-0.5 font-mono text-xs tracking-[0.14em] text-ink-dim uppercase">Balance</div>
@@ -114,7 +114,7 @@
 		{/if}
 		{#if share !== null}
 			<div>
-				<div class="font-mono text-[15px] font-bold">{share}%</div>
+				<div class="font-mono text-body font-bold">{share}%</div>
 				<div class="mt-0.5 font-mono text-xs tracking-[0.14em] text-ink-dim uppercase">
 					Your vote
 				</div>

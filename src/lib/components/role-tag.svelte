@@ -1,10 +1,6 @@
 <script lang="ts">
-	/** creator in amber, member in orange — the app's two roles, in its mono label voice. */
+	/** A member's role, in the mono label voice. Neutral: a role is a fact, not a call to act. */
 	let { role }: { role: 'creator' | 'member' } = $props();
 </script>
 
-<span
-	class="font-mono text-xs font-bold tracking-[0.18em] uppercase {role === 'creator'
-		? 'text-amber'
-		: 'text-orange'}">{role}</span
->
+<span class="font-mono text-label font-bold tracking-[0.18em] text-ink-mid uppercase">{role}</span>

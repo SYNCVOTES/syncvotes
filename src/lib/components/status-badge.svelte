@@ -22,8 +22,8 @@
 				: outcome === 'Failed'
 					? { label: 'Failed', icon: X, variant: 'red' as const }
 					: new Date(closesAt).getTime() < Date.now()
-						? { label: 'Ended', icon: Clock, variant: 'amber' as const }
-						: { label: 'Active', icon: null, variant: 'accent' as const }
+						? { label: 'Counting', icon: Clock, variant: 'amber' as const }
+						: { label: 'Open', icon: null, variant: 'accent' as const }
 	);
 </script>
 

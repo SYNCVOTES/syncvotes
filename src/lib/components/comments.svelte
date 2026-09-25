@@ -52,7 +52,7 @@
 	{:else if !comments?.ready}
 		<Skeleton height="h-16" />
 	{:else if comments.current.total === 0}
-		<p class="text-[13px] text-ink-dim">Nothing said yet.</p>
+		<p class="text-body-sm text-ink-dim">Nothing said yet.</p>
 	{:else}
 		{#if comments.current.total > comments.current.items.length}
 			<button
@@ -91,7 +91,7 @@
 	{#if member}
 		{#if store.screen.at === 'locked'}
 			<div class="space-y-2 border border-border p-3">
-				<p class="text-[13px] text-ink-dim">Unlock your wallet to comment.</p>
+				<p class="text-body-sm text-ink-dim">Unlock your wallet to comment.</p>
 				<UnlockForm />
 			</div>
 		{:else if store.who}
@@ -110,7 +110,7 @@
 					<Button type="submit" size="sm" disabled={store.busy || !body.trim()}>
 						{store.busy ? 'Signing…' : 'Comment'}
 					</Button>
-					<span class="font-mono text-[0.6875rem] text-ink-dim"
+					<span class="font-mono text-label text-ink-dim"
 						>Signed with your key; {actorPays
 							? 'you pay the traffic from your balance'
 							: 'the DAO pays the traffic'} — a few CC per write at today's prices.</span
