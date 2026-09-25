@@ -91,7 +91,7 @@
 			family: 'JetBrains Mono',
 			generic: 'monospace',
 			label: 'Code & labels',
-			description: 'Code, labels, party ids. Sharp and technical.',
+			description: 'Code, labels, party IDs. Sharp and technical.',
 			weights: [
 				[400, 'Regular'],
 				[500, 'Medium'],
@@ -122,14 +122,14 @@
 		'Use the logo on dark backgrounds (#0b0a08 or darker)',
 		'On a light surface use the tile, or the bare mark with the surface’s own ink for its dot — as the app does in its light theme',
 		'Maintain clear space around the logo',
-		'Use the colour values exactly as given',
+		'Use the color values exactly as given',
 		'Keep surfaces flat — hairline rules, square corners, pill buttons'
 	];
 
 	const DONT = [
 		'Don’t set the lockup files on light or white backgrounds',
 		'Don’t rotate, distort or add effects to the logo',
-		'Don’t change the logo colours',
+		'Don’t change the logo colors',
 		'Don’t add gradients, glows or mesh overlays'
 	];
 
@@ -139,17 +139,14 @@
 
 <svelte:head>
 	<title>Brand Kit — SyncVotes</title>
-	<meta
-		name="description"
-		content="Official brand assets for SyncVotes — logos, colours, typography and usage guidelines."
-	/>
+	<meta name="description" content="Logos, colors and type for SyncVotes." />
 </svelte:head>
 
 <Page>
 	<PageHeader
 		eyebrow="Brand"
 		title="Brand Kit"
-		description="Official brand assets for SyncVotes — logos, colours, typography and usage guidelines. Everything you need to represent SyncVotes consistently across any medium."
+		description="Logos, colors and type for SyncVotes."
 	/>
 
 	<div class="space-y-14">
@@ -233,7 +230,7 @@
 		<section>
 			<SectionTitle title="Usage guidelines" />
 			<p class="mb-5 text-sm text-ink-mid">
-				Follow these rules to keep the SyncVotes brand consistent and recognisable.
+				Follow these rules to keep the SyncVotes brand consistent and recognizable.
 			</p>
 			<Panel class="grid gap-8 md:grid-cols-2">
 				<div>

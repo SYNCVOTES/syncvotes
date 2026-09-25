@@ -84,6 +84,6 @@ export function party(): string | null {
 export function required(expected?: string): string {
 	const p = party();
 	if (!p) throw error(401, 'Unlock your wallet to see this');
-	if (expected && p !== expected) throw error(403, 'That is another wallet');
+	if (expected && p !== expected) throw error(403, 'Signed in as a different party');
 	return p;
 }

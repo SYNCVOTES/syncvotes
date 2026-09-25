@@ -33,19 +33,19 @@
 			num: '01',
 			tag: 'Propose',
 			title: 'A contract, not a post',
-			body: 'A proposal is a Daml contract on Canton that says what it does: a decision, who is in and with what share, the name, the voting rules, dissolution. For anything that changes the DAO, what it takes to pass and how long the vote is open come from the DAO’s own voting rules, set at the founding and changed only by vote — not by the proposer, not by a moderator.'
+			body: 'A proposal is a Daml contract that says what it does: a decision, a choice, a membership change, new rules, dissolution. Changes to the DAO pass under the DAO’s own voting rules, not the proposer’s.'
 		},
 		{
 			num: '02',
 			tag: 'Vote',
 			title: 'One key, one ballot',
-			body: 'Your ballot weighs your share of the vote and is signed by a key only you hold. Where the DAO allows it, you may change it until the deadline. A DAO is private to its members unless it chose to be public — then anyone signed in can read it, and only members act.'
+			body: 'Your ballot carries your share of the vote and is signed by a key only you hold. Where the rules allow it, you can change it until the deadline.'
 		},
 		{
 			num: '03',
 			tag: 'Settle',
 			title: 'Settled by the ledger',
-			body: 'The ledger checks every ballot it is handed: right DAO, cast in time, by a member of the moment. A proposal settles the moment its outcome can no longer change, or at the deadline, and what it decided is carried out with the DAO’s own authority. No tally in a spreadsheet.'
+			body: 'The ledger checks every ballot it is handed: right DAO, cast in time, by a member of the moment. A proposal settles the moment its outcome can no longer change, or at the deadline, and what it decided is executed with the DAO’s own authority. No tally in a spreadsheet.'
 		}
 	];
 
@@ -75,12 +75,12 @@
 		{
 			tag: 'Members',
 			title: 'See everything',
-			body: 'The DAO, its proposals, every ballot and the outcome — as contracts on their own party, not rows in a database. A DAO that chose to be public is readable by anyone signed in, through this app; who voted how stays with the members.'
+			body: 'The DAO, its proposals, every ballot and the outcome, as contracts rather than database rows.'
 		},
 		{
-			tag: 'This validator',
+			tag: 'This app',
 			title: 'Co-signs, cannot act',
-			body: 'Hosts your party and co-signs each contract so the ledger accepts it, so it sees what it signs. Only your key can act, and it never leaves your browser.'
+			body: 'Hosts your party on its validator and co-signs each contract. It sees what it signs. Only your key can act for you.'
 		},
 		{
 			tag: 'The rest of Canton',
@@ -93,7 +93,7 @@
 		{
 			tag: 'Key',
 			title: 'Yours, in the browser',
-			body: 'A twelve-word phrase becomes an ed25519 key that never leaves your device. Touch ID or a password unlocks it here; the phrase brings it back anywhere.'
+			body: 'A twelve-word phrase becomes an ed25519 key that never leaves your device. A passkey or a password unlocks it here; the phrase brings it back anywhere.'
 		},
 		{
 			tag: 'Party',
@@ -102,8 +102,8 @@
 		},
 		{
 			tag: 'Rules',
-			title: 'Yours, set at the founding',
-			body: 'Anything that changes the DAO is voted on under rules the DAO chose — an open or secret ballot, votes final or changeable, a majority or two thirds of the whole vote or of votes cast, a quorum, one to ninety days. A decision or a choice runs under rules its proposer sets.'
+			title: 'Yours, set at creation',
+			body: 'Changes to the DAO pass under rules the DAO chose: open or secret ballot, majority or two thirds, quorum, 1–90 days. Decisions and choices run under the proposer’s rule.'
 		},
 		{
 			tag: 'Live',
@@ -114,12 +114,22 @@
 
 	const stats = remote.stats();
 	const counts = $derived(stats.error ? null : (stats.current ?? null));
+	// A live counter shows only once it has something to say: zeros read as "nobody uses this".
+	const live = $derived(
+		counts
+			? [
+					{ k: 'DAOS', n: counts.daos },
+					{ k: 'PUBLIC', n: counts.publicDaos },
+					{ k: 'OPEN PROPOSALS', n: counts.openProposals },
+					{ k: 'VOTES CAST', n: counts.votesCast },
+					{ k: 'MEMBERS', n: counts.members }
+				]
+					.filter((c) => c.n > 0)
+					.map((c) => ({ k: c.k, v: c.n.toLocaleString('en-US') }))
+			: []
+	);
 	const ticker = $derived([
-		{ k: 'DAOS', v: counts ? String(counts.daos) : 'SYNCING' },
-		{ k: 'PUBLIC', v: counts ? String(counts.publicDaos) : 'SYNCING' },
-		{ k: 'OPEN PROPOSALS', v: counts ? String(counts.openProposals) : 'SYNCING' },
-		{ k: 'VOTES CAST', v: counts ? counts.votesCast.toLocaleString('en-US') : 'SYNCING' },
-		{ k: 'MEMBERS', v: counts ? String(counts.members) : 'SYNCING' },
+		...live,
 		{ k: 'NETWORK', v: `CANTON ${NETWORK.toUpperCase()}` },
 		{ k: 'GOVERNANCE', v: 'DAML · LF 2.2' },
 		{ k: 'KEYS', v: 'YOURS' }
@@ -317,18 +327,14 @@
 		</div>
 		<div class="{reveal} {body} space-y-5 text-[15px] lg:pt-2">
 			<p>
-				SyncVotes is a governance app on the Canton Network. A DAO is a Daml contract signed by its
-				creator and this app, run by nobody: everything it changes about itself it decides by vote.
-				A proposal is another contract, under the DAO's voting rules or its proposer's; a ballot is
-				a member's choice on it, weighing their share of the vote, signed by their own key. This app
-				counts the ballots in batches, the ledger checks every one, and once the rule is met — or
-				the deadline comes — the outcome is written to the ledger and carried out.
+				SyncVotes is a governance app on the Canton Network. A DAO is a Daml contract that changes
+				itself only by vote. Members sign ballots with their own keys; the app counts them and the
+				ledger checks every one. When the rule is met, the outcome is executed on-ledger.
 			</p>
 			<p>
-				There is no database of DAOs and no server that votes for anyone. This app hosts your party,
-				prepares transactions and forwards what you signed; the ledger checks the rest. A DAO holds
-				no coin: what it does costs network traffic, paid from a balance anyone tops up by sending
-				Canton Coin to the app with the DAO's memo.
+				No database of DAOs, no server that votes for you. The app hosts your party and forwards
+				what you sign. A DAO holds no coin: its traffic is paid from a balance anyone tops up by
+				sending Canton Coin to the app's address with the DAO's memo.
 			</p>
 		</div>
 	</LandingSection>
@@ -369,7 +375,6 @@
 					delay={i * 0.12}
 				/>{/each}
 		</div>
-		<LandingButton href="/daos/create" arrow class="mt-12">Deploy your DAO</LandingButton>
 	</LandingSection>
 
 	<LandingSection id="hood" rule>
@@ -409,7 +414,7 @@
 				>Start governing.</span
 			>
 		</h2>
-		<LandingButton href="/daos/create" arrow class="{reveal} mt-12">Deploy your DAO</LandingButton>
+		<LandingButton href="/daos/create" arrow class="{reveal} mt-12">Create a DAO</LandingButton>
 		<p
 			class="mt-8 flex items-center justify-center gap-2.5 font-mono text-xs tracking-[0.16em] text-ink-dim uppercase"
 		>

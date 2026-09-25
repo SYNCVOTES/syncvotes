@@ -213,7 +213,7 @@ export const enrol = command(
 		if (have < needed) {
 			error(
 				402,
-				`A party costs ${needed.toFixed(2)} CC today; ${have.toFixed(2)} CC has arrived for this key`
+				`Creating a party costs ${needed.toFixed(2)} CC; ${have.toFixed(2)} CC has arrived. Top up the rest.`
 			);
 		}
 		const count = pacedEnrol();
@@ -472,7 +472,7 @@ export const checkParties = query(
 
 const proposalOf = (id: string): ledger.Proposal => {
 	const p = ledger.proposals.get(id);
-	if (!p) error(404, 'No such proposal');
+	if (!p) error(404, 'Proposal not found');
 	return p;
 };
 
@@ -790,7 +790,7 @@ export const createProposalForm = form(schemas.createProposalForm, async (f) => 
 				if (clash) {
 					error(
 						409,
-						`“${o.title}” already changes ${clash.party.split('::')[0]}; wait until it is settled and carried out`
+						`“${o.title}” already changes ${clash.party.split('::')[0]}; wait until it is settled and executed`
 					);
 				}
 			}
@@ -803,7 +803,7 @@ export const createProposalForm = form(schemas.createProposalForm, async (f) => 
 				if (had === 0 && r.share > 0) count++;
 				if (had > 0 && r.share === 0) count--;
 			}
-			if (count <= 0 || units <= 0) error(400, 'A DAO keeps at least one member with a share');
+			if (count <= 0 || units <= 0) error(400, 'A DAO needs at least one member with units');
 			action = { tag: 'SetShares', value: { changes: schemas.shareTuples(rows) } };
 			break;
 		}
@@ -876,7 +876,7 @@ function paceLookups() {
 	const address = clientAddress();
 	const now = Date.now();
 	const mine = (recentLookups.get(address) ?? []).filter((t) => now - t < 3_600_000);
-	if (mine.length >= LOOKUPS_PER_HOUR) error(429, 'That is a lot of keys for one hour; try later');
+	if (mine.length >= LOOKUPS_PER_HOUR) error(429, 'Too many requests. Try again in an hour.');
 	mine.push(now);
 	recentLookups.set(address, mine);
 }
@@ -904,8 +904,7 @@ function pacedEnrol(): () => void {
 	const address = clientAddress();
 	const now = Date.now();
 	const mine = (recentEnrols.get(address) ?? []).filter((t) => now - t < 3_600_000);
-	if (mine.length >= ENROLS_PER_HOUR)
-		error(429, 'That is a lot of new parties for one hour; try later');
+	if (mine.length >= ENROLS_PER_HOUR) error(429, 'Too many requests. Try again in an hour.');
 	// Counted once the party exists: a failed attempt costs nothing.
 	return () => {
 		mine.push(Date.now());
@@ -919,8 +918,7 @@ const WRITES_PER_HOUR = 30;
 function paced(party: string) {
 	const now = Date.now();
 	const mine = (recentWrites.get(party) ?? []).filter((t) => now - t < 3_600_000);
-	if (mine.length >= WRITES_PER_HOUR)
-		error(429, 'That is a lot of writing for one hour; try later');
+	if (mine.length >= WRITES_PER_HOUR) error(429, 'Too many requests. Try again in an hour.');
 	mine.push(now);
 	recentWrites.set(party, mine);
 }

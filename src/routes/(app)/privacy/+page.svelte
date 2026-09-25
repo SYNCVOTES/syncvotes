@@ -50,7 +50,10 @@
 					your party appears in the app
 				</li>
 				<li>The contracts of the DAOs you are in, and every ballot and comment in them</li>
-				<li>Canton Coin transfers to the app's party, read off the ledger to credit a balance</li>
+				<li>
+					Canton Coin transfers to the validator's party (the app's address), read off the ledger to
+					credit a balance
+				</li>
 				<li>The address a request comes from, used to pace sign-ups</li>
 			</ul>
 			<p>

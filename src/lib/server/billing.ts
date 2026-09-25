@@ -107,8 +107,8 @@ export const balance = (a: Account): number => {
 
 const emptyMessage = (a: Account) =>
 	split(a).kind === 'dao'
-		? "This DAO's balance is empty — someone has to pay in first"
-		: 'Your balance is empty — pay in on your Wallet page first';
+		? "The DAO's balance is empty. Top it up first."
+		: 'Your balance is empty. Top up on the Wallet page.';
 
 /** Refuses a write for an account with nothing left, or not enough for what it will cost. */
 export async function funded(a: Account, costBytes = 0): Promise<void> {
@@ -118,7 +118,7 @@ export async function funded(a: Account, costBytes = 0): Promise<void> {
 	if (cost > have) {
 		throw error(
 			402,
-			`${split(a).kind === 'dao' ? "The DAO's balance" : 'Your balance'} is ${have.toFixed(2)} CC; the participant puts this transaction at ${cost.toFixed(2)} CC`
+			`This costs about ${cost.toFixed(2)} CC; ${split(a).kind === 'dao' ? "the DAO's balance" : 'your balance'} is ${have.toFixed(2)} CC. Top up first.`
 		);
 	}
 }

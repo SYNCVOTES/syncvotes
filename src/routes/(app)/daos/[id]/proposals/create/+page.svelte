@@ -25,7 +25,6 @@
 	import MemberEditor, { type Row, type Summary } from '$lib/components/member-editor.svelte';
 	import MarkdownEditor from '$lib/components/markdown-editor.svelte';
 	import ImageField from '$lib/components/image-field.svelte';
-	import Note from '$lib/components/note.svelte';
 	import RuleSettings from '$lib/components/rule-settings.svelte';
 	import Hint from '$lib/components/hint.svelte';
 	import {

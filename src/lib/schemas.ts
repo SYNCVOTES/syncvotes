@@ -27,7 +27,7 @@ export const proposalDescription = v.pipe(
 export const commentBody = v.pipe(
 	v.string('A comment is required'),
 	v.trim(),
-	v.minLength(1, 'A comment says something'),
+	v.minLength(1, 'Write a comment'),
 	v.maxLength(5000, 'A comment is at most 5000 characters')
 );
 export const profileName = trimmed('The name', 1, 60);
@@ -37,7 +37,7 @@ export const imageUrl = v.pipe(
 	v.optional(v.string(), ''),
 	v.trim(),
 	v.maxLength(2000, 'A link is at most 2000 characters'),
-	v.check((s) => s === '' || /^https:\/\/\S+$/i.test(s), 'A link starting with https://')
+	v.check((s) => s === '' || /^https:\/\/\S+$/i.test(s), 'Use an https:// link')
 );
 export const votingDays = v.pipe(
 	v.number('The voting period is a number of days'),
@@ -72,7 +72,7 @@ export const shareChanges = v.pipe(
 	),
 	v.minLength(1, 'At least one member'),
 	v.maxLength(MAX_CHANGES, `At most ${MAX_CHANGES} members in one change`),
-	v.check((rows) => rows.every((r) => r.party.includes('::')), 'A row has no party id'),
+	v.check((rows) => rows.every((r) => r.party.includes('::')), 'A row has no party ID'),
 	v.check(
 		(rows) => rows.every((r) => Number.isInteger(r.share) && r.share >= 0 && r.share <= 1e9),
 		'Shares are whole numbers'
@@ -172,7 +172,7 @@ export const createDaoForm = v.pipe(
 	v.check((f) => switchesOk(f, 'routine', 'sensitive'), EXCLUSIVE),
 	v.check((f) => fractionOk(f, 'routine', 'sensitive'), FRACTION),
 	v.forward(
-		v.check((f) => f.shares.every((r) => r.share > 0), 'Every founding member holds a share'),
+		v.check((f) => f.shares.every((r) => r.share > 0), 'Every member needs at least 1 unit'),
 		['shares']
 	),
 	v.forward(
@@ -232,7 +232,7 @@ export const createProposalForm = v.pipe(
 	v.forward(
 		v.check(
 			(f) => f.kind !== 'shares' || v.safeParse(shareChanges, f.shares).success,
-			'The share change is not whole'
+			'A DAO needs at least one member with units'
 		),
 		['shares']
 	),

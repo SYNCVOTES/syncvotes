@@ -71,24 +71,27 @@
 		<Clause title="Balances and traffic">
 			<p>
 				Every transaction consumes Canton Network traffic, which this validator pays for in
-				<strong>Canton Coin (CC)</strong> at the network's published price. That cost is charged to a
-				balance as a prepaid service fee. A DAO founded with the DAO paying pays for everything done in
-				it; in a DAO founded with each member paying, a proposal, a vote or a comment is charged to the
-				member who signs it, and the counting and execution of a proposal to its proposer. A party pays
-				for itself in any case: its creation, its profile and the DAOs it founds.
+				<strong>Canton Coin (CC)</strong>. That cost, net of what the network returns for it, is
+				charged to a balance as a prepaid service fee. A DAO founded with the DAO paying pays for
+				everything done in it; in a DAO founded with each member paying, a proposal, a vote or a
+				comment is charged to the member who signs it, and the counting and execution of a proposal
+				to its proposer. A party pays for itself in any case: its creation, its profile and the DAOs
+				it founds.
 			</p>
 			<p>
-				A balance is paid in by sending Canton Coin to the app's party from any wallet, with the
-				memo shown on the DAO's page or on the wallet page as the transfer's reason. Coin that
-				arrives without a memo the app recognises is not credited; write to us through the
-				repository to have it matched.
+				A balance is paid in by sending Canton Coin to the validator's party (the address shown in
+				the app) from any wallet, with the memo shown on the DAO's page or on the wallet page as the
+				transfer's reason. Coin that arrives without a memo the app recognises is not credited;
+				write to us through the repository to have it matched.
 			</p>
 			<p>
-				The charge for a transaction is the traffic the participant reports for it, times the factor
-				stated in the app (one at the time of writing). The estimate shown before you sign is the
-				network's current price, not a guarantee of the final charge, and prices change with the
-				network's traffic price. A transaction the payer's balance cannot cover is refused before
-				you sign. What is paid in is spent on traffic and is not paid back.
+				The charge for a transaction is the traffic the validator reports for it at the network's
+				traffic price, less the validator's traffic rebate and, where they are earned, the app
+				rewards for that traffic, times the factor set by the operator. The price shown in the app
+				is this net price. The estimate shown before you sign is not a guarantee of the final
+				charge, and prices change with the network's traffic price and rewards. A transaction the
+				payer's balance cannot cover is refused before you sign. What is paid in is spent on traffic
+				and is not paid back.
 			</p>
 		</Clause>
 

@@ -41,8 +41,8 @@
 	<button
 		type="button"
 		class="shrink-0 text-ink-dim transition-colors hover:text-orange {copied ? 'text-green' : ''}"
-		aria-label={copied ? 'Copied' : 'Copy party id'}
-		title={copied ? 'Copied' : 'Copy party id'}
+		aria-label={copied ? 'Copied' : 'Copy party ID'}
+		title={copied ? 'Copied' : 'Copy party ID'}
 		onclick={copy}
 	>
 		{#if copied}<Check size={13} />{:else}<Copy size={13} />{/if}
