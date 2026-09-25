@@ -127,13 +127,13 @@ const emptyMessage = (a: Account) =>
 		? "The DAO's balance is empty. Top it up first."
 		: 'Your balance is empty. Top up on the Wallet page.';
 
-/** Refuses a write for an account with nothing left, or not enough for what it will cost. */
 /**
  * Whether traffic costs payers nothing on this deployment: `BILLING_FACTOR` 0 (a test network,
  * say), or rewards that come to the whole of it. Then no balance is needed for anything.
  */
 export const free = async () => (await factor()) === 0;
 
+/** Refuses a write for an account with nothing left, or not enough for what it will cost. */
 export async function funded(a: Account, costBytes = 0): Promise<void> {
 	if (await free()) return;
 	const have = balance(a);
