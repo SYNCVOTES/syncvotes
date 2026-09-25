@@ -18,7 +18,7 @@ services:
       LEDGER_API_URL: http://participant:7575
       PROVIDER_PARTY: ${PROVIDER_PARTY:?set in the env file}
       PAYEE_PARTY: ${PAYEE_PARTY:-}
-      PAYEE_SINCE: ${PAYEE_SINCE:-}
+      DEPOSITS_SINCE: ${DEPOSITS_SINCE:-}
       # The app is an OAuth client of the realm below; the participant checks its tokens' RS256
       # signature against the realm's keys and their audience against LEDGER_API_AUDIENCE.
       # The realm over the compose network: no trip through the public proxy for every token.
