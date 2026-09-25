@@ -35,9 +35,18 @@
 	const screen = $derived(store.screen);
 	// While a party is paid for, its key's account is watched; enough arrived, the party is made.
 	const funding = $derived(screen.at === 'fund' ? remote.purse(screen.fingerprint) : null);
+	// Tried once per key, amount and code: a refusal is shown and waits for something to change,
+	// rather than being retried every time the page settles.
+	let tried = '';
 	$effect(() => {
 		const f = funding?.current;
-		if (screen.at === 'fund' && f && f.credited >= f.needed && !store.busy) void flow.enrolNow();
+		if (screen.at !== 'fund' || !f || f.credited < f.needed || store.busy) return;
+		// Where invites are required and the code was lost to a reload, wait for it to be typed.
+		if (setup.current?.invitesRequired && !screen.invite) return;
+		const attempt = `${screen.fingerprint}:${f.credited}:${screen.invite}`;
+		if (attempt === tried) return;
+		tried = attempt;
+		void flow.enrolNow();
 	});
 	const purse = $derived(screen.at === 'home' ? remote.myPurse(screen.who.party) : null);
 	// Creating a key: the phrase is revealed on request, then one word of it is asked back.
@@ -82,6 +91,20 @@
 	let passkeys = $state(false);
 	$effect(() => {
 		wallet.passkeysAvailable().then((ok) => (passkeys = ok));
+	});
+	// Whatever was typed on one screen is gone when it is left: a recovery phrase above all.
+	let shownAt = '';
+	$effect(() => {
+		if (screen.at === shownAt) return;
+		shownAt = screen.at;
+		phraseInput = '';
+		hintInput = '';
+		inviteInput = '';
+		password = '';
+		checkInput = '';
+		revealed = false;
+		checking = false;
+		editing = false;
 	});
 </script>
 

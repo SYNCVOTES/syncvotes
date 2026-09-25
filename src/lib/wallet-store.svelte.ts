@@ -44,35 +44,6 @@ let phase = $state<string | null>(null);
 let wallets = $state<wallet.StoredWallet[]>([]);
 let selected = $state<string | null>(null);
 
-/** Invite codes by key fingerprint, kept on the device until the party they were for is made. */
-const INVITES = 'syncvotes.invites';
-const invites = {
-	all(): Record<string, string> {
-		try {
-			return JSON.parse(localStorage.getItem(INVITES) ?? '{}') as Record<string, string>;
-		} catch {
-			return {};
-		}
-	},
-	get: (fingerprint: string) => invites.all()[fingerprint] ?? '',
-	set(fingerprint: string, invite: string) {
-		try {
-			localStorage.setItem(INVITES, JSON.stringify({ ...invites.all(), [fingerprint]: invite }));
-		} catch {
-			// Not remembered: the code is asked for again after a reload.
-		}
-	},
-	forget(fingerprint: string) {
-		const rest = invites.all();
-		delete rest[fingerprint];
-		try {
-			localStorage.setItem(INVITES, JSON.stringify(rest));
-		} catch {
-			// Nothing to forget.
-		}
-	}
-};
-
 export const store = {
 	get screen() {
 		return screen;
@@ -228,8 +199,8 @@ async function identify(signer: wallet.Signer, andThen: 'protect' | 'enter') {
 		const kept = wallets.find((w) => w.party.endsWith(`::${found.fingerprint}`));
 		if (kept) {
 			const hint = kept.party.slice(0, -found.fingerprint.length - 2);
-			const invite = invites.get(found.fingerprint);
-			screen = { at: 'fund', signer, fingerprint: found.fingerprint, hint, invite, kept: true };
+			// The invite code is not kept: the fund screen asks for it again where one is needed.
+			screen = { at: 'fund', signer, fingerprint: found.fingerprint, hint, invite: '', kept: true };
 		} else screen = { at: 'hint', signer, fingerprint: found.fingerprint };
 		return;
 	}
@@ -288,7 +259,6 @@ export const flow = {
 			}
 			// The key is kept before anyone pays for it: a reload while the pay-in lands must not
 			// cost a new key. The party id is known already; it is the hint and the fingerprint.
-			invites.set(fingerprint, invite);
 			screen = {
 				at: 'protect',
 				signer,
@@ -298,22 +268,27 @@ export const flow = {
 		});
 	},
 
-	/** A later visit knows the code again; the server asks for it when the party is made. */
+	/** The invite code, asked again on the fund screen when the page was reloaded meanwhile. */
 	setInvite(invite: string) {
 		if (screen.at !== 'fund') return;
-		invites.set(screen.fingerprint, invite);
 		screen = { ...screen, invite };
 	},
 
 	/** What arrived covers a party: the key signs the topology that names it, and you are in. */
 	enrolNow() {
 		if (screen.at !== 'fund' || busy) return;
-		const { signer, hint, invite, fingerprint } = screen;
+		const { signer, hint, invite } = screen;
 		return run(async () => {
 			working('Creating party');
 			const topology = await actions.topology(signer, hint);
-			const who = await actions.enrol(signer, hint, topology, invite);
-			invites.forget(fingerprint);
+			let who;
+			try {
+				who = await actions.enrol(signer, hint, topology, invite);
+			} catch (e) {
+				// A refused code is dropped, so the field to type it again comes back.
+				if (screen.at === 'fund' && /invit/i.test(describe(e))) screen = { ...screen, invite: '' };
+				throw e;
+			}
 			await enter(signer, who);
 		});
 	},
