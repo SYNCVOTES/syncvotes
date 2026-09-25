@@ -163,7 +163,9 @@
 	Closes the DAO permanently. A passed dissolution does not take effect while anything else in the
 	DAO is unfinished: it waits until every other open proposal is decided and every passed change is
 	carried out. Meanwhile its page says <Ui kind="message">Passed. Waiting for the vote on “…”</Ui>,
-	naming what it waits for. Then:
+	naming what it waits for. Meanwhile nothing new can be proposed: the DAO page says <Ui
+		kind="message">A dissolution passed.</Ui
+	> where <Ui>New proposal</Ui> was. Then:
 </p>
 <ul>
 	<li>nothing more can be proposed in the DAO;</li>
