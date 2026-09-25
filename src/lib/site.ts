@@ -9,14 +9,14 @@ export const NAV: NavItem[] = [
 	{ href: '/my-daos', label: 'My DAOs' },
 	{ href: '/daos', label: 'Public DAOs' },
 	{ href: '/wallet', label: 'Wallet' },
-	{ href: '/docs', label: 'Docs', wide: true }
+	{ href: '/docs', label: 'Docs' }
 ];
 
 export const GITHUB = 'https://github.com/SYNCVOTES/syncvotes';
 export const X = 'https://x.com/syncvotes';
 
 export const FOOTER_LINKS: FooterLink[] = [
-	{ href: '/docs', label: 'How it works' },
+	{ href: '/docs', label: 'Docs' },
 	{ href: '/terms', label: 'Terms' },
 	{ href: '/privacy', label: 'Privacy' },
 	{ href: '/brand', label: 'Brand kit' },
