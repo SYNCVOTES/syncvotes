@@ -130,7 +130,7 @@
 			value: 'dissolve',
 			title: 'Dissolve',
 			text: 'Permanently close the DAO.',
-			more: 'Nothing more can be proposed or voted on. The remaining balance is lost. The record stays readable.',
+			more: 'It takes effect once every other open proposal is decided; then nothing more can be proposed or voted on. The remaining balance is lost.',
 			icon: Power
 		}
 	] as const satisfies readonly {
@@ -242,7 +242,7 @@
 			case 'visibility':
 				return d?.public ? 'The DAO becomes private.' : 'The DAO becomes public.';
 			case 'dissolve':
-				return 'The DAO closes permanently. Nothing more can be proposed or voted on. The remaining balance is lost; the record stays readable.';
+				return 'The DAO closes permanently once every other open proposal is decided. Nothing more can be proposed or voted on. The remaining balance is lost.';
 			case 'settings':
 				return `From then on, a change to the DAO is voted on by ${newSensitive.rule.secret ? 'secret' : 'open'} ballot, votes ${newSensitive.rule.changeable ? 'may change until the deadline' : 'final once cast'}, and passes when ${describe(newSensitive.rule)}, open ${newSensitive.votingDays} days.`;
 			default:

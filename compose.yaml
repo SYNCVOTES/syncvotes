@@ -157,6 +157,9 @@ configs:
       }
       ${CADDY_SITE:-${APP_DOMAIN:?set in the env file}} {
         header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        # Prerendered docs carry no CSP header of their own, so framing is refused here.
+        header /docs* X-Frame-Options DENY
+        header /docs* Content-Security-Policy "frame-ancestors 'none'"
         handle /auth/* {
           reverse_proxy keycloak:8080
         }

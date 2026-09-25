@@ -195,7 +195,7 @@
 					>
 						<p class="text-body-sm text-ink">
 							{fmt(waiting.size)}
-							{waiting.size === 1 ? 'proposal waits' : 'proposals wait'} on your vote
+							{waiting.size === 1 ? 'open proposal' : 'open proposals'} not voted
 						</p>
 						<Button
 							size="sm"

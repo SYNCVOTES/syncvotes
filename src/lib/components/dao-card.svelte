@@ -73,8 +73,7 @@
 				class="flex items-center gap-1.5 rounded-full bg-orange-dim px-2.5 py-1 font-mono text-label tracking-[0.12em] text-orange uppercase"
 			>
 				<span class="size-1.5 rounded-full bg-orange" aria-hidden="true"></span>
-				{fmt(awaiting)}
-				{awaiting === 1 ? 'vote' : 'votes'} due
+				{fmt(awaiting)} not voted
 			</span>
 		{/if}
 	</div>

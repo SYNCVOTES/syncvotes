@@ -176,8 +176,8 @@ async function count(id: string) {
 
 /**
  * A passed proposal with an effect is carried out, with the DAO's authority: in one go, or a
- * batch of its entries at a time. A dissolution archives the DAO at once: what was open is
- * moot, what was paid in is spent, the record stays readable.
+ * batch of its entries at a time. A dissolution waits until every other proposal of the DAO is
+ * decided and carried out, then archives the DAO; what was paid in is spent.
  */
 async function execute(p: ledger.Proposal) {
 	if (
@@ -190,6 +190,23 @@ async function execute(p: ledger.Proposal) {
 	const dao = ledger.daos.get(p.daoId);
 	if (!dao || executing.has(p.id) || !due(p.id)) return;
 	if (consumedDao.get(p.daoId) === dao.contractId) return;
+	if (p.effect.kind === 'dissolve') {
+		const others = [...(ledger.proposalsOf.get(p.daoId)?.values() ?? [])].filter(
+			(o) => o.id !== p.id && o.effect.kind !== 'dissolve'
+		);
+		const titles = (list: ledger.Proposal[]) => list.map((o) => `“${o.title}”`).join(', ');
+		const open = others.filter((o) => !o.outcome);
+		const undone = others.filter(
+			(o) =>
+				o.outcome === 'Passed' &&
+				!o.executedAt &&
+				o.effect.kind !== 'signal' &&
+				o.effect.kind !== 'choose'
+		);
+		if (open.length) return waitFor(p.id, `the vote on ${titles(open)}`);
+		if (undone.length) return waitFor(p.id, `${titles(undone)} to be carried out`);
+		waitFor(p.id, null);
+	}
 	executing.add(p.id);
 	let ok = false;
 	try {

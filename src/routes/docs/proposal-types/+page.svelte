@@ -160,22 +160,21 @@
 
 <h2 id="dissolve">Dissolve</h2>
 <p>
-	The New Proposal page and the proposal itself describe it as closing the DAO permanently, with the
-	remaining balance lost and the record readable. What happens once it is executed:
+	Closes the DAO permanently. A passed dissolution does not take effect while anything else in the
+	DAO is unfinished: it waits until every other open proposal is decided and every passed change is
+	carried out. Meanwhile its page says <Ui kind="message">Passed. Waiting for the vote on “…”</Ui>,
+	naming what it waits for. Then:
 </p>
 <ul>
 	<li>nothing more can be proposed in the DAO;</li>
 	<li>
-		the DAO's page no longer opens (it says <Ui kind="message">DAO not found</Ui>), and the DAO
-		leaves My DAOs and Public DAOs;
+		the DAO's page no longer opens (it says <Ui kind="message"
+			>No such DAO. It may have been dissolved.</Ui
+		>), and the DAO leaves My DAOs and Public DAOs;
 	</li>
 	<li>
 		its proposals, ballots and comments stay on the ledger, and members can still open a proposal by
 		its link;
-	</li>
-	<li>
-		proposals still open are never counted or decided, although members can still vote and comment
-		on them;
 	</li>
 	<li>what is left of its balance is lost; nobody gets it back.</li>
 </ul>

@@ -131,7 +131,8 @@
 		</dl>
 	{:else if effect.kind === 'dissolve'}
 		<p class="text-body-sm text-ink-mid">
-			Closes the DAO permanently. The remaining balance is lost; the record stays readable.
+			Closes the DAO permanently, once every other open proposal is decided. The remaining balance
+			is lost.
 		</p>
 	{:else if effect.kind === 'choose'}
 		<p class="text-body-sm text-ink-mid">

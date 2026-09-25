@@ -72,8 +72,8 @@
 		</StateMessage>
 	{:else}
 		{#if due.length > 0}
-			<section class="mb-8 border-l-2 border-orange pl-4" aria-label="Waiting on your vote">
-				<h2 class="eyebrow mb-2 text-orange">Waiting on your vote</h2>
+			<section class="mb-8 border-l-2 border-orange pl-4" aria-label="Not voted">
+				<h2 class="eyebrow mb-2 text-orange">Not voted</h2>
 				<ul class="space-y-1">
 					{#each due as d (d.contractId)}
 						<li>
@@ -84,7 +84,7 @@
 								<span class="font-bold">{d.name}</span>
 								<span class="text-ink-mid group-hover:text-orange"
 									>{fmt(d.awaiting)}
-									{d.awaiting === 1 ? 'proposal waits' : 'proposals wait'} on your vote</span
+									{d.awaiting === 1 ? 'open proposal' : 'open proposals'} not voted</span
 								>
 								<ArrowRight size={14} aria-hidden="true" />
 							</a>

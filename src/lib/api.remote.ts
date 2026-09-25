@@ -269,7 +269,7 @@ export const stats = query.live(() =>
 
 const daoOf = (id: string): ledger.Dao => {
 	const dao = ledger.daos.get(id);
-	if (!dao) error(404, 'DAO not found');
+	if (!dao) error(404, 'No such DAO. It may have been dissolved.');
 	return dao;
 };
 const membersOf = (daoId: string) => [...(ledger.members.get(daoId)?.values() ?? [])];

@@ -28,24 +28,24 @@
 
 <h2 id="find-what-to-vote-on">Find What to Vote On</h2>
 <p>
-	<Ui>My DAOs</Ui> starts with <Ui>Waiting on your vote</Ui>: each DAO with proposals you can vote
-	on and have not. Those DAOs' cards carry a <Ui>3 votes due</Ui> chip (with their count), and the
+	<Ui>My DAOs</Ui> starts with <Ui>Not voted</Ui>: each DAO with open proposals you can vote on and
+	have not. Those DAOs' cards carry a <Ui>3 not voted</Ui> chip (with their count), and the
 	<Ui>Not voted</Ui> tab shows only them.
 </p>
 <Shot
 	light={myDaosLight}
 	dark={myDaosDark}
-	alt="My DAOs with Waiting on your vote at the top and a 3 votes due chip on a card"
+	alt="My DAOs with Not voted at the top and a 3 not voted chip on a card"
 	caption="My DAOs, as a member with three proposals to vote on."
 />
 <p>
-	On a DAO page, a strip says how many proposals wait on your vote; its <Ui>Vote</Ui> button, like the
+	On a DAO page, a strip says how many open proposals are not voted; its <Ui>Vote</Ui> button, like the
 	<Ui>Not voted</Ui> tab, lists only those. Each of them carries a <Ui>Vote</Ui> chip instead of its status.
 </p>
 <Shot
 	light={daoWaitingLight}
 	dark={daoWaitingDark}
-	alt="A DAO page: 3 proposals wait on your vote, and rows with Vote chips"
+	alt="A DAO page: 3 open proposals not voted, and rows with Vote chips"
 	caption="A DAO page with three proposals waiting on your vote."
 />
 <p>

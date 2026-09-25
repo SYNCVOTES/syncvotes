@@ -135,7 +135,9 @@
 <ul>
 	<li>It is private and you are not a member. The page says <Ui>Members only</Ui>.</li>
 	<li>It is on another network. Each network has its own DAOs.</li>
-	<li>It was dissolved. Its page no longer opens.</li>
+	<li>
+		It was dissolved. Its page says <Ui kind="message">No such DAO. It may have been dissolved.</Ui>
+	</li>
 </ul>
 
 <h2 id="does-app-hold-key">Does SyncVotes hold my key?</h2>
