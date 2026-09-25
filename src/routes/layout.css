@@ -532,3 +532,66 @@
 	border-top: 0;
 	padding-top: 0;
 }
+
+/* What the docs point at: an app control, a defined term, a message the app shows. */
+.doc-control {
+	display: inline;
+	-webkit-box-decoration-break: clone;
+	box-decoration-break: clone;
+	font-family: var(--font-mono);
+	font-size: 0.72em;
+	font-weight: 500;
+	line-height: 1.5;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	color: var(--text);
+	background: var(--bg-surface);
+	border: 1px solid var(--border-hover);
+	border-radius: 999px;
+	padding: 0.1em 0.65em;
+}
+.doc-term {
+	color: var(--text);
+	font-weight: 600;
+	text-decoration: underline dotted rgba(var(--accent-rgb), 0.7);
+	text-underline-offset: 3px;
+}
+.doc-message {
+	color: var(--text);
+	quotes: '“' '”';
+}
+
+/* A screenshot in the reader's theme; the other one stays hidden and unfetched. */
+.doc-shot {
+	margin: 1.4em 0 1.8em;
+}
+.doc-shot img {
+	display: block;
+	max-width: 100%;
+	height: auto;
+	border: 1px solid var(--border);
+}
+.doc-shot .doc-shot-light {
+	display: none;
+}
+:root[data-theme='light'] .doc-shot .doc-shot-light {
+	display: block;
+}
+:root[data-theme='light'] .doc-shot .doc-shot-dark {
+	display: none;
+}
+@media (prefers-color-scheme: light) {
+	:root:not([data-theme='dark']) .doc-shot .doc-shot-light {
+		display: block;
+	}
+	:root:not([data-theme='dark']) .doc-shot .doc-shot-dark {
+		display: none;
+	}
+}
+.doc-shot figcaption {
+	margin-top: 0.6em;
+	font-family: var(--font-mono);
+	font-size: 0.75rem;
+	line-height: 1.5;
+	color: var(--text-dim);
+}
