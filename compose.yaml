@@ -166,7 +166,7 @@ configs:
         header /docs* Content-Security-Policy "frame-ancestors 'none'"
         # Only the canton realm's login and keys are for the public: the admin console, the master
         # realm and the account console are reached over an SSH tunnel to keycloak:8080.
-        @keycloakPrivate path /auth/admin* /auth/realms/master* /auth/realms/*/account*
+        @keycloakPrivate path /auth/admin* /auth/realms/master* /auth/realms/canton/account*
         handle @keycloakPrivate {
           respond 404
         }
