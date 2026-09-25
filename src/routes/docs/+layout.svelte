@@ -40,7 +40,7 @@
 		let found = toc[0]?.id ?? '';
 		for (const item of toc) {
 			const el = document.getElementById(item.id);
-			if (el && el.getBoundingClientRect().top < 160) found = item.id;
+			if (el && el.getBoundingClientRect().top < 240) found = item.id;
 		}
 		active = found;
 	}
