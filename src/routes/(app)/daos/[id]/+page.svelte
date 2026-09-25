@@ -97,7 +97,7 @@
 
 		{#if d.image}
 			<div class="-mt-2 mb-6 h-40 w-full overflow-hidden border border-border md:h-52">
-				<img src={d.image} alt="" class="size-full object-cover" />
+				<img referrerpolicy="no-referrer" src={d.image} alt="" class="size-full object-cover" />
 			</div>
 		{/if}
 
@@ -263,9 +263,11 @@
 										<EffectLabel effect={p.effect} equal={d.equal} />
 										{#if !p.outcome}<span>· closes {relative(p.closesAt)}</span>{/if}
 										<span
-											>· {castOf(p) === 0
-												? 'no votes yet'
-												: `${pct(castOf(p), p.eligible)}% voted`}</span
+											>· {p.sealed
+												? 'secret ballot'
+												: castOf(p) === 0
+													? 'no votes yet'
+													: `${pct(castOf(p), p.eligible)}% voted`}</span
 										>
 										<span>· by {hintOf(p.proposer)}</span>
 									</div>

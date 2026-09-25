@@ -5,3 +5,6 @@ build
 daml/.daml
 .git
 *.env
+.env
+.env.*
+!.env.example

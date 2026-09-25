@@ -119,6 +119,7 @@
 			<dt class="font-mono text-xs text-ink-dim">Picture</dt>
 			<dd class="text-ink-mid">
 				{#if effect.image}<img
+						referrerpolicy="no-referrer"
 						src={effect.image}
 						alt=""
 						class="h-32 w-full border border-border object-cover"

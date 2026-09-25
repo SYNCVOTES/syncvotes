@@ -307,6 +307,8 @@
 	font-size: var(--text-body);
 	line-height: 1.65;
 	overflow-wrap: anywhere;
+	/* Nothing in it paints outside it. */
+	contain: paint;
 }
 .markdown > :first-child {
 	margin-top: 0;

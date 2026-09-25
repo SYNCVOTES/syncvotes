@@ -43,7 +43,13 @@ export const init: ServerInit = async () => {
 	void readHostedParties().catch((e) => console.error('The hosted parties could not be read:', e));
 };
 
-/** An unexpected error still tells the user what happened; there is nothing secret in these. */
-export const handleError: HandleServerError = ({ error }) => ({
-	message: error instanceof Error ? error.message : 'Something went wrong'
-});
+/**
+ * An unexpected error is logged in full and shown by a reference only: its text can carry
+ * internal addresses and contract ids. What the ledger refuses reaches the user as an expected
+ * error (`ledgerError`), with its reason.
+ */
+export const handleError: HandleServerError = ({ error }) => {
+	const ref = crypto.randomUUID().slice(0, 8);
+	console.error(`Unexpected error ${ref}:`, error);
+	return { message: `Something went wrong (ref ${ref}). Try again.` };
+};

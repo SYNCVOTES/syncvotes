@@ -36,11 +36,11 @@ services:
       # Shown to users; the ledger does not care.
       NETWORK: ${NETWORK:-TestNet}
       NETWORKS: ${NETWORKS:-}
+      # A signed transaction that issues a hundred voting rights comes back as a ~1 MB request.
+      BODY_SIZE_LIMIT: 8M
       # Behind another proxy (traefik, nginx) the app is told so; see CADDY_* in the env file.
     labels:
       traefik.enable: 'false'
-      # A signed transaction that issues a hundred voting rights comes back as a ~1 MB request.
-      BODY_SIZE_LIMIT: 8M
     depends_on:
       keycloak:
         condition: service_healthy
@@ -157,9 +157,19 @@ configs:
       }
       ${CADDY_SITE:-${APP_DOMAIN:?set in the env file}} {
         header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        header Referrer-Policy strict-origin-when-cross-origin
+        header X-Content-Type-Options nosniff
+        header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+        header Cross-Origin-Opener-Policy same-origin
         # Prerendered docs carry no CSP header of their own, so framing is refused here.
         header /docs* X-Frame-Options DENY
         header /docs* Content-Security-Policy "frame-ancestors 'none'"
+        # Only the canton realm's login and keys are for the public: the admin console, the master
+        # realm and the account console are reached over an SSH tunnel to keycloak:8080.
+        @keycloakPrivate path /auth/admin* /auth/realms/master* /auth/realms/*/account*
+        handle @keycloakPrivate {
+          respond 404
+        }
         handle /auth/* {
           reverse_proxy keycloak:8080
         }

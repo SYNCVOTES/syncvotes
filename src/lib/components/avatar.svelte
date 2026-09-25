@@ -31,6 +31,7 @@
 
 {#if who.avatar}
 	<img
+		referrerpolicy="no-referrer"
 		src={who.avatar}
 		alt=""
 		class="shrink-0 border border-border object-cover {sizes[size]} {className}"

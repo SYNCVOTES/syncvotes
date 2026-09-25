@@ -1,5 +1,10 @@
 {
 	"realm": "canton",
+	"bruteForceProtected": true,
+	"failureFactor": 10,
+	"permanentLockout": false,
+	"maxFailureWaitSeconds": 900,
+	"waitIncrementSeconds": 60,
 	"enabled": true,
 	"sslRequired": "external",
 	"offlineSessionMaxLifespanEnabled": true,

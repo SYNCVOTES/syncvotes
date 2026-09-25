@@ -18,7 +18,16 @@ function hook() {
 			node.setAttribute('target', '_blank');
 			node.setAttribute('rel', 'noopener noreferrer');
 		}
-		if (node.tagName === 'IMG') node.setAttribute('loading', 'lazy');
+		if (node.tagName === 'IMG') {
+			node.setAttribute('loading', 'lazy');
+			// The picture's host learns nothing of the page it was shown on.
+			node.setAttribute('referrerpolicy', 'no-referrer');
+		}
+		// Task-list boxes only, and never ones a reader can tick.
+		if (node.tagName === 'INPUT') {
+			if (node.getAttribute('type') !== 'checkbox') node.remove();
+			else node.setAttribute('disabled', '');
+		}
 	});
 }
 
@@ -27,10 +36,17 @@ export function render(text: string): string {
 	if (typeof window === 'undefined') return '';
 	hook();
 	const html = marked.parse(text, { async: false });
+	// What Markdown produces, and nothing else: no styles, ids or popovers, so text cannot lay
+	// itself over the page or dress up as the app.
 	return DOMPurify.sanitize(html, {
-		USE_PROFILES: { html: true },
-		FORBID_TAGS: ['style', 'form', 'input:not([type=checkbox])'],
-		ADD_ATTR: ['target']
+		ALLOWED_TAGS: [
+			...['p', 'br', 'hr', 'a', 'em', 'strong', 'del', 'code', 'pre', 'blockquote'],
+			...['ul', 'ol', 'li', 'input', 'img'],
+			...['h1', 'h2', 'h3', 'h4', 'h5', 'h6'],
+			...['table', 'thead', 'tbody', 'tr', 'th', 'td']
+		],
+		ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'align', 'type', 'checked', 'disabled', 'start'],
+		ADD_ATTR: ['target', 'rel', 'loading', 'referrerpolicy']
 	});
 }
 

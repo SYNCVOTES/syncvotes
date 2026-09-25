@@ -1,8 +1,12 @@
 // Sets a fresh validator up for this app, once per network; run inside the app image with the
 // validator backend's client secret, before the app is started for the first time:
 //
-//   docker compose --env-file <net>.env run --rm --no-deps \
-//     -e VALIDATOR_CLIENT_SECRET=<KC_VALIDATOR_SECRET> app node scripts/setup-participant.mjs
+//   VALIDATOR_CLIENT_SECRET=$(grep ^KC_VALIDATOR_SECRET= <net>.env | cut -d= -f2-) \
+//     docker compose --env-file <net>.env run --rm --no-deps -e VALIDATOR_CLIENT_SECRET \
+//     app node scripts/setup-participant.mjs
+//
+// (`-e NAME` without a value passes it from the environment, so the secret stays out of the
+// command line and the shell history.)
 //
 // As the validator's ledger admin it allocates the app's own provider party
 // (syncvotes-app-provider, not the validator's party: rewards and the coin paid in by memo belong

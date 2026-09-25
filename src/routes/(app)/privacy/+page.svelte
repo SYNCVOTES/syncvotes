@@ -10,7 +10,7 @@
 	 * the key lives in the browser; one session cookie; the third parties in front of the origin.
 	 */
 	const GITHUB = 'https://github.com/SYNCVOTES/syncvotes';
-	const UPDATED = '23 September 2026';
+	const UPDATED = '25 September 2026';
 </script>
 
 <svelte:head>
@@ -111,6 +111,12 @@
 				terminates connections at its edge and sees the requests it forwards, and its fonts are loaded
 				from Google Fonts; each handles the requests it serves under its own privacy policy. We do not
 				integrate third-party analytics trackers, advertising networks or external data processors.
+			</p>
+			<p>
+				Pictures that users add to DAOs, profiles and descriptions are links: your browser loads
+				each one from wherever its author put it. That server sees your address and when the picture
+				was loaded, though not the page it was shown on. Anyone who adds a picture can therefore
+				learn when it was viewed.
 			</p>
 		</Clause>
 

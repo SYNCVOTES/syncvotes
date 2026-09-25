@@ -60,7 +60,12 @@
 >
 	<div class="mb-4 flex items-start justify-between gap-3">
 		{#if image}
-			<img src={image} alt="" class="size-[46px] shrink-0 border border-border object-cover" />
+			<img
+				referrerpolicy="no-referrer"
+				src={image}
+				alt=""
+				class="size-[46px] shrink-0 border border-border object-cover"
+			/>
 		{:else}
 			<div
 				class="flex size-[46px] shrink-0 items-center justify-center border border-border bg-surface-active font-mono text-xs font-bold tracking-[0.08em] text-ink-mid"

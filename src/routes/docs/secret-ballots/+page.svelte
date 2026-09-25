@@ -18,17 +18,24 @@
 <table>
 	<thead><tr><th></th><th>Open ballot</th><th>Secret ballot</th></tr></thead>
 	<tbody>
-		<tr><td>The totals (yes, no, abstain, each option)</td><td>Yes</td><td>Yes</td></tr>
+		<tr
+			><td>The totals (yes, no, abstain, each option)</td><td>Yes</td><td>Once it is decided</td
+			></tr
+		>
 		<tr><td>Your own vote</td><td>Yes</td><td>Yes</td></tr>
 		<tr><td>Who else voted, and how</td><td>Yes</td><td>No</td></tr>
-		<tr><td>How many members voted</td><td>Yes</td><td>Yes</td></tr>
+		<tr><td>How many members voted</td><td>Yes</td><td>Once it is decided</td></tr>
 	</tbody>
 </table>
 <p>
 	On a secret ballot, the ballot list shows <strong
 		>Secret ballot. You see only your own vote.</strong
 	>
-	and then your own ballot, if you cast one. Readers of a public DAO see only the totals in either case.
+	and then your own ballot, if you cast one. Where the totals would be, the page says <Ui
+		kind="message">Secret ballot. The totals are shown once the vote is decided.</Ui
+	>, and the DAO's proposal list says <Ui>secret ballot</Ui> instead of how many voted: totals that moved
+	with each ballot would tell who voted how. Readers of a public DAO see only the totals, and on a secret
+	ballot only once it is decided.
 </p>
 
 <Shot
@@ -53,14 +60,20 @@
 		DAO it hosts.
 	</li>
 	<li>
-		<strong>The totals can give votes away.</strong> In a small DAO, or when only a few members have voted,
-		the totals may show how someone voted.
+		<strong>The DAO's creator can obtain every ballot.</strong> The creator signs each ballot, so a creator
+		who hosts their party on a validator of their own receives every ballot there, secret ones included.
+	</li>
+	<li>
+		<strong>The final totals can give votes away.</strong> In a small DAO, or when only a few members
+		voted, the totals shown after the decision may show how someone voted.
 	</li>
 </ul>
 <DocNote>
 	<p>
 		Use a secret ballot to keep members from seeing each other's votes. Do not rely on it to hide
-		votes from whoever runs the app. See <a href="/docs/trust-model">Trust Model</a>.
+		votes from whoever runs the app or created the DAO. See <a href="/docs/trust-model"
+			>Trust Model</a
+		>.
 	</p>
 </DocNote>
 

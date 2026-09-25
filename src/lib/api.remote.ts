@@ -409,7 +409,15 @@ export const daoMembers = query.live(
 			const all = membersOf(id)
 				.filter((m) => matches(q)(m.party))
 				.sort((a, b) => b.share - a.share || a.party.localeCompare(b.party))
-				.map((m) => ({ ...m, who: who(m.party) }));
+				// No contract id: a member's contract is replaced each time they vote, so it would
+				// say who voted when, and with the totals, how.
+				.map((m) => ({
+					party: m.party,
+					share: m.share,
+					since: m.since,
+					shareSince: m.shareSince,
+					who: who(m.party)
+				}));
 			return page(all, offset, limit);
 		})
 );
@@ -529,11 +537,27 @@ const summed = (p: ledger.Proposal) => {
 	return sum;
 };
 
+/** A secret ballot still open: its totals and turnout are not shown. */
+const sealed = (p: ledger.Proposal) => p.secret && !p.outcome;
+
 /**
  * A proposal's totals as a page shows them: the ledger's counters once it has counted, and
  * until then (always, where votes may change and are counted at the deadline) what is cast.
  */
 const tallyOf = (p: ledger.Proposal) => {
+	// A secret ballot shows nothing until it is decided: totals that move as each ballot lands
+	// would tell who voted how.
+	if (sealed(p)) {
+		const options = p.effect.kind === 'choose' ? p.effect.options.length : 0;
+		return {
+			yes: 0,
+			no: 0,
+			abstain: 0,
+			tallies: Array<number>(options).fill(0),
+			picked: 0,
+			sealed: true
+		};
+	}
 	const counted = p.yes + p.no + p.abstain + p.tallies.reduce((s, t) => s + t, 0);
 	return counted > 0 && !p.rule.changeable
 		? {
@@ -541,9 +565,10 @@ const tallyOf = (p: ledger.Proposal) => {
 				no: p.no,
 				abstain: p.abstain,
 				tallies: p.tallies,
-				picked: p.picked ?? p.tallies.reduce((s, t) => s + t, 0)
+				picked: p.picked ?? p.tallies.reduce((s, t) => s + t, 0),
+				sealed: false
 			}
-		: summed(p);
+		: { ...summed(p), sealed: false };
 };
 
 /** A vote as the ledger takes it: a variant, since some constructors carry the options picked. */
@@ -563,8 +588,10 @@ export const proposal = query.live(contractId, (id) =>
 		const me = proposalReader(p);
 		const dao = ledger.daos.get(p.daoId);
 		const mine = me && ledger.ballots.get(id)?.get(me.party);
-		const counted = p.yes + p.no + p.abstain + p.tallies.reduce((s, t) => s + t, 0);
 		const shown = tallyOf(p);
+		const counted = shown.sealed
+			? 0
+			: p.yes + p.no + p.abstain + p.tallies.reduce((s, t) => s + t, 0);
 		return {
 			...p,
 			...shown,
@@ -573,7 +600,7 @@ export const proposal = query.live(contractId, (id) =>
 			daoEqual: dao?.equal ?? false,
 			daoActorPays: dao?.actorPays ?? false,
 			members: ledger.members.get(p.daoId)?.size ?? 0,
-			cast: ledger.ballots.get(id)?.size ?? 0,
+			cast: shown.sealed ? 0 : (ledger.ballots.get(id)?.size ?? 0),
 			comments: ledger.comments.get(id)?.size ?? 0,
 			proposedBy: who(p.proposer),
 			waiting: tally.waiting.get(id) ?? null,
@@ -960,6 +987,14 @@ function paced(party: string) {
 	mine.push(now);
 	recentWrites.set(party, mine);
 }
+
+// Addresses and parties not heard from for an hour are forgotten, so the tables do not grow.
+setInterval(() => {
+	const since = Date.now() - 3_600_000;
+	for (const table of [recentLookups, recentEnrols, recentWrites]) {
+		for (const [key, times] of table) if (!times.some((t) => t > since)) table.delete(key);
+	}
+}, 600_000).unref();
 
 export const commentForm = form(schemas.commentForm, async ({ proposal, body }) => {
 	const p = proposalOf(proposal);

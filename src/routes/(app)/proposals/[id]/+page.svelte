@@ -231,7 +231,14 @@
 
 			<aside class="order-first min-w-0 space-y-6 lg:sticky lg:top-24 lg:order-none lg:self-start">
 				<VoteBox {p} {id} {now} />
-				{#if p.effect.kind === 'choose'}
+				{#if p.sealed}
+					<div>
+						<h2 class="eyebrow mb-2">Tally</h2>
+						<p class="text-body-sm text-ink-mid">
+							Secret ballot. The totals are shown once the vote is decided.
+						</p>
+					</div>
+				{:else if p.effect.kind === 'choose'}
 					<ChoiceTally
 						options={p.effect.options}
 						tallies={p.tallies}

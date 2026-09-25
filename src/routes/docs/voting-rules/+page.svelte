@@ -232,8 +232,9 @@
 </p>
 <DocNote title="Choose the basis with care">
 	<p>
-		Under the whole vote with no quorum, the app cannot make a proposal pass by leaving ballots out
-		of the count. Under votes cast, or with a quorum, it could tip a result either way. See
+		Under the whole vote with no quorum, the app cannot make a decision or a change pass by leaving
+		ballots out of the count. Under votes cast, or with a quorum, it could tip a result either way.
+		See
 		<a href="/docs/trust-model">Trust Model</a>.
 	</p>
 </DocNote>

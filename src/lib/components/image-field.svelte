@@ -36,7 +36,13 @@
 		class="flex {box} shrink-0 items-center justify-center overflow-hidden border border-border bg-surface-hover"
 	>
 		{#if value.trim() && !failed}
-			<img src={value} alt="" class="size-full object-cover" onerror={() => (failed = true)} />
+			<img
+				referrerpolicy="no-referrer"
+				src={value}
+				alt=""
+				class="size-full object-cover"
+				onerror={() => (failed = true)}
+			/>
 		{:else}
 			<Image size={18} class="text-ink-dim" aria-hidden="true" />
 		{/if}

@@ -77,7 +77,8 @@ thousands of members, and one member's vote touches no contract another's does.
 - `Ballot` — one vote weighing the voter's units. The provider counts in batches
   (`Proposal_Tally`; a final count three minutes after the deadline) and `Ballot_Count` checks
   each ballot: right DAO and proposal, cast in time, under the same rule, by a member of the
-  time whose share has not changed since. The provider can delay a result, never change it.
+  time whose share has not changed since. The provider cannot forge a ballot; what it can do by
+  leaving ballots out is under the trust model below.
 - `Comment` — said once and kept as said; nobody edits or removes it. Comments and proposals
   are paced by the app (thirty writes an hour per party).
 - `Meter` and `Purse` — the provider's statement of a DAO's and a party's account: paid in,

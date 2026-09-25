@@ -31,7 +31,8 @@ export default defineConfig({
 					'connect-src': ['self'],
 					'frame-ancestors': ['none'],
 					'object-src': ['none'],
-					'base-uri': ['self']
+					'base-uri': ['self'],
+					'form-action': ['self']
 				}
 			},
 			experimental: {

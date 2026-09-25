@@ -15,7 +15,8 @@ import * as billing from './billing';
  * later, less and less often, and after enough failures the proposal says why it is stuck. A
  * ballot the ledger itself refuses is found by halving the batch and left out; any other
  * failure is the network's and is waited out. The ledger checks every ballot and every effect
- * it is handed, so this can only delay a result, never change it.
+ * it is handed, so nothing here can count a ballot that was not cast; what leaving ballots out can
+ * do is in README's trust model.
  */
 
 const BATCH = 200;

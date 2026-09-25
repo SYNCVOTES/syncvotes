@@ -100,6 +100,16 @@
 		options.
 	</li>
 	<li>
+		<strong>Pick the runner-up on a choice</strong> with one pick whose rule is half or less: two options
+		can both reach the rule, and the one with more votes wins, so leaving out the leader's ballots makes
+		the other one chosen.
+	</li>
+	<li>
+		<strong>Change a DAO without a vote, together with its creator.</strong> The DAO and its memberships
+		carry the creator's signature and the provider's. Neither can change them alone, but the two acting
+		together could.
+	</li>
+	<li>
 		<strong>Skip a member in a membership change.</strong> When it executes a Members or Shares change,
 		it hands the ledger the affected members' contracts. If it leaves one out, a removal is skipped, or
 		a member ends up with a second membership and a second vote. The ledger cannot tell a missing membership

@@ -47,9 +47,9 @@
 	</tbody>
 </table>
 <p>
-	The person who creates a DAO carries the <Ui>Creator</Ui> tag and nothing more: after creation they
-	propose and vote like any other member. Nobody edits a DAO by hand, and nobody can withdraw a proposal
-	once it is made.
+	The person who creates a DAO carries the <Ui>Creator</Ui> tag: after creation they propose and vote
+	like any other member. Their signature is on the DAO beside the app's, so the app cannot change a DAO
+	without them. Nobody edits a DAO by hand, and nobody can withdraw a proposal once it is made.
 </p>
 <Shot
 	light={proposalsLight}
@@ -73,7 +73,8 @@
 	<li>If it passed and changes the DAO, the app executes the change with the DAO's authority.</li>
 </ol>
 <p>
-	The app can delay a result but cannot forge a ballot. <a href="/docs/trust-model">Trust Model</a>
+	The app can delay a result or make it fail, and under some rules tip it, but it cannot forge a
+	ballot. <a href="/docs/trust-model">Trust Model</a>
 	lists exactly what it can and cannot do.
 </p>
 
