@@ -129,8 +129,7 @@
 								>Result: <strong class={p.outcome === 'Failed' ? 'text-red' : 'text-green'}
 									>{p.outcome.startsWith('Chosen') ? said(p.outcome, options) : p.outcome}</strong
 								>.</span
-							>{#if acts && p.executedAt}
-								Executed {dateOf(p.executedAt)}.{/if}
+							>{#if acts && p.executedAt}&nbsp;Executed {dateOf(p.executedAt)}.{/if}
 						</Note>
 					{/if}
 				</div>
