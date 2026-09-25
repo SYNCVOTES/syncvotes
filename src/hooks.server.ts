@@ -1,6 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { HandleServerError, ServerInit } from '@sveltejs/kit';
+import { building } from '$app/env';
 import { packageId } from '@daml.js/model';
 import { api, readHostedParties, sdk } from '$lib/server/participant';
 import * as ledger from '$lib/server/ledger';
@@ -17,6 +18,8 @@ const DAR_DIR = 'dar';
  * attempt.
  */
 export const init: ServerInit = async () => {
+	// Prerendering the docs runs the server during the build, with no participant to talk to.
+	if (building) return;
 	const dars = (await readdir(DAR_DIR)).filter((f) => f.endsWith('.dar'));
 	if (dars.length !== 1) throw new Error(`Expected one DAR in ${DAR_DIR}, found ${dars.length}`);
 	await (await sdk()).ledger.dar.upload(await readFile(join(DAR_DIR, dars[0])), packageId);
