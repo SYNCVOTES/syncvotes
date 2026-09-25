@@ -233,20 +233,30 @@ export async function flush(): Promise<void> {
 		for (const a of [...dirty]) {
 			const coin = pending.get(a) ?? 0;
 			const { kind, key } = split(a);
-			// A DAO that is gone, or a purse whose party was never allocated, is not written.
-			const gone = kind === 'dao' ? !ledger.daos.has(key) : !ledger.purses.has(key);
+			// A DAO that is gone, or a purse whose party was never allocated, is not written. A party
+			// with an Account but no Purse yet (one that came back after the provider changed) is.
+			const party =
+				kind === 'purse'
+					? (ledger.purses.get(key)?.party ??
+						[...ledger.accounts.keys()].find((p) => p.split('::')[1] === key) ??
+						null)
+					: null;
+			const gone = kind === 'dao' ? !ledger.daos.has(key) : !party;
 			if (coin === 0 || gone) {
 				dirty.delete(a);
 				pending.delete(a);
 				continue;
 			}
 			const f = figures(a);
+			// An account not on the ledger yet holds what arrived for it so far; the contract that
+			// is written for it starts from that, not from nothing.
+			const credited = f.exists ? f.credited : (deposited.get(a) ?? 0);
 			// The charge moves from pending to the figures as the write goes out, not as it lands.
 			pending.set(a, (pending.get(a) ?? 0) - coin);
-			ahead(a, f.credited, f.charged + coin);
+			ahead(a, credited, f.charged + coin);
 			notify(a);
 			try {
-				await write(a, f.credited, f.charged + coin);
+				await write(a, credited, f.charged + coin, party ?? undefined);
 				dirty.delete(a);
 			} catch (e) {
 				pending.set(a, (pending.get(a) ?? 0) + coin);
