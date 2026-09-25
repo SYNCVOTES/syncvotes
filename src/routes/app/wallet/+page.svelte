@@ -437,7 +437,7 @@
 									>
 								{/if}
 								<a
-									href="/people/{encodeURIComponent(screen.who.party)}"
+									href="/app/people/{encodeURIComponent(screen.who.party)}"
 									class="inline-flex items-center gap-1 font-mono text-xs text-ink-dim transition-colors hover:text-orange"
 									>View public profile <ArrowRight size={12} /></a
 								>

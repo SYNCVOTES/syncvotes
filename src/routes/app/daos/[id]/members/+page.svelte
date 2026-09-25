@@ -42,7 +42,7 @@
 
 <svelte:head><title>Members — {dao?.current?.name ?? 'DAO'} — SyncVotes</title></svelte:head>
 
-<Page back={{ href: `/daos/${id}`, label: dao?.current?.name ?? 'DAO' }}>
+<Page back={{ href: `/app/daos/${id}`, label: dao?.current?.name ?? 'DAO' }}>
 	{#if store.screen.at === 'loading'}
 		<Skeleton />
 	{:else if !dao}
@@ -63,7 +63,7 @@
 			{/snippet}
 			{#snippet action()}
 				{#if d.me.membership}
-					<Button href="/daos/{d.id}/proposals/create?kind=shares" variant="outline"
+					<Button href="/app/daos/{d.id}/proposals/create?kind=shares" variant="outline"
 						>Propose a change</Button
 					>
 				{/if}

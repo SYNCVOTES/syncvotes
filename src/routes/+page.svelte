@@ -139,7 +139,7 @@
 		{ href: '#what', label: 'What' },
 		{ href: '#moves', label: 'Protocol' },
 		{ href: '#privacy', label: 'Privacy' },
-		{ href: '/my-daos', label: 'DAOs' },
+		{ href: '/app/my-daos', label: 'DAOs' },
 		{ href: '/docs', label: 'Docs' },
 		{ href: 'https://docs.canton.network', label: 'Canton', external: true }
 	];
@@ -313,7 +313,7 @@
 			<div
 				class="mt-7 flex animate-fade-in gap-3.5 opacity-0 [animation-delay:0.8s] motion-reduce:animate-none motion-reduce:opacity-100 max-sm:flex-wrap max-sm:gap-2.5"
 			>
-				<LandingButton href="/my-daos" arrow>Launch App</LandingButton>
+				<LandingButton href="/app/my-daos" arrow>Launch App</LandingButton>
 				<LandingButton href="#moves" variant="ghost">How it works</LandingButton>
 			</div>
 		</div>
@@ -415,7 +415,7 @@
 				>Start governing.</span
 			>
 		</h2>
-		<LandingButton href="/daos/create" arrow class="{reveal} mt-12">Create a DAO</LandingButton>
+		<LandingButton href="/app/daos/create" arrow class="{reveal} mt-12">Create a DAO</LandingButton>
 		<p
 			class="mt-8 flex items-center justify-center gap-2.5 font-mono text-xs tracking-[0.16em] text-ink-dim uppercase"
 		>

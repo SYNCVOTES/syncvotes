@@ -64,7 +64,8 @@
 		{:else if daos.current.total === 0}
 			<StateMessage variant="dashed" title={q ? 'No matches.' : 'No public DAOs yet'}>
 				{#snippet actions()}
-					{#if !q}<Button href="/my-daos" variant="outline">Make one of yours public</Button>{/if}
+					{#if !q}<Button href="/app/my-daos" variant="outline">Make one of yours public</Button
+						>{/if}
 				{/snippet}
 			</StateMessage>
 		{:else}

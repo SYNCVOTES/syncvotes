@@ -79,8 +79,8 @@
 <Page
 	width="wide"
 	back={dao?.current && !dao.current.me.membership
-		? { href: '/daos', label: 'Public DAOs' }
-		: { href: '/my-daos', label: 'My DAOs' }}
+		? { href: '/app/daos', label: 'Public DAOs' }
+		: { href: '/app/my-daos', label: 'My DAOs' }}
 >
 	{#if store.screen.at === 'loading'}
 		<Skeleton />
@@ -149,7 +149,7 @@
 			{/snippet}
 			{#snippet action()}
 				{#if d.me.membership && !empty && !d.dissolving}
-					<Button href="/daos/{d.id}/proposals/create"
+					<Button href="/app/daos/{d.id}/proposals/create"
 						><Plus strokeWidth={2.5} /> New proposal</Button
 					>
 				{/if}
@@ -249,7 +249,7 @@
 					<List>
 						{#each proposals.current.items as p (p.id)}
 							{@const due = waiting.has(p.id)}
-							<ListItem href="/proposals/{p.id}" padding="md" class="min-w-0">
+							<ListItem href="/app/proposals/{p.id}" padding="md" class="min-w-0">
 								<div class="min-w-0 flex-1">
 									<div class="flex min-w-0 items-center gap-2">
 										<span class="truncate font-display text-body font-bold">{p.title}</span>
@@ -328,7 +328,7 @@
 							{#each [1, 2, 3] as i (i)}<Skeleton height="h-11" />{/each}
 						</div>
 					{/if}
-					<Button href="/daos/{d.id}/members" variant="outline" size="sm" class="mt-3 w-full">
+					<Button href="/app/daos/{d.id}/members" variant="outline" size="sm" class="mt-3 w-full">
 						All members
 						<ArrowRight size={14} />
 					</Button>

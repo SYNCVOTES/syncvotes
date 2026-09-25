@@ -40,7 +40,7 @@
 	<div class="flex items-center gap-3 max-[1120px]:ml-auto max-sm:gap-2">
 		<a
 			class="rounded-full border border-current px-4 py-[9px] font-mono text-[13px] tracking-[0.12em] whitespace-nowrap uppercase max-sm:px-[13px] max-sm:py-2 max-sm:text-xs max-sm:tracking-[0.08em]"
-			href="/my-daos"
+			href="/app/my-daos"
 		>
 			<!-- eslint-disable-next-line svelte/no-useless-mustaches -- a bare space here is dropped -->
 			Launch<span class="max-sm:hidden">{' '}App</span>

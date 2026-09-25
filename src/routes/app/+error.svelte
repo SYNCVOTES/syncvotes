@@ -19,11 +19,11 @@
 	<!-- My DAOs asks a signed-out visitor to sign in first; home is the way on for them. -->
 	<div class="flex flex-wrap gap-3">
 		{#if store.who}
-			<Button href="/my-daos">My DAOs</Button>
+			<Button href="/app/my-daos">My DAOs</Button>
 			<Button href="/" variant="outline">Home</Button>
 		{:else}
 			<Button href="/">Home</Button>
-			<Button href="/my-daos" variant="outline">My DAOs</Button>
+			<Button href="/app/my-daos" variant="outline">My DAOs</Button>
 		{/if}
 	</div>
 </Page>

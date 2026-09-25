@@ -17,7 +17,7 @@
 			<Problem message={store.problem} />
 			<UnlockForm />
 		{:else}
-			<Button href="/wallet">Go to Wallet</Button>
+			<Button href="/app/wallet">Go to Wallet</Button>
 		{/if}
 	{/snippet}
 </StateMessage>

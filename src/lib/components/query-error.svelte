@@ -16,7 +16,7 @@
 	let {
 		error,
 		refresh,
-		back = { href: '/my-daos', label: 'Back to My DAOs' }
+		back = { href: '/app/my-daos', label: 'Back to My DAOs' }
 	}: {
 		error: unknown;
 		refresh: () => unknown;

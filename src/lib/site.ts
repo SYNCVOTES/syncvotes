@@ -6,9 +6,9 @@ export type NavItem = { href: string; label: string; wide?: boolean };
 export type FooterLink = { href: string; label: string; external?: boolean };
 
 export const NAV: NavItem[] = [
-	{ href: '/my-daos', label: 'My DAOs' },
-	{ href: '/daos', label: 'Public DAOs' },
-	{ href: '/wallet', label: 'Wallet' },
+	{ href: '/app/my-daos', label: 'My DAOs' },
+	{ href: '/app/daos', label: 'Public DAOs' },
+	{ href: '/app/wallet', label: 'Wallet' },
 	{ href: '/docs', label: 'Docs' }
 ];
 

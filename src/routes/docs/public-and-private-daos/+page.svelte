@@ -90,8 +90,8 @@
 	<li>Find its DAO ID on the organization's own site or channel.</li>
 	<li>
 		Compare it with the <Ui>DAO ID</Ui> at the bottom of a public DAO's page, or with the end of the page's
-		address, <code>/daos/&lt;DAO ID&gt;</code>. Pasting the ID into the Public DAOs search finds the
-		DAO too.
+		address, <code>/app/daos/&lt;DAO ID&gt;</code>. Pasting the ID into the Public DAOs search finds
+		the DAO too.
 	</li>
 </ol>
 <Shot

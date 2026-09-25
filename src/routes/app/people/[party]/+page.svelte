@@ -49,7 +49,7 @@
 			{#snippet meta()}<PartyId {party} />{/snippet}
 			{#snippet action()}
 				{#if party === me && p.exists}
-					<Button variant="outline" href="/wallet">Edit profile</Button>
+					<Button variant="outline" href="/app/wallet">Edit profile</Button>
 				{/if}
 			{/snippet}
 		</EntityHeader>
@@ -61,7 +61,7 @@
 		{:else if party === me}
 			<StateMessage variant="dashed" icon={UserRound} title="No profile yet">
 				Others see only your party ID.
-				{#snippet actions()}<Button href="/wallet">Set up profile</Button>{/snippet}
+				{#snippet actions()}<Button href="/app/wallet">Set up profile</Button>{/snippet}
 			</StateMessage>
 		{:else}
 			<StateMessage variant="dashed" icon={UserRound} title="No profile" />

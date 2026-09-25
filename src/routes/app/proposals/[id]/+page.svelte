@@ -75,8 +75,8 @@
 
 <Page
 	back={proposal?.current
-		? { href: `/daos/${proposal.current.daoId}`, label: proposal.current.daoName ?? 'DAO' }
-		: { href: '/my-daos', label: 'My DAOs' }}
+		? { href: `/app/daos/${proposal.current.daoId}`, label: proposal.current.daoName ?? 'DAO' }
+		: { href: '/app/my-daos', label: 'My DAOs' }}
 >
 	{#if store.screen.at === 'loading'}
 		<Skeleton />

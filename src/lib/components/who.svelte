@@ -17,7 +17,7 @@
 		size?: 'sm' | 'md';
 		class?: string;
 	} = $props();
-	const href = $derived(`/people/${encodeURIComponent(who.party)}`);
+	const href = $derived(`/app/people/${encodeURIComponent(who.party)}`);
 </script>
 
 <span class="flex min-w-0 items-center gap-2.5 {className}">

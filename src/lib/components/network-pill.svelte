@@ -14,14 +14,15 @@
 		.map((pair) => pair.trim().split('='))
 		.filter(([name, url]) => name && url && name !== NETWORK)
 		.map(([name, url]) => ({ name, url: url.replace(/\/$/, '') }));
-	const KEEP = ['/', '/my-daos', '/daos', '/wallet'];
+	const KEEP = ['/', '/app/my-daos', '/app/daos', '/app/wallet'];
 	// On MainNet the beta tag is the environment signal; the pill stays as the way to switch.
 	const mainnet = NETWORK.toLowerCase() === 'mainnet';
 	// The docs are the same on every network, so a docs page stays where it is.
 	const path = $derived(
-		KEEP.includes(page.url.pathname) || page.url.pathname.startsWith('/docs')
+		KEEP.includes(page.url.pathname) ||
+			/^\/(docs|privacy|terms|brand)(\/|$)/.test(page.url.pathname)
 			? page.url.pathname
-			: '/my-daos'
+			: '/app/my-daos'
 	);
 	let open = $state(false);
 	let root: HTMLElement | undefined = $state();

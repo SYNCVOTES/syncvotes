@@ -37,7 +37,7 @@
 		<div class="flex shrink-0 items-center gap-2.5">
 			<span class="hidden md:flex"><ThemeToggle /></span>
 			<Button
-				href="/wallet"
+				href="/app/wallet"
 				variant="outline"
 				size="sm"
 				class="max-w-[130px] px-3 md:max-w-[200px]"

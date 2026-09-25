@@ -160,7 +160,7 @@
 				}
 			};
 		},
-		({ id }) => goto(`/daos/${id}`)
+		({ id }) => goto(`/app/daos/${id}`)
 	);
 </script>
 
@@ -366,7 +366,7 @@
 						label="Create DAO"
 						busy={store.busy || f.pending > 0}
 						disabled={!summary.valid || !validRule(sensitive.rule)}
-						cancelHref="/my-daos"
+						cancelHref="/app/my-daos"
 					/>
 				</div>
 				<div

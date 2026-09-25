@@ -1,6 +1,6 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { HandleServerError, ServerInit } from '@sveltejs/kit';
+import { redirect, type Handle, type HandleServerError, type ServerInit } from '@sveltejs/kit';
 import { building } from '$app/env';
 import { packageId } from '@daml.js/model';
 import { api, readHostedParties, sdk } from '$lib/server/participant';
@@ -52,4 +52,14 @@ export const handleError: HandleServerError = ({ error }) => {
 	const ref = crypto.randomUUID().slice(0, 8);
 	console.error(`Unexpected error ${ref}:`, error);
 	return { message: `Something went wrong (ref ${ref}). Try again.` };
+};
+
+/** Where the app lived before it moved under /app: links already shared keep working. */
+const MOVED = /^\/(my-daos|daos|proposals|people|wallet)(\/|$)/;
+
+export const handle: Handle = ({ event, resolve }) => {
+	// The query is read only for a moved path: prerendered pages may not touch it.
+	const { pathname } = event.url;
+	if (MOVED.test(pathname)) redirect(308, `/app${pathname}${event.url.search}`);
+	return resolve(event);
 };

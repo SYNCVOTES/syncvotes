@@ -53,7 +53,7 @@
 </script>
 
 <a
-	href="/daos/{id}"
+	href="/app/daos/{id}"
 	class="group flex flex-col border bg-surface p-5 transition-colors hover:border-border-hover hover:bg-surface-hover md:p-6 {awaiting
 		? 'border-orange/40'
 		: 'border-border'}"

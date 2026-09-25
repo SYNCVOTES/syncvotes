@@ -7,7 +7,7 @@
 	 */
 	let { href, label, size = 'md' }: { href: string; label: string; size?: 'md' | 'sm' } = $props();
 	const active = $derived(
-		href === '/daos' ? page.url.pathname === '/daos' : page.url.pathname.startsWith(href)
+		href === '/app/daos' ? page.url.pathname === '/app/daos' : page.url.pathname.startsWith(href)
 	);
 </script>
 

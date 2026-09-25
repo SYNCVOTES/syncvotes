@@ -45,7 +45,9 @@
 	<PageHeader eyebrow="Your DAOs" title="My DAOs" description="DAOs you created or belong to.">
 		{#snippet action()}
 			{#if who && daos?.ready && daos.current.length > 0}
-				<Button href="/daos/create" variant="outline"><Plus strokeWidth={2.5} /> Create DAO</Button>
+				<Button href="/app/daos/create" variant="outline"
+					><Plus strokeWidth={2.5} /> Create DAO</Button
+				>
 			{/if}
 		{/snippet}
 	</PageHeader>
@@ -67,7 +69,7 @@
 			Create one, or share your party ID with a member:
 			<span class="mt-2 flex justify-center"><PartyId party={who.party} /></span>
 			{#snippet actions()}
-				<Button href="/daos/create"><Plus strokeWidth={2.5} /> Create DAO</Button>
+				<Button href="/app/daos/create"><Plus strokeWidth={2.5} /> Create DAO</Button>
 			{/snippet}
 		</StateMessage>
 	{:else}
@@ -78,7 +80,7 @@
 					{#each due as d (d.contractId)}
 						<li>
 							<a
-								href="/daos/{d.id}"
+								href="/app/daos/{d.id}"
 								class="group inline-flex flex-wrap items-center gap-x-2 text-body-sm text-ink hover:text-orange"
 							>
 								<span class="font-bold">{d.name}</span>

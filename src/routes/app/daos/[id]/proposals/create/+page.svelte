@@ -331,7 +331,7 @@
 				}
 			};
 		},
-		({ pid }) => goto(`/proposals/${pid}`)
+		({ pid }) => goto(`/app/proposals/${pid}`)
 	);
 
 	const ready = $derived.by(() => {
@@ -355,7 +355,7 @@
 
 <svelte:head><title>New Proposal — SyncVotes</title></svelte:head>
 
-<Page width="narrow" back={{ href: `/daos/${id}`, label: d?.name ?? 'DAO' }}>
+<Page width="narrow" back={{ href: `/app/daos/${id}`, label: d?.name ?? 'DAO' }}>
 	<PageHeader eyebrow={d?.name ?? 'DAO'} title="New Proposal" />
 
 	{#if store.screen.at === 'loading'}
@@ -657,7 +657,7 @@
 					label="Create proposal"
 					busy={store.busy || f.pending > 0}
 					disabled={!ready}
-					cancelHref="/daos/{id}"
+					cancelHref="/app/daos/{id}"
 					problem={store.problem}
 				/>
 			</div>
