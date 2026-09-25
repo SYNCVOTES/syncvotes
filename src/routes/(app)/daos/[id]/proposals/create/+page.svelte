@@ -62,20 +62,31 @@
 	 * do: the same sentence the voters will read.
 	 */
 	type Kind = 'signal' | 'choose' | 'shares' | 'info' | 'dissolve' | 'settings' | 'visibility';
-	let kind = $state<Kind>('signal');
+	// `?kind=shares` (from the members page) starts on that kind; anything else on a decision.
+	const KINDS: Kind[] = [
+		'signal',
+		'choose',
+		'shares',
+		'info',
+		'dissolve',
+		'settings',
+		'visibility'
+	];
+	const asked = page.url.searchParams.get('kind') as Kind | null;
+	let kind = $state<Kind>(asked && KINDS.includes(asked) ? asked : 'signal');
 	const kinds = $derived([
 		{
 			value: 'signal',
 			title: 'Decision',
 			text: 'The DAO takes a position. Nothing else changes.',
-			more: "Records the DAO's position on a question: an opinion, an approval, a mandate for someone. Nothing on the ledger changes but the record of the vote itself. For anything that does not need the ledger to act.",
+			more: "Records the DAO's position, for example an approval or a mandate. Changes nothing on the ledger.",
 			icon: MessageSquare
 		},
 		{
 			value: 'choose',
 			title: 'Choice',
-			text: 'The DAO picks one of several options.',
-			more: 'Puts two to ten options to the vote; each member picks one, or abstains. The option with the most votes wins if it reaches what the rule you set asks of a yes — more than half of the whole vote, say — and stands alone at the top; a tie decides nothing. With several options allowed on the ballot, a member picks any number, and every option that reaches the rule is chosen. Nothing on the ledger changes but the record of the choice.',
+			text: 'The DAO picks from a list of options.',
+			more: '2–10 options. The top option wins if it meets the rule and is not tied. With several picks allowed, every option that meets the rule wins.',
 			icon: ListChecks
 		},
 		d?.equal
@@ -83,28 +94,28 @@
 					value: 'shares',
 					title: 'Members',
 					text: 'Who is in the DAO: parties join or leave.',
-					more: "Adds or removes members; every member has one vote. Only the parties you add or remove are put to the vote, everyone else stays as is. A member removed has no vote from the moment this is carried out; a ballot they cast before on a proposal that was already open still counts, since that vote's electorate was fixed when it opened.",
+					more: 'Only the parties you add or remove are voted on.',
 					icon: Users
 				}
 			: {
 					value: 'shares',
 					title: 'Shares',
 					text: 'Who holds what share of the vote: parties join, leave, gain or lose.',
-					more: 'Changes who holds how many units of the vote: parties join with units, leave at zero, or move up or down. Only the parties you touch are put to the vote. A member whose units change cannot vote on proposals that were open before the change was made, so nobody votes twice with two different weights.',
+					more: "Only the parties you change are voted on. Members whose units change can't vote on proposals opened before the change.",
 					icon: PieChart
 				},
 		{
 			value: 'info',
-			title: 'Name & description',
+			title: 'Name and description',
 			text: 'A new name, description or picture.',
-			more: 'Renames the DAO, rewrites its description in Markdown, or changes its picture. The fields start with what is there today; what you leave as is stays as is.',
+			more: 'Fields start with the current values.',
 			icon: Pencil
 		},
 		{
 			value: 'settings',
 			title: 'Voting rules',
 			text: 'How the DAO votes on changes to itself.',
-			more: "Changes the DAO's voting rules: for anything that changes the DAO — members, name, these rules, visibility, dissolution — whether the ballot is secret, whether votes may change, what it takes to pass and how long the vote is open. This proposal is itself such a change, so it passes under the rules as they stand today.",
+			more: 'Passes under the current voting rules.',
 			icon: Scale
 		},
 		{
@@ -113,14 +124,14 @@
 			text: d?.public
 				? 'Make the DAO private again.'
 				: 'Make the DAO public: listed, readable by anyone signed in.',
-			more: "Public: listed among the public DAOs, readable by anyone signed in — proposals, outcomes, members, comments — and open to pay-ins; only members act, and who voted how stays with the members. Private: only members see it exists. A change to the DAO, so it passes under the DAO's voting rules.",
+			more: 'Public: anyone signed in can read it. Private: only members see it.',
 			icon: Eye
 		},
 		{
 			value: 'dissolve',
 			title: 'Dissolve',
-			text: 'The DAO is wound up for good.',
-			more: 'Winds the DAO up for good. The moment it passes the DAO is archived: nothing more can be proposed or voted on, what was paid in for it is spent, and its record stays readable.',
+			text: 'Permanently close the DAO.',
+			more: 'Nothing more can be proposed or voted on. The remaining balance is lost. The record stays readable.',
 			icon: Power
 		}
 	] as const satisfies readonly {
@@ -200,10 +211,8 @@
 	const outcome = $derived.by(() => {
 		switch (kind) {
 			case 'shares': {
-				if (!summary.valid && summary.changes === 0)
-					return 'Nothing changes yet — edit the table below.';
-				if (!summary.valid)
-					return 'The change is not whole: a DAO keeps at least one member with a share.';
+				if (!summary.valid && summary.changes === 0) return 'No changes yet.';
+				if (!summary.valid) return 'A DAO needs at least one member with units.';
 				const parts = [];
 				if (summary.joins)
 					parts.push(
@@ -217,30 +226,28 @@
 					parts.push(
 						`${fmt(summary.moved)} ${summary.moved === 1 ? 'share changes' : 'shares change'}`
 					);
-				return `${parts.join(', ')}; ${fmt(summary.members)} ${summary.members === 1 ? 'member' : 'members'} after${d?.equal ? '' : `, ${fmt(summary.units)} units in all`}.${summary.changes > BATCH ? ` Carried out in ${Math.ceil(summary.changes / BATCH)} batches.` : ''}`;
+				return `${parts.join(', ')}; ${fmt(summary.members)} ${summary.members === 1 ? 'member' : 'members'} after${d?.equal ? '' : `, ${fmt(summary.units)} units in all`}.${summary.changes > BATCH ? ` Executed in ${Math.ceil(summary.changes / BATCH)} batches.` : ''}`;
 			}
 			case 'info':
-				if (!newName.trim()) return 'Give the DAO its name below.';
-				if (!infoChanged) return 'Nothing changes yet — edit the name, description or picture.';
+				if (!newName.trim()) return 'Enter a name.';
+				if (!infoChanged) return 'No changes yet.';
 				return `The DAO is ${newName.trim() !== d?.name ? `renamed to “${newName.trim()}”` : 'kept as is'}${newDescription !== d?.description ? ', with a new description' : ''}${(newImage.trim() || null) !== d?.image ? (newImage.trim() ? ', with a new picture' : ', without a picture') : ''}.`;
 			case 'choose':
 				if (!validOptions(optionList))
 					return optionList.length < 2
-						? 'Give at least two options below.'
-						: 'Two to ten distinct options, eighty characters each at most.';
+						? 'Add at least two options.'
+						: '2–10 distinct options, 80 characters each.';
 				return several
-					? `Members pick any of ${fmt(optionList.length)} options; every option that reaches what a yes would need is chosen.`
-					: `Members pick one of ${fmt(optionList.length)} options; the one with the most votes wins if it reaches what a yes would need, and stands alone at the top.`;
+					? `Members pick any of ${fmt(optionList.length)} options. Every option that meets the rule wins.`
+					: `Members pick one of ${fmt(optionList.length)} options. The top option wins if it meets the rule.`;
 			case 'visibility':
-				return d?.public
-					? 'The DAO becomes private: it leaves the public list, and only its members can read it from then on.'
-					: 'The DAO becomes public: listed for anyone signed in to read — proposals, outcomes, members, comments. Only members act; who voted how stays with the members.';
+				return d?.public ? 'The DAO becomes private.' : 'The DAO becomes public.';
 			case 'dissolve':
-				return 'The DAO is archived the moment this passes: nothing more can be proposed or voted on, what was paid in for it is spent, and its record stays readable.';
+				return 'The DAO closes permanently. Nothing more can be proposed or voted on. The remaining balance is lost; the record stays readable.';
 			case 'settings':
 				return `From then on, a change to the DAO is voted on by ${newSensitive.rule.secret ? 'secret' : 'open'} ballot, votes ${newSensitive.rule.changeable ? 'may change until the deadline' : 'final once cast'}, and passes when ${describe(newSensitive.rule)}, open ${newSensitive.votingDays} days.`;
 			default:
-				return 'The decision is recorded on the ledger. Nothing else changes.';
+				return 'Recorded on the ledger. Nothing else changes.';
 		}
 	});
 	/** A title the proposal can carry if none is typed. */
@@ -350,14 +357,10 @@
 	});
 </script>
 
-<svelte:head><title>New proposal — SyncVotes</title></svelte:head>
+<svelte:head><title>New Proposal — SyncVotes</title></svelte:head>
 
 <Page width="narrow" back={{ href: `/daos/${id}`, label: d?.name ?? 'DAO' }}>
-	<PageHeader
-		eyebrow="New proposal"
-		title="Propose"
-		description="Every member votes with their share. A change to the DAO runs under its voting rules; for a decision or a choice you set the ballot and the rule yourself. The ledger carries out what passes."
-	/>
+	<PageHeader eyebrow={d?.name ?? 'DAO'} title="New Proposal" />
 
 	{#if store.screen.at === 'loading'}
 		<Skeleton height="h-64" />
@@ -368,7 +371,30 @@
 	{:else if !d}
 		<Skeleton height="h-64" />
 	{:else}
-		<form {...enhanced} class="space-y-8">
+		{@const picked = kinds.find((k) => k.value === kind)}
+		{#snippet kindButton(k: (typeof kinds)[number])}
+			{@const Icon = k.icon}
+			{@const danger = k.value === 'dissolve'}
+			<label
+				class="flex cursor-pointer items-center gap-2 border px-3 py-2.5 text-body-sm transition-colors {kind ===
+				k.value
+					? danger
+						? 'border-red bg-red/[0.06] text-red'
+						: 'border-orange bg-orange/5 text-ink'
+					: danger
+						? 'border-red/30 text-red hover:border-red/60'
+						: 'border-border text-ink-mid hover:border-border-hover hover:text-ink'}"
+			>
+				<input type="radio" class="sr-only" value={k.value} bind:group={kind} />
+				<Icon
+					size={15}
+					class="shrink-0 {danger ? 'text-red' : kind === k.value ? 'text-orange' : 'text-ink-dim'}"
+					aria-hidden="true"
+				/>
+				<span class="min-w-0 truncate font-display font-bold">{k.title}</span>
+			</label>
+		{/snippet}
+		<form {...enhanced} class="space-y-10">
 			<input {...f.fields.dao.as('hidden', id)} />
 			<input type="hidden" name="kind" value={kind} />
 			<input type="hidden" name="title" value={title.trim() || suggested} />
@@ -376,38 +402,38 @@
 			<input type="hidden" name="several" value={several ? 'yes' : 'no'} />
 			<input type="hidden" name="newPublic" value={d.public ? 'no' : 'yes'} />
 
-			<FormSection title="What it does">
-				<div class="grid gap-3 sm:grid-cols-2">
-					{#each kinds as k (k.value)}
-						{@const Icon = k.icon}
-						<label
-							class="flex cursor-pointer items-start gap-3 border p-4 transition-colors {kind ===
-							k.value
-								? 'border-orange bg-orange/5'
-								: 'border-border hover:border-border-hover'}"
-						>
-							<input type="radio" class="sr-only" value={k.value} bind:group={kind} />
-							<Icon
-								size={18}
-								class="mt-0.5 shrink-0 {kind === k.value ? 'text-orange' : 'text-ink-dim'}"
-								aria-hidden="true"
-							/>
-							<span class="min-w-0">
-								<span class="flex items-center gap-1.5 font-display text-body font-bold"
-									>{k.title} <Hint text={k.more} /></span
-								>
-								<span class="mt-1 block text-xs leading-relaxed text-ink-mid">{k.text}</span>
-							</span>
-						</label>
+			<FormSection variant="plain" number="01" title="Type">
+				<div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+					{#each kinds.filter((k) => categoryOf(k.value) === 'routine' || k.value === 'shares') as k (k.value)}
+						{@render kindButton(k)}
 					{/each}
 				</div>
+				<div>
+					<p class="eyebrow mb-2">Changes to the DAO</p>
+					<div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+						{#each kinds.filter((k) => k.value === 'info' || k.value === 'settings' || k.value === 'visibility') as k (k.value)}
+							{@render kindButton(k)}
+						{/each}
+					</div>
+				</div>
+				<div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+					{#each kinds.filter((k) => k.value === 'dissolve') as k (k.value)}
+						{@render kindButton(k)}
+					{/each}
+				</div>
+				{#if picked}
+					<p class="flex items-center gap-1.5 text-body-sm text-ink-mid">
+						{picked.text}
+						<Hint text={picked.more} />
+					</p>
+				{/if}
 			</FormSection>
 
-			<FormSection title="The proposal">
+			<FormSection variant="plain" number="02" title="Details">
 				<Field
 					label="Title"
 					id="title"
-					hint={suggested && !title.trim() ? `Left empty, it will be “${suggested}”.` : undefined}
+					hint={suggested && !title.trim() ? `Default: “${suggested}”` : undefined}
 					issues={f.fields.title.issues()}
 				>
 					<Input
@@ -423,210 +449,219 @@
 						id="description"
 						bind:value={description}
 						maxlength={20_000}
-						placeholder="What is being decided, and why. Markdown; pictures by link."
+						placeholder="What and why. Markdown supported."
 						disabled={store.busy}
 					/>
 				</Field>
 			</FormSection>
 
-			<FormSection title="If it passes">
-				{#if kind === 'shares'}
-					<Field
-						label={d.equal ? 'The members after' : 'The table after'}
-						id="shares"
-						hint={d.equal
-							? "Today's members to start from. Add or remove; only what changes is put to the vote."
-							: "Today's holders and units to start from. Add, remove, move; only what changes is put to the vote."}
-						issues={f.fields.shares.issues()}
-					>
-						{#if rowsSeeded}
-							<MemberEditor
-								mode={d.equal ? 'equal' : 'shares'}
-								name="shares"
-								emit="diff"
-								dao={id}
-								busy={store.busy}
-								{baseline}
-								bind:rows
-								bind:summary
-							/>
-						{:else}
-							<Skeleton height="h-24" />
-						{/if}
-					</Field>
-				{:else if kind === 'choose'}
-					<Field
-						label="Options"
-						id="option-0"
-						hint="Two to ten, a few words each. Members pick one, or several if the ballot allows it; an abstention takes part without picking."
-						issues={f.fields.options.issues()}
-					>
-						<ol class="space-y-2">
-							{#each options, i (i)}
-								<li class="flex items-center gap-2">
-									<span class="w-5 shrink-0 text-right font-mono text-xs text-ink-dim">{i + 1}</span
-									>
-									<Input
-										id="option-{i}"
-										maxlength={80}
-										placeholder={i === 0 ? 'Telecaster' : i === 1 ? 'Stratocaster' : ''}
-										class="flex-1"
-										disabled={store.busy}
-										bind:value={options[i]}
-									/>
-									{#if options.length > 2}
-										<button
-											type="button"
-											class="p-1 text-ink-dim hover:text-red"
-											aria-label="Remove option {i + 1}"
-											onclick={() => (options = options.filter((_, j) => j !== i))}
-											><X size={14} /></button
+			{#if kind !== 'signal' && kind !== 'dissolve' && kind !== 'visibility'}
+				<FormSection variant="plain" number="03" title="If it passes">
+					{#if kind === 'shares'}
+						<Field
+							label={d.equal ? 'The members after' : 'The table after'}
+							id="shares"
+							hint={d.equal
+								? 'Add or remove members. Only changes are voted on.'
+								: 'Add, remove or change units. Only changes are voted on.'}
+							issues={f.fields.shares.issues()}
+						>
+							{#if rowsSeeded}
+								<MemberEditor
+									mode={d.equal ? 'equal' : 'shares'}
+									name="shares"
+									emit="diff"
+									dao={id}
+									busy={store.busy}
+									{baseline}
+									bind:rows
+									bind:summary
+								/>
+							{:else}
+								<Skeleton height="h-24" />
+							{/if}
+						</Field>
+					{:else if kind === 'choose'}
+						<Field
+							label="Options"
+							id="option-0"
+							hint="2–10 options, a few words each."
+							issues={f.fields.options.issues()}
+						>
+							<ol class="space-y-2">
+								{#each options, i (i)}
+									<li class="flex items-center gap-2">
+										<span class="w-5 shrink-0 text-right font-mono text-xs text-ink-dim"
+											>{i + 1}</span
 										>
-									{/if}
-								</li>
-							{/each}
-						</ol>
-						{#if options.length < 10}
-							<button
-								type="button"
-								class="mt-2 font-mono text-xs text-ink-dim underline hover:text-ink"
-								onclick={() => (options = [...options, ''])}>Add an option</button
-							>
-						{/if}
-					</Field>
-				{:else if kind === 'info'}
-					<Field label="Name" id="newName" issues={f.fields.newName.issues()}>
-						<Input
-							{...f.fields.newName.as('text')}
-							id="newName"
-							maxlength={60}
-							bind:value={newName}
-						/>
-					</Field>
-					<Field label="Description" id="newDescription" issues={f.fields.newDescription.issues()}>
-						<MarkdownEditor
-							name="newDescription"
+										<Input
+											id="option-{i}"
+											maxlength={80}
+											placeholder={i === 0 ? 'Telecaster' : i === 1 ? 'Stratocaster' : ''}
+											class="flex-1"
+											disabled={store.busy}
+											bind:value={options[i]}
+										/>
+										{#if options.length > 2}
+											<button
+												type="button"
+												class="p-1 text-ink-dim hover:text-red"
+												aria-label="Remove option {i + 1}"
+												onclick={() => (options = options.filter((_, j) => j !== i))}
+												><X size={14} /></button
+											>
+										{/if}
+									</li>
+								{/each}
+							</ol>
+							{#if options.length < 10}
+								<button
+									type="button"
+									class="mt-2 font-mono text-xs text-ink-dim underline hover:text-ink"
+									onclick={() => (options = [...options, ''])}>Add option</button
+								>
+							{/if}
+						</Field>
+					{:else if kind === 'info'}
+						<Field label="Name" id="newName" issues={f.fields.newName.issues()}>
+							<Input
+								{...f.fields.newName.as('text')}
+								id="newName"
+								maxlength={60}
+								bind:value={newName}
+							/>
+						</Field>
+						<Field
+							label="Description"
 							id="newDescription"
-							bind:value={newDescription}
-							maxlength={10_000}
-							placeholder="Leave empty to clear it"
-							disabled={store.busy}
+							issues={f.fields.newDescription.issues()}
+						>
+							<MarkdownEditor
+								name="newDescription"
+								id="newDescription"
+								bind:value={newDescription}
+								maxlength={10_000}
+								placeholder="Leave empty to clear it"
+								disabled={store.busy}
+							/>
+						</Field>
+						<Field label="Picture" id="newImage" issues={f.fields.newImage.issues()}>
+							<ImageField
+								name="newImage"
+								id="newImage"
+								bind:value={newImage}
+								disabled={store.busy}
+							/>
+						</Field>
+					{:else if kind === 'settings'}
+						{#each settingsFields('newRoutine', newRoutine) as [name, value] (name)}
+							<input type="hidden" {name} {value} />
+						{/each}
+						<h3 class="eyebrow">Ballot</h3>
+						<RuleSettings
+							bind:settings={newSensitive}
+							prefix="newSensitive"
+							part="ballot"
+							eligible={d.units}
+							equal={d.equal}
 						/>
-					</Field>
-					<Field label="Picture" id="newImage" issues={f.fields.newImage.issues()}>
-						<ImageField name="newImage" id="newImage" bind:value={newImage} disabled={store.busy} />
-					</Field>
-				{:else if kind === 'settings'}
-					{#each settingsFields('newRoutine', newRoutine) as [name, value] (name)}
-						<input type="hidden" {name} {value} />
-					{/each}
-					<h3 class="eyebrow">Ballot</h3>
-					<RuleSettings
-						bind:settings={newSensitive}
-						prefix="newSensitive"
-						part="ballot"
-						eligible={d.units}
-						equal={d.equal}
-					/>
-					<h3 class="eyebrow">How it passes</h3>
-					<RuleSettings
-						bind:settings={newSensitive}
-						prefix="newSensitive"
-						eligible={d.units}
-						equal={d.equal}
-					/>
-				{/if}
+						<h3 class="eyebrow">How it passes</h3>
+						<RuleSettings
+							bind:settings={newSensitive}
+							prefix="newSensitive"
+							eligible={d.units}
+							equal={d.equal}
+						/>
+					{/if}
+				</FormSection>
+			{/if}
 
-				<Note mono={false}>{outcome}</Note>
-			</FormSection>
-
-			<FormSection title="Ballot">
+			<FormSection
+				variant="plain"
+				number={kind !== 'signal' && kind !== 'dissolve' && kind !== 'visibility' ? '04' : '03'}
+				title="Voting"
+			>
 				{#if own}
-					<p class="text-sm leading-relaxed text-ink-mid">
-						How members vote on this one. You choose, since a decision or a choice changes nothing
-						on the ledger.
-					</p>
+					<p class="text-body-sm text-ink-mid">Set by you for this proposal.</p>
 					<RuleSettings
 						bind:settings={newRoutine}
 						prefix="newRoutine"
-						part="ballot"
 						eligible={d.units}
 						equal={d.equal}
+						collapsed
 					>
-						{#snippet extra()}
-							{#if kind === 'choose'}
-								<div
-									class="grid items-center gap-3 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"
-								>
-									<span
-										class="flex items-center gap-1.5 font-mono text-xs tracking-[0.14em] text-ink-dim uppercase"
-										>Several options <Hint
-											text="Each member picks any number of options. Each option is measured on its own against the rule below; every one that reaches it is chosen. Where the rule counts the votes cast, an option is measured against the ballots that picked anything."
-										/></span
-									>
-									<label class="flex items-center gap-2 text-sm">
-										<input
-											type="checkbox"
-											class="accent-orange"
-											aria-label="Members may pick several options"
-											bind:checked={several}
-										/>
-										<span class="text-ink-mid">a member may pick more than one</span>
-									</label>
-								</div>
-							{/if}
+						{#snippet ballot()}
+							<RuleSettings
+								bind:settings={newRoutine}
+								prefix="newRoutine"
+								part="ballot"
+								bare
+								eligible={d.units}
+								equal={d.equal}
+							>
+								{#snippet extra()}
+									{#if kind === 'choose'}
+										<div
+											class="grid items-center gap-3 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"
+										>
+											<span
+												class="flex items-center gap-1.5 font-mono text-xs tracking-[0.14em] text-ink-dim uppercase"
+												>Several options <Hint
+													text="Each option is measured against the rule separately. With 'votes cast', the base is ballots that picked something."
+												/></span
+											>
+											<label class="flex items-center gap-2 text-sm">
+												<input
+													type="checkbox"
+													class="accent-orange"
+													aria-label="Members may pick several options"
+													bind:checked={several}
+												/>
+												<span class="text-ink-mid">a member may pick more than one</span>
+											</label>
+										</div>
+									{/if}
+								{/snippet}
+							</RuleSettings>
 						{/snippet}
 					</RuleSettings>
 				{:else if applies}
-					<p class="text-sm leading-relaxed text-ink-mid">
-						Set by the DAO for every change to it: {applies.rule.secret
-							? 'a secret ballot'
-							: 'an open ballot'}, and votes {applies.rule.changeable
-							? 'may change until the deadline'
-							: 'cannot be changed once cast'}.
+					<p class="text-body-sm leading-relaxed text-ink-mid">
+						Voting rules: {applies.rule.secret ? 'secret ballot' : 'open ballot'}, votes {applies
+							.rule.changeable
+							? 'may change'
+							: 'final once cast'}. Passes when {describe(applies.rule)}{applies.rule.early
+							? '; settles early'
+							: '; decided at the deadline'}. Open {applies.votingDays}
+						{applies.votingDays === 1 ? 'day' : 'days'}.
+						<Hint text="Change them with a Voting rules proposal." />
 					</p>
 				{/if}
 			</FormSection>
 
-			<FormSection title="How it passes">
-				{#if own}
-					<p class="text-sm leading-relaxed text-ink-mid">
-						What it takes and for how long, also yours to set; it starts from the DAO's default.
+			<!-- What passing would do, who votes, and the button: kept in view along the bottom. -->
+			<div
+				class="sticky bottom-0 z-10 -mx-6 space-y-3 border-t border-border bg-[rgba(var(--bg-rgb),0.95)] px-6 py-4 backdrop-blur md:-mx-10 md:px-10"
+			>
+				<div class="space-y-1">
+					<p class="text-body-sm {kind === 'dissolve' ? 'text-red' : 'text-ink'}">
+						<span class="eyebrow mr-1">If it passes</span>
+						{outcome}
 					</p>
-					<RuleSettings
-						bind:settings={newRoutine}
-						prefix="newRoutine"
-						eligible={d.units}
-						equal={d.equal}
-					/>
-				{:else if applies}
-					<p class="text-sm leading-relaxed text-ink-mid">
-						This changes the DAO, so it runs under the DAO's voting rules: it passes when {describe(
-							applies.rule
-						)}{applies.rule.early
-							? ', settling early once that is sure'
-							: ', decided at the deadline'}. The vote is open for {applies.votingDays}
-						{applies.votingDays === 1 ? 'day' : 'days'} from the moment you sign.
-						<Hint
-							text="Set when the DAO was founded, changed only by a Voting rules proposal that passes under them. No proposer chooses them."
-						/>
+					<p class="font-mono text-xs text-ink-dim">
+						The vote opens for the {fmt(d.members)} current {d.members === 1
+							? 'member'
+							: 'members'}{d.equal ? '' : `, ${fmt(d.units)} units`}, the moment you sign.
 					</p>
-				{/if}
-			</FormSection>
-
-			<p class="font-mono text-xs text-ink-dim">
-				The vote opens for the {fmt(d.members)} current {d.members === 1
-					? 'member'
-					: 'members'}{d.equal ? '' : `, ${fmt(d.units)} units`}, the moment you sign.
-			</p>
-
-			<FormActions
-				label="Create proposal"
-				busy={store.busy || f.pending > 0}
-				disabled={!ready}
-				cancelHref="/daos/{id}"
-				problem={store.problem}
-			/>
+				</div>
+				<FormActions
+					label="Create proposal"
+					busy={store.busy || f.pending > 0}
+					disabled={!ready}
+					cancelHref="/daos/{id}"
+					problem={store.problem}
+				/>
+			</div>
 		</form>
 	{/if}
 </Page>
