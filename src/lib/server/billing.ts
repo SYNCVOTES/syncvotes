@@ -1,6 +1,6 @@
 import { error } from '@sveltejs/kit';
 import { Main } from '@daml.js/model';
-import { BILLING_FACTOR } from '$app/env/private';
+import { BILLING_FACTOR, BILLING_FLOOR } from '$app/env/private';
 import * as ledger from './ledger';
 import * as splice from './splice';
 import * as deposits from './deposits';
@@ -47,14 +47,16 @@ const bytesPerRound = () => {
 /**
  * What a byte is charged at, as a fraction of what it costs: what does not come back as rewards
  * (the validator's for the traffic it buys; the provider's where it earns app rewards for it,
- * enough per round to clear the threshold), times `BILLING_FACTOR`, below one to subsidise.
+ * enough per round to clear the threshold), times `BILLING_FACTOR`, below one to subsidise. Where
+ * rewards come to all of it or more, the net is nothing; `BILLING_FLOOR` still charges that
+ * fraction of the price, so payers pay something even then.
  */
 async function factor(): Promise<number> {
 	const [back, { usdPerMb }] = await Promise.all([splice.rewards(), splice.prices()]);
 	const appUsdPerRound = (bytesPerRound() / 1_000_000) * usdPerMb * back.featuredApp;
 	const app = appUsdPerRound >= back.thresholdUsd ? back.featuredApp : 0;
 	const net = Math.max(0, 1 - back.validator - app);
-	return net * Number(BILLING_FACTOR ?? '1');
+	return Math.max(net * Number(BILLING_FACTOR ?? '1'), Number(BILLING_FLOOR ?? '0'));
 }
 
 /** Coin per byte of traffic, right now. */

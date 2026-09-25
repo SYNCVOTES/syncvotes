@@ -9,7 +9,7 @@ import * as session from './server/session';
 import * as billing from './server/billing';
 import * as tally from './server/tally';
 import { fingerprintOf } from './verify';
-import { BILLING_FACTOR, INVITE_CODES } from '$app/env/private';
+import { BILLING_FACTOR, BILLING_FLOOR, INVITE_CODES } from '$app/env/private';
 import { normaliseHint, hintProblem } from './hint';
 import * as schemas from './schemas';
 import { categoryOf, settingsOf, settingsToLedger } from './rules';
@@ -92,7 +92,7 @@ export const config = query(async () => ({
 	/** A new party needs an invite code while any are set. */
 	invitesRequired: inviteCodes().length > 0,
 	/** Traffic is not charged on this deployment: nothing has to be paid in for anything. */
-	free: Number(BILLING_FACTOR ?? '1') === 0
+	free: Number(BILLING_FACTOR ?? '1') === 0 && Number(BILLING_FLOOR ?? '0') === 0
 }));
 
 // ---- Invites -------------------------------------------------------------------------------

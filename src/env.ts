@@ -62,6 +62,11 @@ export const variables = defineEnvVars({
 			'A multiple of the net cost of traffic (its price less the rewards it earns) a payer is charged; below one subsidises',
 		schema: v.optional(v.string(), '1')
 	},
+	BILLING_FLOOR: {
+		description:
+			"The least a payer is charged, as a fraction of the network's traffic price, however much comes back as rewards. 0: no floor",
+		schema: v.optional(v.string(), '0')
+	},
 	INVITE_CODES: {
 		description:
 			'Invite codes, comma-separated; while any are set, a new party needs one. Empty: open to all',

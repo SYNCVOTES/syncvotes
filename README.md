@@ -99,7 +99,8 @@ validator 0.2 coin per coin it burns on traffic (the latest issuing round's rate
 and a featured app's provider its share per coin of its transactions' traffic where the network
 mints app rewards by traffic (CIP-0104; not yet on MainNet) and the app's traffic per round clears
 the reward threshold. That net cost is multiplied by `BILLING_FACTOR` (one; below one subsidises
-from the validator's wallet). App rewards arrive at the provider; every hour the app moves the
+from the validator's wallet), and never charged below `BILLING_FLOOR` of the price (none by default),
+for when rewards come to the whole cost or more. App rewards arrive at the provider; every hour the app moves the
 provider's coin beyond a small float to the payee, whose wallet buys the traffic. Two kinds of
 account, paid in the same way: a DAO's (`Meter`) and a party's own (`Purse`, by fingerprint).
 A DAO founded with "the DAO pays" pays for everything done in it; one founded with "each
