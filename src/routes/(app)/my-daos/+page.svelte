@@ -1,7 +1,5 @@
 <script lang="ts">
 	import * as remote from '$lib/api.remote';
-	// Where traffic is free, a DAO's balance means nothing and is not shown.
-	const setup = remote.config();
 	import { store } from '$lib/wallet-store.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import Page from '$lib/components/page.svelte';
@@ -121,7 +119,7 @@
 					image={dao.image}
 					members={dao.members}
 					openProposals={dao.openProposals}
-					balance={setup.current?.free ? null : dao.balance}
+					balance={dao.free ? null : dao.balance}
 					actorPays={dao.actorPays}
 					share={!dao.equal && dao.units > 0
 						? Math.round((dao.myShare / dao.units) * 1000) / 10

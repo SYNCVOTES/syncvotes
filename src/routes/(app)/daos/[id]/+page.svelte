@@ -92,7 +92,8 @@
 		<Skeleton />
 	{:else}
 		{@const d = dao.current}
-		{@const empty = !d.actorPays && d.balance <= 0 && !setup.current?.free}
+		{@const empty =
+			!d.actorPays && d.balance <= 0 && !(billing?.current?.free ?? setup.current?.free)}
 
 		{#if d.image}
 			<div class="-mt-2 mb-6 h-40 w-full overflow-hidden border border-border md:h-52">

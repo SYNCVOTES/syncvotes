@@ -318,6 +318,8 @@ const card = async (d: ledger.Dao, party: string) => ({
 	...summarise(d),
 	balance: billing.balance(billing.daoAccount(d.id)),
 	myShare: ledger.members.get(d.id)?.get(party)?.share ?? 0,
+	/** Traffic costs nothing here right now: the balance is beside the point. */
+	free: await billing.free(),
 	/** Open proposals this party is entitled to vote on and has not. */
 	awaiting: awaiting(d.id, party)
 });

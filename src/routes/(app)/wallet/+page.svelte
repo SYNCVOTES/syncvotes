@@ -36,6 +36,8 @@
 	const screen = $derived(store.screen);
 	// While a party is paid for, its key's account is watched; enough arrived, the party is made.
 	const funding = $derived(screen.at === 'fund' ? remote.purse(screen.fingerprint) : null);
+	// Free as the server prices it now (rewards may cover everything), the deployment's setting until then.
+	const free = $derived(funding?.current?.free ?? setup.current?.free ?? false);
 	// Tried once per key, amount and code: a refusal is shown and waits for something to change,
 	// rather than being retried every time the page settles.
 	let tried = '';
@@ -68,13 +70,7 @@
 	const chosenHint = $derived(normaliseHint(hintInput));
 	const hintIssue = $derived(hintInput.trim() ? hintProblem(chosenHint) : null);
 	// The five steps of making a key, and which one this is; none while restoring or signed in.
-	const STEPS = $derived([
-		'Phrase',
-		'Check',
-		'Party hint',
-		'Keep',
-		setup.current?.free ? 'Create' : 'Top up'
-	]);
+	const STEPS = $derived(['Phrase', 'Check', 'Party hint', 'Keep', free ? 'Create' : 'Top up']);
 	const step = $derived(
 		screen.at === 'create'
 			? checking
@@ -305,7 +301,7 @@
 		</form>
 	{:else if screen.at === 'fund'}
 		<Panel class="space-y-5">
-			{#if setup.current?.free}
+			{#if free}
 				<h2 class="eyebrow">Creating your party</h2>
 				<p class="text-sm text-ink-mid">
 					<code class="break-all text-ink">{screen.hint}::{screen.fingerprint}</code>
