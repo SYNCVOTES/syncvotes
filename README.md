@@ -40,7 +40,9 @@ balance can be paid in from any wallet.
 
 ### The model
 
-`daml/src/Main.daml`, package `syncvotes-options`. Every contract a user acts on carries the
+`daml/src/SyncVotes/`, package `syncvotes`, in modules: `Types` (votes, effects, rules), `Rules`
+(what a valid rule or share change is), `Tally` (counting), `Markers`, `Governance` (DAO,
+member, proposal, ballot, comment), `Account` (account, profile), `Billing` (meter, purse). Every contract a user acts on carries the
 provider's signature, so the provider confirms every transaction (what CIP-0104 pays traffic
 rewards for) while only the user's key ever signs a submission. A DAO is signed by its creator
 and the provider, and every member, proposal, ballot and comment carries both, cross-checked, so
@@ -111,12 +113,21 @@ has paid: the wallet page shows the memo of the key and what a party costs today
 is made once that much has arrived. Before signing anything, the participant's own estimate is
 checked against the payer's balance.
 
+Where the provider is a featured app and `MARKERS=true`, creating a DAO, proposing, voting and a
+change's last batch each also create a featured-app activity marker for the provider, in the
+same transaction (`SyncVotes.Markers`, the `splice-api-featured-app-v1` interface, weight one;
+the right is read from Scan and passed disclosed). Where the network mints by markers, each is
+worth `featuredAppActivityMarkerAmount` in coin at the round's rate, and that is taken off the
+charge of the transaction that made it before `BILLING_FACTOR` applies, so the factor still sets
+what the payer covers. Comments and profiles make none (CIP-47 asks for markers on economically
+meaningful activity only). Where the provider is not featured, nothing changes.
+
 A balance is paid in by sending Canton Coin from any wallet to the payee (`PAYEE_PARTY`: the
 validator operator's own party, whose wallet buys the traffic the transactions use) with the memo
 as the transfer's reason (`syncvotes:<dao id>` or `syncvotes:<fingerprint>`). The payee has its
 own transfer pre-approval, so coin lands in one step. What arrived with a memo is read off the
-payee's transactions (and the provider's, which took payments before) and recomputed on a
-restart; the ledger's figure is the only figure. What is paid in is spent on traffic and is not
+payee's transactions (and the provider's, which took payments before) from `DEPOSITS_SINCE` on and
+recomputed on a restart; the ledger's figure is the only figure. What is paid in is spent on traffic and is not
 paid back: the DAO holds no coin, and nothing leaves the payee on a DAO's behalf.
 
 What the provider cannot do: forge a ballot or a proposal, count a ballot the ledger refuses,
@@ -146,7 +157,7 @@ pnpm exec vite build   # what the image build runs
 Re-run codegen and `pnpm i` after every change to the Daml side. Codegen names its package
 `@daml.js/<name>-<version>` from `daml/daml.yaml`; package.json aliases it once as
 `@daml.js/model`, so a version bump is `daml/daml.yaml` and that one line. Template ids are
-package-name-scoped (`#syncvotes-options:Main:Proposal`), which is what keeps an upgrade from
+package-name-scoped (`#syncvotes:SyncVotes.Governance:Proposal`), which is what keeps an upgrade from
 breaking submissions.
 
 ## Authentication
@@ -191,7 +202,7 @@ date.
 
 | Path                             | What it is                                                                  |
 | -------------------------------- | --------------------------------------------------------------------------- |
-| `daml/src/Main.daml`             | The whole model; `daml/upgrades/` the previous DAR                          |
+| `daml/src/SyncVotes/`            | The model, one module per concern                                           |
 | `daml.js/`                       | Generated bindings, never edited                                            |
 | `src/lib/wallet.ts`              | Phrase → signer closure; keys encrypted at rest per device                  |
 | `src/lib/wallet-store.svelte.ts` | The wallet as one rune store: onboarding screens, signer, identity          |
@@ -237,13 +248,14 @@ change to it needs `compose up -d --force-recreate caddy`. A deploy takes nothin
 holds a request until the new app container answers.
 
 The DAR is built inside the image and uploaded by the app at startup, which then checks the
-package is on the participant. The package is a lineage, `syncvotes-options`, and its name never
-changes: every release is a Canton Smart Contract Upgrade of the one before, checked by the
-compiler against the previous DAR (`upgrades:` in `daml/daml.yaml`), so live contracts carry
-over. Allowed: a choice's body, a new template or choice, an `Optional` field appended last. Not
-allowed: removing or retyping a field or choice, changing signatories or observers, tightening
-`ensure`. Release: bump the version, point `upgrades:` at the release before, keep that DAR in
-`daml/upgrades/`.
+package is on the participant. The package is a lineage, `syncvotes` (1.0.0 replaced
+`syncvotes-options`, whose contracts the app no longer sees), and its name never changes again:
+every release is a Canton Smart Contract Upgrade of the one before, checked by the compiler
+against the previous DAR (`upgrades:` in `daml/daml.yaml`), so live contracts carry over.
+Allowed: a choice's body, a new template or choice, an `Optional` field appended last. Not
+allowed: removing or retyping a field or choice, moving a template to another module, changing
+signatories or observers, tightening `ensure`. Release: bump the version, point `upgrades:` at
+the release before, keep that DAR in `daml/upgrades/`.
 
 ## Notes
 
