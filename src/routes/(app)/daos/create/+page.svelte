@@ -353,10 +353,11 @@
 						</li>
 					</ul>
 					<p class="border-t border-border pt-3 font-mono text-xs text-ink-dim">
-						Charged to your balance{#if purse?.ready}: <span
-								class={purse.current.balance > 0 ? 'text-ink' : 'text-red'}
-								>{coin(purse.current.balance)}</span
-							>{/if}.
+						{#if purse?.ready && purse.current.free}Free on this network.{:else}Charged to your
+							balance{#if purse?.ready}: <span
+									class={purse.current.balance > 0 ? 'text-ink' : 'text-red'}
+									>{coin(purse.current.balance)}</span
+								>{/if}.{/if}
 					</p>
 					<FormActions
 						label="Create DAO"

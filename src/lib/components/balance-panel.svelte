@@ -22,7 +22,9 @@
 			text="Pays for everything done in this DAO. Every transaction costs network traffic at the price shown. Top-ups are not refunded."
 		/>
 	</h2>
-	{#if billing?.ready}
+	{#if billing?.ready && billing.current.free}
+		<p class="text-body-sm text-ink-mid">Transactions are free on this network for now.</p>
+	{:else if billing?.ready}
 		{@const b = billing.current}
 		<div class="font-mono text-figure font-bold {b.balance > 0 ? 'text-ink' : 'text-red'}">
 			{coin(b.balance)}

@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import * as remote from '$lib/api.remote';
+	// Where traffic is free, no DAO is ever out of balance.
+	const setup = remote.config();
 	import { store } from '$lib/wallet-store.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import Page from '$lib/components/page.svelte';
@@ -90,7 +92,7 @@
 		<Skeleton />
 	{:else}
 		{@const d = dao.current}
-		{@const empty = !d.actorPays && d.balance <= 0}
+		{@const empty = !d.actorPays && d.balance <= 0 && !setup.current?.free}
 
 		{#if d.image}
 			<div class="-mt-2 mb-6 h-40 w-full overflow-hidden border border-border md:h-52">
@@ -123,7 +125,7 @@
 				<span class={d.openProposals > 0 ? 'text-ink' : ''}>{fmt(d.openProposals)} open</span>
 				{#if d.actorPays}
 					<span aria-hidden="true">·</span><span>members pay</span>
-				{:else if billing?.ready}
+				{:else if billing?.ready && !billing.current.free}
 					<span aria-hidden="true">·</span>
 					<a
 						href="#balance"

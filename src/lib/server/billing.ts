@@ -111,7 +111,14 @@ const emptyMessage = (a: Account) =>
 		: 'Your balance is empty. Top up on the Wallet page.';
 
 /** Refuses a write for an account with nothing left, or not enough for what it will cost. */
+/**
+ * Whether traffic costs payers nothing on this deployment: `BILLING_FACTOR` 0 (a test network,
+ * say), or rewards that come to the whole of it. Then no balance is needed for anything.
+ */
+export const free = async () => (await factor()) === 0;
+
 export async function funded(a: Account, costBytes = 0): Promise<void> {
+	if (await free()) return;
 	const have = balance(a);
 	if (have <= 0) throw error(402, emptyMessage(a));
 	const cost = await coinFor(costBytes);
@@ -134,6 +141,8 @@ export type Statement = {
 	coinPerMb: number;
 	usdPerCoin: number;
 	factor: number;
+	/** Nothing is charged here: no balance is needed, and none is asked for. */
+	free: boolean;
 	updatedAt: string | null;
 };
 
@@ -155,6 +164,7 @@ export async function statement(a: Account): Promise<Statement> {
 		coinPerMb: (usdPerMb / usdPerCoin) * now,
 		usdPerCoin,
 		factor: Math.round(now * 100) / 100,
+		free: now === 0,
 		updatedAt: row?.updatedAt ?? null
 	};
 }

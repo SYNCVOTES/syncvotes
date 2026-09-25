@@ -20,6 +20,7 @@
 			balance: number;
 			coinPerMb: number;
 			factor: number;
+			free?: boolean;
 		};
 		/** What a new party costs, while there is none yet. */
 		needed?: number | null;
@@ -34,7 +35,13 @@
 			text="Pays for your profile, DAOs you create, and your actions in DAOs where members pay. Every transaction costs network traffic at the price shown. Top-ups are not refunded."
 		/>
 	</h2>
-	{#if needed !== null}
+	{#if s.free}
+		<p class="text-body-sm text-ink-mid">
+			{needed !== null
+				? 'Creating a party is free on this network. Creating yours…'
+				: 'Transactions are free on this network for now.'}
+		</p>
+	{:else if needed !== null}
 		<div class="font-mono text-figure font-bold {short > 0 ? 'text-amber' : 'text-green'}">
 			{coin(s.credited)}
 			<span class="text-xs font-normal text-ink-dim">of {coin(needed)} for a party</span>
@@ -62,5 +69,7 @@
 			<p class="text-body-sm text-red">Balance empty. Top up to continue.</p>
 		{/if}
 	{/if}
-	<PayIn payTo={s.payTo} memo={s.memo} open={needed !== null || s.balance <= 0} />
+	{#if !s.free}
+		<PayIn payTo={s.payTo} memo={s.memo} open={needed !== null || s.balance <= 0} />
+	{/if}
 </section>

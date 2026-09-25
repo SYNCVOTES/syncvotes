@@ -68,7 +68,13 @@
 	const chosenHint = $derived(normaliseHint(hintInput));
 	const hintIssue = $derived(hintInput.trim() ? hintProblem(chosenHint) : null);
 	// The five steps of making a key, and which one this is; none while restoring or signed in.
-	const STEPS = ['Phrase', 'Check', 'Party hint', 'Keep', 'Top up'];
+	const STEPS = $derived([
+		'Phrase',
+		'Check',
+		'Party hint',
+		'Keep',
+		setup.current?.free ? 'Create' : 'Top up'
+	]);
 	const step = $derived(
 		screen.at === 'create'
 			? checking
@@ -152,7 +158,9 @@
 			</div>
 			{#await cost then c}
 				<p class="font-mono text-xs text-ink-dim">
-					Creating a party costs about {coin(c)} in network traffic. You top up before it is created.
+					{c > 0
+						? `Creating a party costs about ${coin(c)} in network traffic. You top up before it is created.`
+						: 'Creating a party is free on this network.'}
 				</p>
 			{/await}
 		</Panel>
@@ -297,14 +305,21 @@
 		</form>
 	{:else if screen.at === 'fund'}
 		<Panel class="space-y-5">
-			<h2 class="eyebrow">Pay for your party</h2>
-			<p class="text-sm text-ink-mid">
-				Creating party <code class="break-all text-ink">{screen.hint}::{screen.fingerprint}</code>
-				costs network traffic. Top up the amount below; the party is created as soon as it arrives.
-				{screen.kept
-					? 'You can close this page and come back.'
-					: 'Keep this tab open until the party is created.'}
-			</p>
+			{#if setup.current?.free}
+				<h2 class="eyebrow">Creating your party</h2>
+				<p class="text-sm text-ink-mid">
+					<code class="break-all text-ink">{screen.hint}::{screen.fingerprint}</code>
+				</p>
+			{:else}
+				<h2 class="eyebrow">Pay for your party</h2>
+				<p class="text-sm text-ink-mid">
+					Creating party <code class="break-all text-ink">{screen.hint}::{screen.fingerprint}</code>
+					costs network traffic. Top up the amount below; the party is created as soon as it arrives.
+					{screen.kept
+						? 'You can close this page and come back.'
+						: 'Keep this tab open until the party is created.'}
+				</p>
+			{/if}
 			{#await setup then c}
 				{#if c.invitesRequired && !screen.invite}
 					<div class="space-y-1">
