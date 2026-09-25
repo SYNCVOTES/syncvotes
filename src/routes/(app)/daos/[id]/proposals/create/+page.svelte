@@ -402,15 +402,18 @@
 			<input type="hidden" name="newPublic" value={d.public ? 'no' : 'yes'} />
 
 			<FormSection variant="plain" number="01" title="Type">
-				<div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
-					{#each kinds.filter((k) => categoryOf(k.value) === 'routine' || k.value === 'shares') as k (k.value)}
-						{@render kindButton(k)}
-					{/each}
+				<div>
+					<p class="eyebrow mb-2">Decisions and choices</p>
+					<div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+						{#each kinds.filter((k) => categoryOf(k.value) === 'routine') as k (k.value)}
+							{@render kindButton(k)}
+						{/each}
+					</div>
 				</div>
 				<div>
 					<p class="eyebrow mb-2">Changes to the DAO</p>
 					<div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
-						{#each kinds.filter((k) => k.value === 'info' || k.value === 'settings' || k.value === 'visibility') as k (k.value)}
+						{#each kinds.filter((k) => k.value === 'shares' || k.value === 'info' || k.value === 'settings' || k.value === 'visibility') as k (k.value)}
 							{@render kindButton(k)}
 						{/each}
 					</div>

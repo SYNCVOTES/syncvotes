@@ -43,7 +43,7 @@
 		part?: 'passing' | 'ballot';
 		/**
 		 * `passing` only: show the preset and what it comes to, with every other dial (and the
-		 * `ballot` snippet) behind "Customise". The fields travel either way.
+		 * `ballot` snippet) behind "Customize". The fields travel either way.
 		 */
 		collapsed?: boolean;
 		/** `ballot` only: the rows without a frame of their own, to sit inside another. */
@@ -316,7 +316,7 @@
 				<summary
 					class="flex cursor-pointer list-none items-center justify-between px-4 py-3 font-mono text-xs tracking-[0.14em] text-ink-mid uppercase hover:text-ink [&::-webkit-details-marker]:hidden"
 				>
-					Customise ballot and rule
+					Customize ballot and rule
 					<span class="transition-transform group-open/custom:rotate-45" aria-hidden="true">+</span>
 				</summary>
 				<div class="divide-y divide-border border-t border-border">
