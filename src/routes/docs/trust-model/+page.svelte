@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Ui from '$lib/components/doc-ui.svelte';
 	import DocNote from '$lib/components/doc-note.svelte';
 </script>
 
@@ -148,8 +149,8 @@
 <p>
 	The code is on <a href="https://github.com/SYNCVOTES/syncvotes" rel="noopener">GitHub</a>,
 	including the Daml model that the ledger enforces. Each site answers at
-	<a href="/version" rel="external"><code>/version</code></a> (the <strong>Build</strong> link in the
-	footer) with two lines:
+	<a href="/version" rel="external"><code>/version</code></a> (the <Ui>Build</Ui> link in the footer)
+	with two lines:
 </p>
 <ul>
 	<li><code>commit</code>: the commit the site was built from. A site only runs committed code.</li>

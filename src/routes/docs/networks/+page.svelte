@@ -1,4 +1,8 @@
 <script lang="ts">
+	import Ui from '$lib/components/doc-ui.svelte';
+	import Shot from '$lib/components/doc-shot.svelte';
+	import networkMenuLight from '$lib/assets/docs/network-menu-light.webp';
+	import networkMenuDark from '$lib/assets/docs/network-menu-dark.webp';
 	import DocNote from '$lib/components/doc-note.svelte';
 </script>
 
@@ -44,8 +48,7 @@
 <p>
 	Your recovery phrase is the one thing that works everywhere. It gives the same key, and so the
 	same fingerprint, on every network. To use it on another network, open that site and select
-	<strong>Restore key</strong>. If you have no party there yet, the app says so and lets you create
-	one.
+	<Ui>Restore key</Ui>. If you have no party there yet, the app says so and lets you create one.
 </p>
 <DocNote>
 	<p>
@@ -55,6 +58,13 @@
 </DocNote>
 
 <h2 id="switching">Switching Networks</h2>
+<Shot
+	light={networkMenuLight}
+	dark={networkMenuDark}
+	alt="The network menu open under the DevNet pill, listing MainNet and TestNet"
+	caption="The network pill, opened."
+/>
+
 <p>
 	Select the network pill in the header to open the list of the other networks, then select one. The
 	switch opens the other site on the same list page (My DAOs, Public DAOs, the Wallet page or these

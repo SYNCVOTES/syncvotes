@@ -1,11 +1,12 @@
 <script lang="ts">
+	import Ui from '$lib/components/doc-ui.svelte';
 	import DocNote from '$lib/components/doc-note.svelte';
 </script>
 
 <p>
-	Every transaction on the Canton Network costs <strong>traffic</strong>, which is Canton's term for
-	transaction fees. The app's validator buys traffic with Canton Coin (CC). SyncVotes charges what
-	each transaction cost to a balance, which you top up by sending CC to the app's address.
+	Every transaction on the Canton Network costs <Ui kind="term">traffic</Ui>, which is Canton's term
+	for transaction fees. The app's validator buys traffic with Canton Coin (CC). SyncVotes charges
+	what each transaction cost to a balance, which you top up by sending CC to the app's address.
 </p>
 
 <h2 id="why-it-costs">Why It Costs</h2>
@@ -33,17 +34,17 @@
 		</tr>
 		<tr>
 			<td>A DAO's</td>
-			<td>The DAO page, under <strong>Balance</strong></td>
+			<td>The DAO page, under <Ui>Balance</Ui></td>
 			<td>Everything done in a DAO where the DAO pays</td>
 		</tr>
 	</tbody>
 </table>
 <p>Each balance shows three figures and the price:</p>
 <ul>
-	<li><strong>Topped up</strong>: all the CC credited to it so far.</li>
-	<li><strong>Spent</strong>: what its transactions have cost.</li>
-	<li><strong>Available</strong>: the difference, which is what you can still spend.</li>
-	<li><strong>Price</strong>: what a megabyte of traffic costs right now, in CC.</li>
+	<li><Ui>Topped up</Ui>: all the CC credited to it so far.</li>
+	<li><Ui>Spent</Ui>: what its transactions have cost.</li>
+	<li><Ui>Available</Ui>: the difference, which is what you can still spend.</li>
+	<li><Ui>Price</Ui>: what a megabyte of traffic costs right now, in CC.</li>
 </ul>
 
 <h2 id="who-pays">Who Pays for What</h2>
@@ -66,28 +67,27 @@
 <p>
 	Before your key signs, the app asks the validator what the transaction will cost and checks that
 	the balance covers it. If it does not, you see a message such as
-	<strong>This costs about 0.40 CC; your balance is 0.12 CC. Top up first.</strong> Counting and executing
-	are not stopped this way, so a balance can go below zero. The next top-up covers that first.
+	<Ui kind="message">This costs about 0.40 CC; your balance is 0.12 CC. Top up first.</Ui> Counting and
+	executing are not stopped this way, so a balance can go below zero. The next top-up covers that first.
 </p>
 <p>
 	Where the DAO pays and its balance is empty, the DAO page says
-	<strong>The DAO's balance is empty. Top it up to act.</strong> and nobody can propose, vote or comment
-	until someone does.
+	<Ui kind="message">The DAO's balance is empty. Top it up to act.</Ui> and nobody can propose, vote or
+	comment until someone does.
 </p>
 
 <h2 id="top-up">Top Up</h2>
 <ol>
 	<li>
-		Open <strong>Top up</strong> under the balance: on the Wallet page for your own, on the DAO page for
-		a DAO's.
+		Open <Ui>Top up</Ui> under the balance: on the Wallet page for your own, on the DAO page for a DAO's.
 	</li>
 	<li>
-		Copy the <strong>Address</strong>. It is the party of the app's validator, whose wallet buys the
+		Copy the <Ui>Address</Ui>. It is the party of the app's validator, whose wallet buys the
 		traffic.
 	</li>
 	<li>
-		Copy the <strong>Memo</strong>. It names the balance to credit: <code>syncvotes:</code> followed by
-		your key's fingerprint, or by the DAO's ID.
+		Copy the <Ui>Memo</Ui>. It names the balance to credit: <code>syncvotes:</code> followed by your key's
+		fingerprint, or by the DAO's ID.
 	</li>
 	<li>
 		From any Canton wallet, send CC to the Address, with the Memo exactly as shown in the transfer's
@@ -132,10 +132,10 @@
 </p>
 <h3 id="activity-markers">Activity Markers</h3>
 <p>
-	Where the network rewards featured apps by <strong>activity marker</strong> instead, the app can record
-	one marker with each piece of its activity: creating a DAO, a proposal or a vote, and executing a change.
-	Such a transaction is charged less what its marker brings. The price per MB shown does not include this,
-	so these transactions cost less than the price suggests.
+	Where the network rewards featured apps by <Ui kind="term">activity marker</Ui> instead, the app can
+	record one marker with each piece of its activity: creating a DAO, a proposal or a vote, and executing
+	a change. Such a transaction is charged less what its marker brings. The price per MB shown does not
+	include this, so these transactions cost less than the price suggests.
 </p>
 <p>
 	All these inputs move with the network, so the price moves too. The app reads the prices about
@@ -154,8 +154,9 @@
 <h2 id="free-networks">Where Traffic Is Free</h2>
 <p>
 	Where the app charges nothing, as on TestNet and DevNet today, no balance is needed. The Wallet
-	page says <strong>Creating a party is free on this network.</strong>, balances read
-	<strong>Transactions are free on this network for now.</strong>, and nothing asks you to top up.
+	page says <Ui kind="message">Creating a party is free on this network.</Ui>, balances read
+	<Ui kind="message">Transactions are free on this network for now.</Ui>, and nothing asks you to
+	top up.
 </p>
 
 <h2 id="no-refunds">No Refunds</h2>

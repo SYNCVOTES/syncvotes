@@ -1,3 +1,7 @@
+<script lang="ts">
+	import Ui from '$lib/components/doc-ui.svelte';
+</script>
+
 <h2 id="lost-phrase">I lost my recovery phrase. Can I get it back?</h2>
 <p>
 	No. Nobody, including SyncVotes, can recover it. If a device still keeps your key and you can
@@ -17,7 +21,7 @@
 	</li>
 	<li>
 		<strong>Another phrase.</strong> A valid phrase with a word swapped or out of order gives a
-		different key. Select <strong>Back</strong> and check the words against what you wrote down.
+		different key. Select <Ui>Back</Ui> and check the words against what you wrote down.
 	</li>
 </ul>
 <p>
@@ -30,30 +34,30 @@
 	<thead><tr><th>Message</th><th>Why</th></tr></thead>
 	<tbody>
 		<tr>
-			<td>The DAO's balance is empty. Top it up first.</td>
+			<td><Ui kind="message">The DAO's balance is empty. Top it up first.</Ui></td>
 			<td>The DAO pays for ballots, and its balance has run out.</td>
 		</tr>
 		<tr>
-			<td>Your balance is empty. Top up on the Wallet page.</td>
+			<td><Ui kind="message">Your balance is empty. Top up on the Wallet page.</Ui></td>
 			<td>Each member pays in this DAO, and your balance has run out.</td>
 		</tr>
 		<tr>
-			<td>You have no vote on this proposal</td>
+			<td><Ui kind="message">You have no vote on this proposal</Ui></td>
 			<td>
 				The vote has closed or closes within 90 seconds, you joined or your units changed after the
 				proposal was made, or you already voted and votes cannot change.
 			</td>
 		</tr>
 		<tr>
-			<td>You have already voted. Votes on this proposal are final.</td>
+			<td><Ui kind="message">You have already voted. Votes on this proposal are final.</Ui></td>
 			<td>Your first ballot is already on the ledger.</td>
 		</tr>
 		<tr>
-			<td>This changed since you opened it. Reload and try again.</td>
+			<td><Ui kind="message">This changed since you opened it. Reload and try again.</Ui></td>
 			<td>Something you were voting from changed a moment before you signed.</td>
 		</tr>
 		<tr>
-			<td>Wallet locked. Unlock and try again.</td>
+			<td><Ui kind="message">Wallet locked. Unlock and try again.</Ui></td>
 			<td>The key locked itself while you were voting.</td>
 		</tr>
 	</tbody>
@@ -63,15 +67,15 @@
 <ul>
 	<li>
 		<strong>It is a decision or a choice.</strong> These have nothing to execute. Their status stays
-		<strong>Passed</strong> or <strong>Decided</strong>.
+		<Ui>Passed</Ui> or <Ui>Decided</Ui>.
 	</li>
 	<li>
-		<strong>It is being executed.</strong> The page says <strong>Passed. Executing…</strong>. A
-		large membership change runs in batches of 200 and shows how far it got.
+		<strong>It is being executed.</strong> The page says <Ui kind="message">Passed. Executing…</Ui>.
+		A large membership change runs in batches of 200 and shows how far it got.
 	</li>
 	<li>
-		<strong>Execution keeps failing.</strong> The page says <strong>Not executed yet</strong> with the
-		reason. The app keeps retrying, up to every 15 minutes.
+		<strong>Execution keeps failing.</strong> The page says <Ui kind="message">Not executed yet</Ui> with
+		the reason. The app keeps retrying, up to every 15 minutes.
 	</li>
 </ul>
 <p>
@@ -123,13 +127,13 @@
 
 <h2 id="where-coin-goes">Where does my coin go?</h2>
 <p>
-	To the validator operator's own party, the Address shown under <strong>Top up</strong>. Its wallet
-	buys the traffic your transactions use. What you top up is spent on traffic and is not paid back.
+	To the validator operator's own party, the Address shown under <Ui>Top up</Ui>. Its wallet buys
+	the traffic your transactions use. What you top up is spent on traffic and is not paid back.
 </p>
 
 <h2 id="cannot-see-dao">Why can't I see a DAO someone sent me?</h2>
 <ul>
-	<li>It is private and you are not a member. The page says <strong>Members only</strong>.</li>
+	<li>It is private and you are not a member. The page says <Ui>Members only</Ui>.</li>
 	<li>It is on another network. Each network has its own DAOs.</li>
 	<li>It was dissolved. Its page no longer opens.</li>
 </ul>

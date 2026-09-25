@@ -1,6 +1,15 @@
+<script lang="ts">
+	import Ui from '$lib/components/doc-ui.svelte';
+	import Shot from '$lib/components/doc-shot.svelte';
+	import profileFormLight from '$lib/assets/docs/profile-form-light.webp';
+	import profileFormDark from '$lib/assets/docs/profile-form-dark.webp';
+	import profilePageLight from '$lib/assets/docs/profile-page-light.webp';
+	import profilePageDark from '$lib/assets/docs/profile-page-dark.webp';
+</script>
+
 <p>
-	A <strong>profile</strong> gives your party a face: a display name, a picture and a few words. It is
-	optional. Without one, others see your party ID, and your party hint stands in for a name.
+	A <Ui kind="term">profile</Ui> gives your party a face: a display name, a picture and a few words. It
+	is optional. Without one, others see your party ID, and your party hint stands in for a name.
 </p>
 
 <h2 id="what-it-holds">What It Holds</h2>
@@ -20,12 +29,12 @@
 <h2 id="set-it-up">Set It Up</h2>
 <ol>
 	<li>
-		On the Wallet page, select <strong>Set up profile</strong> (or <strong>Edit profile</strong>).
+		On the Wallet page, select <Ui>Set up profile</Ui> (or <Ui>Edit profile</Ui>).
 	</li>
 	<li>Fill in the fields.</li>
 	<li>
-		Select <strong>Create profile</strong> (or <strong>Save profile</strong>). Your key signs, and
-		the profile is on the ledger.
+		Select <Ui>Create profile</Ui> (or <Ui>Save profile</Ui>). Your key signs, and the profile is on
+		the ledger.
 	</li>
 </ol>
 <p>
@@ -33,13 +42,27 @@
 	remove it, only replace it.
 </p>
 
+<Shot
+	light={profileFormLight}
+	dark={profileFormDark}
+	alt="The profile form: Display name, Picture and About"
+	caption="The profile form on the Wallet page."
+/>
+
 <h2 id="who-sees-it">Who Sees It</h2>
 <p>
 	Anyone signed in to SyncVotes on this network who knows your party ID can see your profile. It
 	shows next to your party ID wherever your party appears: members lists, ballots, comments and
-	proposals. Select <strong>View public profile</strong> on the Wallet page to see it as others do.
-	Each profile has its own page, <code>/people/&lt;party ID&gt;</code>.
+	proposals. Select <Ui>View public profile</Ui> on the Wallet page to see it as others do. Each profile
+	has its own page, <code>/people/&lt;party ID&gt;</code>.
 </p>
+
+<Shot
+	light={profilePageLight}
+	dark={profilePageDark}
+	alt="A public profile page with no profile yet"
+	caption="A profile page. Without a profile, others see only the party ID."
+/>
 
 <h2 id="who-pays">Who Pays</h2>
 <p>

@@ -1,9 +1,15 @@
 <script lang="ts">
+	import Ui from '$lib/components/doc-ui.svelte';
+	import Shot from '$lib/components/doc-shot.svelte';
+	import proposalSecretLight from '$lib/assets/docs/proposal-secret-light.webp';
+	import proposalSecretDark from '$lib/assets/docs/proposal-secret-dark.webp';
+	import proposalVotingLight from '$lib/assets/docs/proposal-voting-light.webp';
+	import proposalVotingDark from '$lib/assets/docs/proposal-voting-dark.webp';
 	import DocNote from '$lib/components/doc-note.svelte';
 </script>
 
 <p>
-	A <strong>secret ballot</strong> hides who voted how from the other members. It is part of a proposal's
+	A <Ui kind="term">secret ballot</Ui> hides who voted how from the other members. It is part of a proposal's
 	rule: the DAO's voting rules set it for changes to the DAO, and a proposer sets it for a decision or
 	a choice.
 </p>
@@ -24,6 +30,13 @@
 	>
 	and then your own ballot, if you cast one. Readers of a public DAO see only the totals in either case.
 </p>
+
+<Shot
+	light={proposalSecretLight}
+	dark={proposalSecretDark}
+	alt="Ballots on a secret ballot: the notice and only your own ballot"
+	caption="A secret ballot, as a member who voted sees it."
+/>
 
 <h2 id="what-it-does-not-hide">What It Does Not Hide</h2>
 <p>
@@ -54,12 +67,19 @@
 <h2 id="turning-it-on">Turning It On</h2>
 <ul>
 	<li>
-		<strong>For changes to the DAO</strong>: tick <strong>Secret ballot</strong> in the DAO's voting rules
-		when you create the DAO, or pass a Voting rules proposal that sets it.
+		<strong>For changes to the DAO</strong>: tick <Ui>Secret ballot</Ui> in the DAO's voting rules when
+		you create the DAO, or pass a Voting rules proposal that sets it.
 	</li>
 	<li>
-		<strong>For a decision or a choice</strong>: open <strong>Customize ballot and rule</strong> in
-		the proposal form and tick <strong>Secret ballot</strong>.
+		<strong>For a decision or a choice</strong>: open <Ui>Customize ballot and rule</Ui> in the proposal
+		form and tick <Ui>Secret ballot</Ui>.
 	</li>
 </ul>
+<Shot
+	light={proposalVotingLight}
+	dark={proposalVotingDark}
+	alt="Customize ballot and rule, with Secret ballot among the ballot settings"
+	caption="Secret ballot, with the other ballot settings, on a proposal form."
+/>
+
 <p>A proposal keeps the ballot it opened with, whatever the DAO's rules say later.</p>

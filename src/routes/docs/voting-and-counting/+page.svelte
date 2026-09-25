@@ -1,4 +1,10 @@
 <script lang="ts">
+	import Ui from '$lib/components/doc-ui.svelte';
+	import Shot from '$lib/components/doc-shot.svelte';
+	import proposalTallyLight from '$lib/assets/docs/proposal-tally-light.webp';
+	import proposalTallyDark from '$lib/assets/docs/proposal-tally-dark.webp';
+	import proposalExecutedLight from '$lib/assets/docs/proposal-executed-light.webp';
+	import proposalExecutedDark from '$lib/assets/docs/proposal-executed-dark.webp';
 	import DocNote from '$lib/components/doc-note.svelte';
 </script>
 
@@ -80,7 +86,7 @@
 <p>
 	A ballot signed just before the deadline can reach the ledger just after it. The ledger accepts
 	it, because it was cast in time. So the app waits 3 minutes after the deadline before it makes the
-	final count. Until then the proposal shows <strong>Counting</strong>.
+	final count. Until then the proposal shows <Ui>Counting</Ui>.
 </p>
 <p>
 	The final count is the one thing the ledger takes on the app's word: that no ballots are left. It
@@ -90,15 +96,22 @@
 <h2 id="what-the-page-shows">What the Page Shows</h2>
 <p>
 	Before the ledger has counted anything, the tally shows the ballots cast, marked
-	<strong>(not yet counted)</strong>. Where votes may change, it keeps showing the ballots cast
-	until the deadline. In the ballot list, members see <strong>not counted yet</strong> or
-	<strong>may change</strong> next to ballots the ledger has not counted.
+	<Ui kind="message">(not yet counted)</Ui>. Where votes may change, it keeps showing the ballots
+	cast until the deadline. In the ballot list, members see <Ui>not counted yet</Ui> or
+	<Ui>may change</Ui> next to ballots the ledger has not counted.
 </p>
 <p>
 	All percentages are shares of the whole vote at the time the proposal was made. On a Decision, the
 	middle figure is what yes must reach. On a Choice, the line under the bars says what the leading
 	option (or, with several picks, any option) needs.
 </p>
+
+<Shot
+	light={proposalTallyLight}
+	dark={proposalTallyDark}
+	alt="Tally: 50% yes, 100% to pass, 0% no; 1 voted, 50% of the vote"
+	caption="A tally in shares of the whole vote at the time the proposal was made."
+/>
 
 <h2 id="execution">Execution</h2>
 <p>
@@ -109,15 +122,22 @@
 	<li>Most changes take one transaction.</li>
 	<li>
 		A Members or Shares change is executed in batches of 200 parties. The proposal page shows how
-		many entries are done, for example <strong>400 of 1,000 executed</strong>.
+		many entries are done, for example <Ui kind="message">400 of 1,000 executed</Ui>.
 	</li>
 </ul>
+<Shot
+	light={proposalExecutedLight}
+	dark={proposalExecutedDark}
+	alt="An executed Members change with the Membership card"
+	caption="A Members change after execution: the card lists each entry."
+/>
+
 <h3 id="retries">Retries and Stuck Execution</h3>
 <p>
 	If a count or an execution fails, for example because the network is busy, the app tries again:
 	after 30 seconds, then after twice as long each time, up to every 15 minutes. After 5 failures in
-	a row, a passed change shows <strong>Not executed yet</strong> with the reason, and the app keeps trying.
-	The note goes away once it succeeds.
+	a row, a passed change shows <Ui kind="message">Not executed yet</Ui> with the reason, and the app keeps
+	trying. The note goes away once it succeeds.
 </p>
 
 <h2 id="who-pays">Who Pays for Counting</h2>
