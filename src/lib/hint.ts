@@ -15,7 +15,7 @@ export const normaliseHint = (input: string): string =>
 
 export const hintProblem = (hint: string): string | null =>
 	hint.length < 2
-		? 'A hint needs at least two letters or digits'
+		? 'The party hint needs at least 2 letters or digits'
 		: hint.length > HINT_MAX
-			? `A hint is at most ${HINT_MAX} characters`
+			? `The party hint is at most ${HINT_MAX} characters`
 			: null;

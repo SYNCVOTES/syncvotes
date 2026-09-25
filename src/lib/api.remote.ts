@@ -110,6 +110,9 @@ const inviteOk = (code: string) => {
 /** Whether this code opens sign-up; asked before anyone pays for a party. */
 export const checkInvite = query(v.optional(v.string(), ''), (code) => inviteOk(code));
 
+/** What creating a party costs today, in CC: said on the wallet's welcome, before anyone starts. */
+export const partyCost = query(async () => billing.enrolCost());
+
 // ---- Identity ----------------------------------------------------------------------------
 
 const accountOf = (party: string): ledger.Account => {
@@ -193,8 +196,7 @@ export const enrol = command(
 		invite: v.optional(v.string(), '')
 	}),
 	async ({ publicKey, hint, multiHash, signature, invite }) => {
-		if (!inviteOk(invite))
-			error(403, 'This app is by invitation for now; the code is missing or wrong');
+		if (!inviteOk(invite)) error(403, 'Invalid invite code.');
 		// The ledger verifies this signature when it allocates a new party; for a party that
 		// already exists it never looks, so check here too.
 		const valid = ed25519.verify(

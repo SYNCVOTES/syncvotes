@@ -1,14 +1,12 @@
 <script lang="ts">
-	import Panel from './panel.svelte';
-	import CopyField from './copy-field.svelte';
 	import Hint from './hint.svelte';
+	import PayIn from './pay-in.svelte';
 	import { coin } from '$lib/format';
 
 	/**
-	 * A party's own balance with the app: what was paid in for its key, what its own
-	 * transactions cost, what that leaves — and how to pay in: the app's address and the memo
-	 * that credits this key. Before the party exists, what a party costs today and how much
-	 * of it has arrived.
+	 * A party's own balance with the app: what it has, what was topped up and spent, the price,
+	 * and how to top up (the app's address and the memo that credits this key). Before the
+	 * party exists, what a party costs today and how much of it has arrived.
 	 */
 	let {
 		statement,
@@ -30,59 +28,39 @@
 	const short = $derived(needed !== null && s.credited < needed ? needed - s.credited : 0);
 </script>
 
-<Panel padding="sm" class="space-y-3">
+<section class="space-y-3">
 	<h2 class="eyebrow flex items-center gap-1.5">
 		Balance <Hint
-			text="What you pay for yourself: your party's allocation, your profile, the DAOs you found, and in a DAO where each member pays, what you sign there. Every transaction costs network traffic at the price shown. What is paid in is spent on traffic and is not paid back."
+			text="Pays for your profile, DAOs you create, and your actions in DAOs where members pay. Every transaction costs network traffic at the price shown. Top-ups are not refunded."
 		/>
 	</h2>
 	{#if needed !== null}
-		<div class="font-mono text-2xl font-bold {short > 0 ? 'text-amber' : 'text-green'}">
+		<div class="font-mono text-figure font-bold {short > 0 ? 'text-amber' : 'text-green'}">
 			{coin(s.credited)}
 			<span class="text-xs font-normal text-ink-dim">of {coin(needed)} for a party</span>
 		</div>
 		{#if short > 0}
 			<p class="text-body-sm text-ink-mid">
-				A party costs {coin(needed)} today — its allocation and its account, at the network's traffic
-				price. Send at least {coin(short)} more with the memo below; whatever is left over stays on your
-				balance.
+				Send at least {coin(short)} more with the memo below. Any extra stays on your balance.
 			</p>
 		{:else}
-			<p class="text-body-sm text-green">Enough has arrived; your party is being created.</p>
+			<p class="text-body-sm text-green">Received. Creating your party…</p>
 		{/if}
 	{:else}
-		<div class="font-mono text-2xl font-bold {s.balance > 0 ? 'text-ink' : 'text-red'}">
+		<div class="font-mono text-figure font-bold {s.balance > 0 ? 'text-ink' : 'text-red'}">
 			{coin(s.balance)}
-			<span class="text-xs font-normal text-ink-dim">to spend</span>
+			<span class="text-xs font-normal text-ink-dim">available</span>
 		</div>
-		<dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 font-mono text-xs">
-			<dt class="text-ink-dim">Paid in</dt>
-			<dd class="text-ink">{coin(s.credited)}</dd>
-			<dt class="text-ink-dim">Spent</dt>
-			<dd class="text-ink">{coin(s.charged)}</dd>
-			<dt class="text-ink-dim">Price</dt>
-			<dd
-				class="text-ink"
-				title="The network's traffic price, less what the network pays back for this traffic in rewards"
+		<p class="flex flex-wrap gap-x-3 gap-y-1 font-mono text-xs text-ink-dim">
+			<span>Topped up <span class="text-ink">{coin(s.credited)}</span></span>
+			<span>Spent <span class="text-ink">{coin(s.charged)}</span></span>
+			<span title="Network traffic price, net of app rewards."
+				>Price <span class="text-ink">{coin(s.coinPerMb)} per MB</span></span
 			>
-				{coin(s.coinPerMb)} per MB{s.factor !== 1
-					? ` (${s.factor}× the network's, net of rewards)`
-					: ''}
-			</dd>
-		</dl>
+		</p>
 		{#if s.balance <= 0}
-			<p class="text-body-sm text-red">
-				Empty: a profile, a new DAO, or anything in a DAO where members pay for themselves waits
-				until you pay in.
-			</p>
+			<p class="text-body-sm text-red">Balance empty. Top up to continue.</p>
 		{/if}
 	{/if}
-	<div class="space-y-3 border-t border-border pt-3">
-		<p class="text-body-sm text-ink-mid">
-			Pay in by sending Canton Coin to this address from any wallet, with this memo as the
-			transfer's reason. Coin without the memo is not credited to anyone.
-		</p>
-		<CopyField label="Address" value={s.payTo} />
-		<CopyField label="Memo" value={s.memo} />
-	</div>
-</Panel>
+	<PayIn payTo={s.payTo} memo={s.memo} open={needed !== null || s.balance <= 0} />
+</section>

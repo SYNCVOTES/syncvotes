@@ -34,9 +34,9 @@ export async function enrol(
 	topology: Topology,
 	invite = ''
 ): Promise<Identity> {
-	working('Checking the party the ledger would create');
+	working('Verifying party');
 	await verifyTopology(topology, s.publicKey, hint);
-	working('Signing the party into existence');
+	working('Creating party');
 	return remote.enrol({
 		publicKey: toBase64(s.publicKey),
 		hint,
@@ -59,16 +59,16 @@ export const closeSession = () => remote.sessionEnd().catch(() => {});
 
 /** Signs a prepared transaction, once it is verified to do exactly what `intent` says. */
 export async function sign(s: Signer, who: Identity, intent: Intent, prepared: Prepared) {
-	working('Checking what you are about to sign');
+	working('Verifying transaction');
 	await verifyPrepared(prepared, { party: who.party, ...intent });
-	working('Signing with your key');
+	working('Signing');
 	const signature = s.sign(prepared.preparedTransactionHash);
-	working('Waiting for the ledger to confirm');
+	working('Waiting for confirmation');
 	await remote.execute({ ...prepared, signature });
 }
 
 /** Said before every prepare: the server is building the transaction. */
-const preparing = () => working('Preparing the transaction');
+const preparing = () => working('Preparing transaction');
 
 // ---- Proposals ----------------------------------------------------------------------------
 

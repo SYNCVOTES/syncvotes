@@ -46,7 +46,7 @@
 				class="absolute inset-0 flex items-center justify-center gap-2 text-sm text-ink hover:text-orange"
 				onclick={() => (revealed = true)}
 			>
-				<Eye size={16} /> Reveal the phrase
+				<Eye size={16} /> Reveal
 			</button>
 		{/if}
 	</div>

@@ -158,7 +158,7 @@ async function run(action: () => Promise<void>) {
 	} catch (error) {
 		if (error instanceof wallet.LockedError) {
 			lock();
-			problem = 'The wallet locked itself — unlock and try again';
+			problem = 'Wallet locked. Unlock and try again.';
 		} else {
 			problem = describe(error);
 		}
@@ -185,26 +185,26 @@ export function transient(error: unknown): boolean {
 
 /** Remote functions rethrow server errors as HttpError; the message is in the body. */
 export function describe(error: unknown): string {
-	if (transient(error)) return 'The app is being updated or is out of reach — back in a moment';
+	if (transient(error)) return "Can't reach SyncVotes. Try again in a moment.";
 	const body = (error as { body?: { message?: string } })?.body;
 	if (body?.message) return body.message;
 	// WebAuthn's one error for "cancelled", "timed out" and "no such passkey here".
 	if (error instanceof DOMException && error.name === 'NotAllowedError') {
-		return 'Touch ID was cancelled or timed out — try again';
+		return 'Passkey cancelled or timed out. Try again.';
 	}
 	return error instanceof Error ? error.message : String(error);
 }
 
 /** The read session first, so the pages that open next are allowed to read. */
 async function enter(signer: wallet.Signer, who: actions.Identity) {
-	working('Opening your session');
+	working('Signing in');
 	await actions.openSession(signer, who);
 	screen = { at: 'home', signer, who };
 }
 
 /** A key is in hand: does the ledger know it? A known key is signed in; a new one picks a hint. */
 async function identify(signer: wallet.Signer, andThen: 'protect' | 'enter') {
-	working('Looking your party up');
+	working('Finding your party');
 	// A key is in memory from here on, so the auto-lock is armed from here on too.
 	autoLock.start(lock);
 	const found = await actions.lookup(signer);
@@ -270,7 +270,7 @@ export const flow = {
 		return run(async () => {
 			// Checked before anyone pays for a party: a wrong code costs nothing.
 			if (!(await remote.checkInvite(invite))) {
-				throw new Error('This app is by invitation for now; the code is missing or wrong');
+				throw new Error('Invalid invite code.');
 			}
 			// The key is kept before anyone pays for it: a reload while the pay-in lands must not
 			// cost a new key. The party id is known already; it is the hint and the fingerprint.
@@ -296,7 +296,7 @@ export const flow = {
 		if (screen.at !== 'fund' || busy) return;
 		const { signer, hint, invite, fingerprint } = screen;
 		return run(async () => {
-			working('Creating your party on the ledger');
+			working('Creating party');
 			const topology = await actions.topology(signer, hint);
 			const who = await actions.enrol(signer, hint, topology, invite);
 			invites.forget(fingerprint);
@@ -312,7 +312,7 @@ export const flow = {
 		if (screen.at !== 'protect') return;
 		const { signer, who, pending } = screen;
 		return run(async () => {
-			working('Encrypting the key on this device');
+			working('Encrypting key');
 			selected =
 				'passkey' in how
 					? await wallet.lockWithPasskey(signer, who.party)
@@ -338,7 +338,7 @@ export const flow = {
 		const id = selected;
 		const kind = screen.lock;
 		return run(async () => {
-			working('Unlocking your key');
+			working('Unlocking');
 			const signer =
 				kind === 'passkey'
 					? await wallet.unlockWithPasskey(id)

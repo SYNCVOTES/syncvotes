@@ -9,8 +9,7 @@
 </script>
 
 {#if kind === 'passkey'}
-	<Button disabled={store.busy} onclick={() => flow.unlock()}>Unlock with Touch ID / passkey</Button
-	>
+	<Button disabled={store.busy} onclick={() => flow.unlock()}>Unlock with passkey</Button>
 {:else if kind === 'password'}
 	<form
 		class="flex w-full gap-3"
