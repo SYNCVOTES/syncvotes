@@ -1,0 +1,48 @@
+-- | The provider's statements of account: what was paid in and what traffic has cost, for a DAO
+-- and for a party. They record; they hold no coin.
+module SyncVotes.Billing where
+
+-- | A DAO's account: coin paid in with the DAO's memo, and what its transactions have cost. The
+-- balance is the difference. Rewritten as the numbers move; one per DAO.
+template Meter
+  with
+    provider : Party
+    daoId : Text
+    credited : Decimal
+    charged : Decimal
+    updatedAt : Time
+  where
+    signatory provider
+
+    choice Meter_Update : ContractId Meter
+      with
+        newCredited : Decimal
+        newCharged : Decimal
+      controller provider
+      do
+        now <- getTime
+        create this with credited = newCredited; charged = newCharged; updatedAt = now
+
+-- | A party's own account, by its key's fingerprint: coin paid in with that memo, less what the
+-- party's own transactions cost (its creation, its profile, the DAOs it founds, and what it
+-- signs where each member pays). Opened when the party is created; one per key.
+template Purse
+  with
+    provider : Party
+    fingerprint : Text
+    party : Optional Party
+    credited : Decimal
+    charged : Decimal
+    updatedAt : Time
+  where
+    signatory provider
+
+    choice Purse_Update : ContractId Purse
+      with
+        newParty : Optional Party
+        newCredited : Decimal
+        newCharged : Decimal
+      controller provider
+      do
+        now <- getTime
+        create this with party = newParty; credited = newCredited; charged = newCharged; updatedAt = now

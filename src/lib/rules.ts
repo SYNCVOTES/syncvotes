@@ -266,7 +266,7 @@ export type LedgerRule = {
 	quorum: string;
 	early: boolean;
 	changeable: boolean;
-	secret: boolean | null;
+	secret: boolean;
 };
 export const toLedger = (r: Rule): LedgerRule => ({
 	basis: r.basis === 'all' ? 'OfAll' : 'OfCast',
@@ -282,5 +282,5 @@ export const toLedger = (r: Rule): LedgerRule => ({
 	quorum: String(r.quorum),
 	early: r.early,
 	changeable: r.changeable,
-	secret: r.secret ? true : null
+	secret: !!r.secret
 });

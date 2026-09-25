@@ -2,7 +2,7 @@ import { error } from '@sveltejs/kit';
 import { ed25519 } from '@noble/curves/ed25519.js';
 import { command, form, query, getRequestEvent } from '$app/server';
 import * as v from 'valibot';
-import { Main } from '@daml.js/model';
+import { Templates } from '$lib/templates';
 import * as participant from './server/participant';
 import * as ledger from './server/ledger';
 import * as session from './server/session';
@@ -12,6 +12,8 @@ import { fingerprintOf } from './verify';
 import { BILLING_FACTOR, BILLING_FLOOR, INVITE_CODES } from '$app/env/private';
 import { normaliseHint, hintProblem } from './hint';
 import * as schemas from './schemas';
+import * as markers from './server/markers';
+import type * as splice from './server/splice';
 import { categoryOf, settingsOf, settingsToLedger } from './rules';
 
 /**
@@ -131,11 +133,9 @@ async function ensureAccount(
 		[
 			{
 				CreateCommand: {
-					templateId: Main.Account.templateId,
+					templateId: Templates.Account.templateId,
 					createArguments: {
 						provider: participant.providerParty(),
-						// The operator field predates the provider doing everything; it names the provider.
-						operator: participant.providerParty(),
 						user: party
 					}
 				}
@@ -680,14 +680,16 @@ const prepare = async (
 	contractId: string,
 	choice: string,
 	choiceArgument: unknown,
-	dao: string | null
+	dao: string | null,
+	/** The provider's featured app right, where this choice records an activity marker. */
+	right: splice.Disclosed | null = null
 ) => {
 	const payer = payerFor(party, dao);
 	await billing.funded(payer);
 	const prepared = await participant.prepare(
 		party,
 		[{ ExerciseCommand: { templateId: template.templateId, contractId, choice, choiceArgument } }],
-		{ payer }
+		{ payer, disclosedContracts: right ? [right] : [], marked: !!right }
 	);
 	// The participant has priced it: what the account holds has to cover that.
 	await billing.funded(payer, prepared.cost);
@@ -711,6 +713,7 @@ export const createDaoForm = form(schemas.createDaoForm, async (f) => {
 		if (!ledger.accounts.has(r.party)) error(404, `${r.party} is not registered with the app`);
 	}
 	const id = crypto.randomUUID();
+	const right = await markers.right();
 	// The creator's own share is in the first batch, so the DAO is theirs from the start.
 	const ordered = [
 		...shares.filter((r) => r.party === party),
@@ -722,17 +725,26 @@ export const createDaoForm = form(schemas.createDaoForm, async (f) => {
 		description,
 		image: nullable(image),
 		equal: equal === 'yes',
-		routine: settingsToLedger(settingsOf(f, 'routine')),
-		sensitive: settingsToLedger(settingsOf(f, 'sensitive')),
+		rules: settingsToLedger(settingsOf(f, 'sensitive')),
+		decisions: settingsToLedger(settingsOf(f, 'routine')),
 		shares: schemas.shareTuples(ordered.slice(0, schemas.BATCH)),
 		more: schemas.shareTuples(ordered.slice(schemas.BATCH)),
 		actorPays: actorPays === 'yes',
-		public: isPublic
+		public: isPublic,
+		featuredAppRight: right?.contractId ?? null
 	};
 	return {
 		id,
 		args,
-		prepared: await prepare(party, Main.Account, account, 'Account_CreateDAO', args, null)
+		prepared: await prepare(
+			party,
+			Templates.Account,
+			account,
+			'Account_CreateDAO',
+			args,
+			null,
+			right
+		)
 	};
 });
 
@@ -757,7 +769,7 @@ export const createProposalForm = form(schemas.createProposalForm, async (f) => 
 		case 'choose': {
 			const options = schemas.parseOptions(f.options);
 			if (!schemas.validOptions(options)) error(400, 'Two to ten distinct options');
-			action = { tag: 'Choose', value: { options, several: f.several === 'yes' ? true : null } };
+			action = { tag: 'Choose', value: { options, several: f.several === 'yes' } };
 			break;
 		}
 		case 'visibility':
@@ -768,11 +780,8 @@ export const createProposalForm = form(schemas.createProposalForm, async (f) => 
 			break;
 		case 'settings':
 			action = {
-				tag: 'SetSettings',
-				value: {
-					routine: settingsToLedger(settingsOf(f, 'newRoutine')),
-					sensitive: settingsToLedger(settingsOf(f, 'newSensitive'))
-				}
+				tag: 'SetRules',
+				value: { rules: settingsToLedger(settingsOf(f, 'newSensitive')) }
 			};
 			break;
 		case 'shares': {
@@ -815,22 +824,30 @@ export const createProposalForm = form(schemas.createProposalForm, async (f) => 
 	// A decision or a choice runs under the rule its proposer set; the rest under the DAO's.
 	const own =
 		categoryOf(f.kind) === 'routine' ? settingsToLedger(settingsOf(f, 'newRoutine')) : null;
+	const right = await markers.right();
 	const args = {
 		dao: d.contractId,
 		pid,
 		title: f.title,
 		description: f.description,
 		action,
-		// Secrecy travels in the rule, the proposer's or the DAO's.
-		secret: null,
 		rule: own?.rule ?? null,
-		votingDays: own?.votingDays ?? null
+		votingDays: own?.votingDays ?? null,
+		featuredAppRight: right?.contractId ?? null
 	};
 	return {
 		pid,
 		membership,
 		args,
-		prepared: await prepare(party, Main.Member, membership, 'Member_Propose', args, f.dao)
+		prepared: await prepare(
+			party,
+			Templates.Member,
+			membership,
+			'Member_Propose',
+			args,
+			f.dao,
+			right
+		)
 	};
 });
 
@@ -844,7 +861,7 @@ export const prepareVote = command(
 			v.pipe(v.string(), v.regex(/^PickMany:\d(,\d){0,9}$/))
 		])
 	}),
-	({ proposal, vote }) => {
+	async ({ proposal, vote }) => {
 		const p = proposalOf(proposal);
 		const me = proposalReader(p);
 		if (!me || !mayVote(p, me)) error(409, 'You have no vote on this proposal');
@@ -860,14 +877,26 @@ export const prepareVote = command(
 			}
 		} else if (picks.length > 0) error(400, 'This proposal takes yes or no');
 		const previous = ledger.ballots.get(proposal)?.get(me.party)?.contractId ?? null;
+		const right = await markers.right();
 		const args = {
 			proposalId: proposal,
 			closesAt: p.closesAt,
 			changeable: p.rule.changeable,
 			vote: voteWire(vote as ledger.Vote),
-			previous
+			previous,
+			featuredAppRight: right?.contractId ?? null
 		};
-		return prepare(me.party, Main.Member, me.contractId, 'Member_Vote', args, p.daoId);
+		const prepared = await prepare(
+			me.party,
+			Templates.Member,
+			me.contractId,
+			'Member_Vote',
+			args,
+			p.daoId,
+			right
+		);
+		// The browser names the same right in what it checks before signing.
+		return { ...prepared, featuredAppRight: args.featuredAppRight };
 	}
 );
 
@@ -937,7 +966,14 @@ export const commentForm = form(schemas.commentForm, async ({ proposal, body }) 
 		membership: me.contractId,
 		proposalId: proposal,
 		body,
-		prepared: await prepare(me.party, Main.Member, me.contractId, 'Member_Comment', args, p.daoId)
+		prepared: await prepare(
+			me.party,
+			Templates.Member,
+			me.contractId,
+			'Member_Comment',
+			args,
+			p.daoId
+		)
 	};
 });
 
@@ -949,7 +985,7 @@ export const profileForm = form(schemas.profileForm, async ({ name, avatar, bio 
 	const args = { name, avatar: nullable(avatar), bio, previous };
 	return {
 		...args,
-		prepared: await prepare(party, Main.Account, account, 'Account_SetProfile', args, null)
+		prepared: await prepare(party, Templates.Account, account, 'Account_SetProfile', args, null)
 	};
 });
 
@@ -968,6 +1004,7 @@ export const execute = command(
 			{ fingerprint: party.split('::')[1], signature }
 		]);
 		await ledger.applied(updateId);
-		if (known?.payer) void billing.settle(known.payer as billing.Account, updateId, party);
+		if (known?.payer)
+			void billing.settle(known.payer as billing.Account, updateId, party, known.marked);
 	}
 );

@@ -1,0 +1,99 @@
+-- | A party's standing with the app: the door through which it founds DAOs and keeps a profile.
+module SyncVotes.Account where
+
+import DA.Action (void, when)
+import DA.Foldable (forA_)
+import Splice.Api.FeaturedAppRightV1 (FeaturedAppRight)
+import SyncVotes.Governance
+import SyncVotes.Markers (mark)
+import SyncVotes.Rules
+import SyncVotes.Types
+
+-- | Made by the provider once per party. Its signature is how the provider's authority enters
+-- every contract the party later acts on.
+template Account
+  with
+    provider : Party
+    user : Party
+  where
+    signatory provider
+    observer user
+
+    -- The founding share table: the first batch of members is created here, the rest as a
+    -- proposal already passed, carried out by the provider in batches like any other. The
+    -- founder holds a share.
+    nonconsuming choice Account_CreateDAO : ContractId DAO
+      with
+        id : Text
+        daoName : Text
+        description : Text
+        image : Optional Text
+        equal : Bool
+        rules : Settings
+        decisions : Settings
+        shares : [(Party, Int)]
+        more : [(Party, Int)]
+        actorPays : Bool
+        public : Bool
+        featuredAppRight : Optional (ContractId FeaturedAppRight)
+      controller user
+      do
+        now <- getTime
+        assertMsg "A DAO needs a name" (daoName /= "")
+        assertMsg "The settings' numbers are out of range" (validSettings rules && validSettings decisions)
+        assertMsg "The founding shares must be whole" (validChanges equal (shares ++ more))
+        assertMsg "The first batch is one to a batch" (not (null shares) && length shares <= batch)
+        assertMsg "The founding shares are all positive" (all (\(_, u) -> u > 0) (shares ++ more))
+        assertMsg "The founder holds a share" (user `elem` map fst (shares ++ more))
+        forA_ shares \(party, units) ->
+          create Member with
+            provider; creator = user; daoId = id; party; since = now
+            share = units; shareSince = now; voted = []
+        when (not (null more)) do
+          void $ create Proposal with
+            provider; creator = user; daoId = id; proposer = user; id = id <> "-founding"
+            title = "Founding members"; description = ""
+            action = SetShares with changes = more
+            rule = Rule with
+              basis = OfAll; threshold = Majority; quorum = 0; early = True; changeable = False
+              secret = False
+            eligible = sum (map snd shares); createdAt = now; closesAt = now
+            yes = 0; no = 0; abstain = 0; tallies = []; picked = 0; outcome = Some Passed
+            executed = 0; executedAt = None
+        mark provider featuredAppRight
+        create DAO with
+          provider; creator = user; id; name = daoName; description; image; equal; rules
+          decisions; createdAt = now; members = length shares; units = sum (map snd shares)
+          actorPays; public
+
+    -- How a party presents itself: a name, a picture, a few words. One per party; replacing it
+    -- hands in the old one.
+    nonconsuming choice Account_SetProfile : ContractId Profile
+      with
+        name : Text
+        avatar : Optional Text
+        bio : Text
+        previous : Optional (ContractId Profile)
+      controller user
+      do
+        assertMsg "A profile needs a name" (name /= "")
+        forA_ previous \cid -> do
+          old <- fetch cid
+          assertMsg "Not this party's profile" (old.user == user)
+          archive cid
+        now <- getTime
+        create Profile with provider; user; name; avatar; bio; updatedAt = now
+
+-- | How a party presents itself to the DAOs it is in.
+template Profile
+  with
+    provider : Party
+    user : Party
+    name : Text
+    avatar : Optional Text
+    bio : Text
+    updatedAt : Time
+  where
+    signatory provider, user
+
+    ensure name /= ""

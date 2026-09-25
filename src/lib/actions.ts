@@ -102,7 +102,15 @@ export async function vote(
 	const intent = {
 		choice: 'Member_Vote',
 		contractId: membership,
-		args: { proposalId, closesAt, changeable, vote, previous }
+		args: {
+			proposalId,
+			closesAt,
+			changeable,
+			vote,
+			previous,
+			// The provider's featured app right, known to the server only; it records a marker.
+			featuredAppRight: prepared.featuredAppRight
+		}
 	};
 	await sign(s, who, intent, prepared);
 }

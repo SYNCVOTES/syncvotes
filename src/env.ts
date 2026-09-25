@@ -67,6 +67,11 @@ export const variables = defineEnvVars({
 			"The least a payer is charged, as a fraction of the network's traffic price, however much comes back as rewards. 0: no floor",
 		schema: v.optional(v.string(), '0')
 	},
+	MARKERS: {
+		description:
+			"Record featured app activity markers (CIP-0047) where the provider is featured: 'true' or 'false'",
+		schema: v.optional(v.string(), 'false')
+	},
 	INVITE_CODES: {
 		description:
 			'Invite codes, comma-separated; while any are set, a new party needs one. Empty: open to all',

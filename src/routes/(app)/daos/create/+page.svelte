@@ -132,7 +132,7 @@
 	const enhanced = signedForm(
 		f,
 		schema,
-		(fields, { id }) => {
+		(fields, { id, args: sent }) => {
 			const { daoName, description, image, equal, shares } = fields;
 			const me = store.who!.party;
 			const ordered = [
@@ -150,10 +150,13 @@
 					equal: equal === 'yes',
 					actorPays: payer === 'members',
 					public: visibility === 'public',
-					routine: settingsToLedger(settingsOf(fields, 'routine')),
-					sensitive: settingsToLedger(settingsOf(fields, 'sensitive')),
+					rules: settingsToLedger(settingsOf(fields, 'sensitive')),
+					decisions: settingsToLedger(settingsOf(fields, 'routine')),
 					shares: shareTuples(ordered.slice(0, BATCH)),
-					more: shareTuples(ordered.slice(BATCH))
+					more: shareTuples(ordered.slice(BATCH)),
+					// The provider's featured app right, which only the server knows; a marker on it
+					// records the app's activity and changes nothing of the DAO.
+					featuredAppRight: sent.featuredAppRight
 				}
 			};
 		},

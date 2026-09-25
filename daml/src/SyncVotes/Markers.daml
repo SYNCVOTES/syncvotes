@@ -1,0 +1,18 @@
+-- | Featured app activity markers (CIP-0047): where the network rewards featured apps by
+-- marker, the provider records one for each piece of activity worth a reward, in the same
+-- transaction as the activity. The provider's FeaturedAppRight is handed in by the app when
+-- markers are on and the provider is featured; absent, nothing is recorded.
+module SyncVotes.Markers where
+
+import DA.Foldable (forA_)
+import DA.Action (void)
+import Splice.Api.FeaturedAppRightV1
+
+-- | One marker of weight one for `provider`, the beneficiary of its reward, on the provider's
+-- own right. A right that is another app's is refused rather than used.
+mark : Party -> Optional (ContractId FeaturedAppRight) -> Update ()
+mark provider right = forA_ right \cid -> do
+  featured <- fetch cid
+  assertMsg "Not this app's featured app right" ((view featured).provider == provider)
+  void $ exercise cid FeaturedAppRight_CreateActivityMarker with
+    beneficiaries = [AppRewardBeneficiary with beneficiary = provider; weight = 1.0]

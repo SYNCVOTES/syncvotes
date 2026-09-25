@@ -392,7 +392,10 @@ export type Prepared = {
  * hand in a transaction of their own making and skip the rules the prepare functions enforce.
  * The DAO named here is the one billed for the traffic.
  */
-const prepared = new Map<string, { party: string; payer: string | null; at: number }>();
+const prepared = new Map<
+	string,
+	{ party: string; payer: string | null; marked: boolean; at: number }
+>();
 const PREPARED_TTL = 10 * 60 * 1000;
 
 /**
@@ -408,6 +411,8 @@ export async function prepare(
 		payer?: string | null;
 		disclosedContracts?: DisclosedContract[];
 		signatures?: number;
+		/** It records an activity marker: its charge is less what the marker brings. */
+		marked?: boolean;
 	} = {}
 ): Promise<Prepared> {
 	try {
@@ -439,6 +444,7 @@ export async function prepare(
 		prepared.set(response.preparedTransactionHash, {
 			party,
 			payer: options.payer ?? null,
+			marked: options.marked ?? false,
 			at: now
 		});
 		return {

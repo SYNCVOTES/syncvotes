@@ -6,7 +6,8 @@ import {
 } from '@canton-network/core-tx-visualizer';
 import { BinaryReader, WireType } from '@protobuf-ts/runtime';
 import type { Value } from '@canton-network/core-ledger-proto';
-import { Main, packageId } from '@daml.js/model';
+import { packageId } from '@daml.js/model';
+import { Templates } from './templates';
 import { fromBase64, toBase64 } from './wallet';
 
 /**
@@ -33,17 +34,17 @@ const CONFIRMATION = 2;
 const EC_CURVE25519 = 1;
 
 /** The package this app was built with; a same-named choice elsewhere is refused. */
-export const PACKAGE_NAME = Main.Account.templateId.slice(1).split(':')[0];
+export const PACKAGE_NAME = Templates.Account.templateId.slice(1).split(':')[0];
 
 type Home = { template: string; pkg: string };
 
 /** The only choices a user is ever asked to sign, and where each lives. */
 const CHOICES: Record<string, Home> = {
-	Account_CreateDAO: { template: 'Main:Account', pkg: PACKAGE_NAME },
-	Account_SetProfile: { template: 'Main:Account', pkg: PACKAGE_NAME },
-	Member_Propose: { template: 'Main:Member', pkg: PACKAGE_NAME },
-	Member_Vote: { template: 'Main:Member', pkg: PACKAGE_NAME },
-	Member_Comment: { template: 'Main:Member', pkg: PACKAGE_NAME }
+	Account_CreateDAO: { template: 'SyncVotes.Account:Account', pkg: PACKAGE_NAME },
+	Account_SetProfile: { template: 'SyncVotes.Account:Account', pkg: PACKAGE_NAME },
+	Member_Propose: { template: 'SyncVotes.Governance:Member', pkg: PACKAGE_NAME },
+	Member_Vote: { template: 'SyncVotes.Governance:Member', pkg: PACKAGE_NAME },
+	Member_Comment: { template: 'SyncVotes.Governance:Member', pkg: PACKAGE_NAME }
 };
 
 // ---- Sign-up: the party topology --------------------------------------------------------

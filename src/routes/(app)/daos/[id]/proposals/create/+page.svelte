@@ -303,7 +303,7 @@
 									tag: 'Choose',
 									value: {
 										options: parseOptions(fields.options),
-										several: fields.several === 'yes' ? true : null
+										several: fields.several === 'yes'
 									}
 								}
 							: fields.kind === 'visibility'
@@ -312,11 +312,8 @@
 									? { tag: 'Dissolve', value: {} }
 									: fields.kind === 'settings'
 										? {
-												tag: 'SetSettings',
-												value: {
-													routine: settingsToLedger(settingsOf(fields, 'newRoutine')),
-													sensitive: settingsToLedger(settingsOf(fields, 'newSensitive'))
-												}
+												tag: 'SetRules',
+												value: { rules: settingsToLedger(settingsOf(fields, 'newSensitive')) }
 											}
 										: { tag: 'Signal', value: {} };
 			return {
@@ -328,9 +325,9 @@
 					title: fields.title,
 					description: fields.description,
 					action,
-					secret: null,
 					rule: own ? settingsToLedger(settingsOf(fields, 'newRoutine')).rule : null,
-					votingDays: own ? settingsToLedger(settingsOf(fields, 'newRoutine')).votingDays : null
+					votingDays: own ? settingsToLedger(settingsOf(fields, 'newRoutine')).votingDays : null,
+					featuredAppRight: args.featuredAppRight
 				}
 			};
 		},

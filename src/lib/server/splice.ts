@@ -79,6 +79,19 @@ export const openRound = cached(60_000, async () => {
 });
 
 /**
+ * The provider's featured app right, from Scan: what an activity marker is recorded on. Null
+ * where the provider is not featured. Its contract is disclosed to the transactions that use it.
+ */
+export const featuredAppRight = cached(10 * 60_000, async () => {
+	const r = await scan<{ featured_app_right: ScanContract | null }>(
+		`/api/scan/v0/featured-apps/${encodeURIComponent(providerParty())}`
+	);
+	if (!r.featured_app_right) return null;
+	const rules = await amuletRules();
+	return disclosed(r.featured_app_right, rules.synchronizerId);
+});
+
+/**
  * What comes back of what traffic costs, as fractions of it, from the latest issuing round: the
  * validator is minted `validator` coin per coin it burns buying traffic, and a featured app's
  * provider `featuredApp` per coin of its transactions' traffic, but only where the network mints
@@ -104,16 +117,27 @@ export const rewards = cached(10 * 60_000, async () => {
 			};
 		}
 	).configSchedule.initialValue.rewardConfig;
+	const markerAmount = Number(
+		(
+			(await amuletRules()).payload as {
+				configSchedule: { initialValue: { featuredAppActivityMarkerAmount?: string } };
+			}
+		).configSchedule.initialValue.featuredAppActivityMarkerAmount ?? 0
+	);
 	const featured = await scan<{ featured_app_right: unknown }>(
 		`/api/scan/v0/featured-apps/${encodeURIComponent(providerParty())}`
 	).then((x) => x.featured_app_right !== null);
+	const perFeatured = Number(latest?.issuancePerFeaturedAppRewardCoupon ?? 0);
+	const byMarkers = config?.mintingVersion === 'RewardVersion_FeaturedAppMarkers';
 	return {
 		validator: Number(latest?.issuancePerValidatorRewardCoupon ?? 0),
-		featuredApp:
-			featured && config?.mintingVersion === 'RewardVersion_TrafficBasedAppRewards'
-				? Number(latest?.issuancePerFeaturedAppRewardCoupon ?? 0)
-				: 0,
-		thresholdUsd: Number(config?.appRewardCouponThreshold ?? 0.5)
+		featuredApp: featured && !byMarkers ? perFeatured : 0,
+		thresholdUsd: Number(config?.appRewardCouponThreshold ?? 0.5),
+		/**
+		 * What one activity marker brings the provider, in USD, where the network mints by marker:
+		 * the marker's amount (a USD figure in the rules) times this round's issuance per unit.
+		 */
+		markerUsd: featured && byMarkers ? markerAmount * perFeatured : 0
 	};
 });
 

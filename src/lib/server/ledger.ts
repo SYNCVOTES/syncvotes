@@ -1,4 +1,4 @@
-import { Main } from '@daml.js/model';
+import { Templates } from '$lib/templates';
 import { providerParty, sdk, streamActiveContracts, type Created } from './participant';
 import type { Rule, Settings } from '$lib/rules';
 
@@ -349,11 +349,11 @@ const effect = (v: unknown): Effect => {
 			return { kind: 'dissolve' };
 		case 'SetPublic':
 			return { kind: 'visibility', public: (t.value as { public?: unknown }).public === true };
-		case 'SetSettings':
+		case 'SetRules':
 			return {
 				kind: 'settings',
-				routine: settings(t.value.routine),
-				sensitive: settings(t.value.sensitive)
+				routine: settings(t.value.rules),
+				sensitive: settings(t.value.rules)
 			};
 		default:
 			return { kind: 'signal' };
@@ -376,8 +376,8 @@ function created({ contractId, templateId, createArgument: a }: Created) {
 				description: text(a.description),
 				image: optional(a.image),
 				equal: a.equal === true,
-				routine: settings(a.routine),
-				sensitive: settings(a.sensitive),
+				routine: settings(a.decisions),
+				sensitive: settings(a.rules),
 				createdAt: text(a.createdAt),
 				members: num(a.members),
 				units: num(a.units),
@@ -425,8 +425,8 @@ function created({ contractId, templateId, createArgument: a }: Created) {
 				outcome: a.outcome == null ? null : (tagged(a.outcome) as Outcome),
 				executed: num(a.executed),
 				executedAt: optional(a.executedAt),
-				secret: a.secret === true,
-				picked: a.picked == null ? null : num(a.picked)
+				secret: (a.rule as { secret?: unknown } | undefined)?.secret === true,
+				picked: num(a.picked)
 			};
 			track(
 				contractId,
@@ -521,15 +521,15 @@ function archived(contractId: string) {
 // ---- following the ledger ------------------------------------------------------------------
 
 const TEMPLATES = [
-	Main.Account,
-	Main.DAO,
-	Main.Member,
-	Main.Proposal,
-	Main.Ballot,
-	Main.Comment,
-	Main.Profile,
-	Main.Meter,
-	Main.Purse
+	Templates.Account,
+	Templates.DAO,
+	Templates.Member,
+	Templates.Proposal,
+	Templates.Ballot,
+	Templates.Comment,
+	Templates.Profile,
+	Templates.Meter,
+	Templates.Purse
 ].map((t) => t.templateId);
 
 type Event =

@@ -12,8 +12,8 @@ importers:
         specifier: ^1.5.0
         version: 1.5.0
       '@daml.js/model':
-        specifier: workspace:@daml.js/syncvotes-options-0.25.0@*
-        version: link:daml.js/syncvotes-options-0.25.0
+        specifier: workspace:@daml.js/syncvotes-1.0.0@*
+        version: link:daml.js/syncvotes-1.0.0
       '@daml/types':
         specifier: 3.5.2
         version: 3.5.2
@@ -247,7 +247,16 @@ importers:
         specifier: ^3.1.0
         version: 3.1.0
 
-  daml.js/syncvotes-options-0.25.0:
+  daml.js/splice-api-featured-app-v1-1.0.0:
+    dependencies:
+      '@daml.js/ghc-stdlib-DA-Internal-Template-1.0.0':
+        specifier: file:../ghc-stdlib-DA-Internal-Template-1.0.0
+        version: link:../ghc-stdlib-DA-Internal-Template-1.0.0
+      '@mojotech/json-type-validation':
+        specifier: ^3.1.0
+        version: 3.1.0
+
+  daml.js/syncvotes-1.0.0:
     dependencies:
       '@daml.js/daml-prim-DA-Types-1.0.0':
         specifier: file:../daml-prim-DA-Types-1.0.0
@@ -255,6 +264,9 @@ importers:
       '@daml.js/ghc-stdlib-DA-Internal-Template-1.0.0':
         specifier: file:../ghc-stdlib-DA-Internal-Template-1.0.0
         version: link:../ghc-stdlib-DA-Internal-Template-1.0.0
+      '@daml.js/splice-api-featured-app-v1-1.0.0':
+        specifier: file:../splice-api-featured-app-v1-1.0.0
+        version: link:../splice-api-featured-app-v1-1.0.0
       '@mojotech/json-type-validation':
         specifier: ^3.1.0
         version: 3.1.0

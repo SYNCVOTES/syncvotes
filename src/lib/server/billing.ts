@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { Main } from '@daml.js/model';
+import { Templates } from '$lib/templates';
 import { BILLING_FACTOR, BILLING_FLOOR } from '$app/env/private';
 import * as ledger from './ledger';
 import * as splice from './splice';
@@ -57,6 +57,21 @@ async function factor(): Promise<number> {
 	const app = appUsdPerRound >= back.thresholdUsd ? back.featuredApp : 0;
 	const net = Math.max(0, 1 - back.validator - app);
 	return Math.max(net * Number(BILLING_FACTOR ?? '1'), Number(BILLING_FLOOR ?? '0'));
+}
+
+/**
+ * What a transaction of `bytes` is charged, in coin. As `coinFor`, and where it recorded an
+ * activity marker and the network mints by marker, less what the marker brings, before the
+ * factor applies; never below `BILLING_FLOOR` of the price.
+ */
+async function chargeFor(bytes: number, marked: boolean): Promise<number> {
+	const [back, { usdPerMb, usdPerCoin }] = await Promise.all([splice.rewards(), splice.prices()]);
+	if (!marked || back.markerUsd === 0) return coinFor(bytes);
+	const gross = ((bytes / 1_000_000) * usdPerMb) / usdPerCoin;
+	const appUsdPerRound = (bytesPerRound() / 1_000_000) * usdPerMb * back.featuredApp;
+	const app = appUsdPerRound >= back.thresholdUsd ? back.featuredApp : 0;
+	const net = Math.max(0, gross * (1 - back.validator - app) - back.markerUsd / usdPerCoin);
+	return Math.max(net * Number(BILLING_FACTOR ?? '1'), gross * Number(BILLING_FLOOR ?? '0'));
 }
 
 /** Coin per byte of traffic, right now. */
@@ -172,10 +187,10 @@ export async function statement(a: Account): Promise<Statement> {
 }
 
 /** The traffic a transaction cost, charged to the account that caused it. */
-export async function charge(a: Account, bytes: number): Promise<void> {
+export async function charge(a: Account, bytes: number, marked = false): Promise<void> {
 	if (!bytes) return;
 	recent.push({ at: Date.now(), bytes });
-	const coin = bytes * (await coinPerByte());
+	const coin = await chargeFor(bytes, marked);
 	pending.set(a, (pending.get(a) ?? 0) + coin);
 	dirty.add(a);
 	notify(a);
@@ -189,8 +204,13 @@ const notify = (a: Account) => {
 };
 
 /** Looks up what a transaction cost and charges it; for writes the provider submitted too. */
-export async function settle(a: Account, updateId: string, party = providerParty()) {
-	await charge(a, await paidTraffic(updateId, party));
+export async function settle(
+	a: Account,
+	updateId: string,
+	party = providerParty(),
+	marked = false
+) {
+	await charge(a, await paidTraffic(updateId, party), marked);
 }
 
 async function write(a: Account, credited: number, charged: number, party?: string) {
@@ -204,7 +224,7 @@ async function write(a: Account, credited: number, charged: number, party?: stri
 				[
 					{
 						ExerciseCommand: {
-							templateId: kind === 'dao' ? Main.Meter.templateId : Main.Purse.templateId,
+							templateId: kind === 'dao' ? Templates.Meter.templateId : Templates.Purse.templateId,
 							contractId: row.contractId,
 							choice: kind === 'dao' ? 'Meter_Update' : 'Purse_Update',
 							choiceArgument:
@@ -220,10 +240,9 @@ async function write(a: Account, credited: number, charged: number, party?: stri
 				[
 					{
 						CreateCommand: {
-							templateId: kind === 'dao' ? Main.Meter.templateId : Main.Purse.templateId,
+							templateId: kind === 'dao' ? Templates.Meter.templateId : Templates.Purse.templateId,
 							createArguments: {
 								provider: providerParty(),
-								operator: providerParty(),
 								...(kind === 'dao' ? { daoId: key } : { fingerprint: key, party: party ?? null }),
 								credited: credited.toFixed(10),
 								charged: charged.toFixed(10),

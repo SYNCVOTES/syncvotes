@@ -30,6 +30,7 @@ services:
       SCAN_URL: ${SCAN_URL:?set in the env file}
       BILLING_FACTOR: ${BILLING_FACTOR:-1}
       BILLING_FLOOR: ${BILLING_FLOOR:-0}
+      MARKERS: ${MARKERS:-false}
       # Comma-separated invite codes; while any are set, sign-up needs one. Empty opens the door.
       INVITE_CODES: ${INVITE_CODES:-}
       # Shown to users; the ledger does not care.

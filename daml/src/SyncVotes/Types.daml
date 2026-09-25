@@ -1,0 +1,71 @@
+-- | The data a DAO is made of: what a vote says, what a proposal does, what decides it.
+module SyncVotes.Types where
+
+-- | Yes, no or abstain on a proposal; on a choice among options, the option picked, or several
+-- of them where the proposal allows it.
+data Vote = Yes | No | Abstain | Pick Int | PickMany [Int]
+  deriving (Eq, Show)
+
+-- | Passed or failed. A choice is decided as the option chosen, or as every option that
+-- reached the rule where several may be picked; it fails when none did (a tie at the top of a
+-- single-pick choice fails too).
+data Outcome = Passed | Failed | Chosen Int | ChosenMany [Int]
+  deriving (Eq, Show)
+
+-- | What a proposal does once it passes. `Signal` and `Choose` record a decision and change
+-- nothing else; the rest change the DAO. A share change lists only the parties it touches,
+-- zero meaning they leave, and is carried out in batches, so one proposal can reshape a DAO
+-- of thousands.
+data Effect
+  = Signal
+  | Choose with
+      options : [Text]
+      several : Bool
+  | SetShares with
+      changes : [(Party, Int)]
+  | SetInfo with
+      daoName : Text
+      description : Text
+      image : Optional Text
+  | SetRules with
+      rules : Settings
+  | SetPublic with
+      public : Bool
+  | Dissolve
+  deriving (Eq, Show)
+
+-- | Yes is measured against the whole vote, or against the votes cast (yes and no; an
+-- abstention takes part but takes no side).
+data Basis = OfAll | OfCast
+  deriving (Eq, Show)
+
+-- | Strictly more than half, at least a percentage, or at least a fraction (two thirds of
+-- three is two, not the three that 67% would demand).
+data Threshold
+  = Majority
+  | Percent Int
+  | Fraction with
+      num : Int
+      den : Int
+  deriving (Eq, Show)
+
+-- | What passing takes and how members vote. `quorum` is the percentage of the vote that must
+-- take part at all. `early` settles the proposal the moment its outcome can no longer change;
+-- `changeable` lets a voter replace their ballot until the deadline; the two exclude each
+-- other, since an outcome that is sure only while nobody changes their mind is not sure.
+-- `secret` has the app show nobody a vote but their own (the provider, which counts, sees the
+-- ballots regardless).
+data Rule = Rule with
+    basis : Basis
+    threshold : Threshold
+    quorum : Int
+    early : Bool
+    changeable : Bool
+    secret : Bool
+  deriving (Eq, Show)
+
+-- | A rule and how many days a vote under it is open.
+data Settings = Settings with
+    rule : Rule
+    votingDays : Int
+  deriving (Eq, Show)

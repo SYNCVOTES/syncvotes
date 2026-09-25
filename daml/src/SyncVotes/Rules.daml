@@ -1,0 +1,50 @@
+-- | What the ledger accepts: well-formed rules, options and share changes, and which proposals
+-- change the DAO.
+module SyncVotes.Rules where
+
+import DA.List (dedup)
+import qualified DA.Text as T
+import SyncVotes.Types
+
+-- | Anything but a decision or a choice changes the DAO, so it runs under the DAO's own rules;
+-- a decision or a choice runs under a rule its proposer sets.
+changesDao : Effect -> Bool
+changesDao Signal = False
+changesDao (Choose {}) = False
+changesDao _ = True
+
+validRule : Rule -> Bool
+validRule r =
+  r.quorum >= 0 && r.quorum <= 100
+    && not (r.early && r.changeable)
+    && case r.threshold of
+      Majority -> True
+      Percent p -> p >= 1 && p <= 100
+      Fraction num den -> num >= 1 && num <= den && den <= 100
+
+-- | A vote is open one to ninety days.
+validSettings : Settings -> Bool
+validSettings s = validRule s.rule && s.votingDays >= 1 && s.votingDays <= 90
+
+-- | Two to ten distinct options, a few words each.
+validOptions : [Text] -> Bool
+validOptions options =
+  length options >= 2 && length options <= 10
+    && all (\o -> o /= "" && T.length o <= 80) options
+    && dedup options == options
+
+-- | Members created, reshared or removed per transaction; longer lists take several.
+batch : Int
+batch = 200
+
+-- | The most parties one share change may touch.
+maxChanges : Int
+maxChanges = 2000
+
+-- | Each party once, a whole number of units, zero to leave; by membership, one unit or none.
+validChanges : Bool -> [(Party, Int)] -> Bool
+validChanges equal changes =
+  not (null changes)
+    && length changes <= maxChanges
+    && all (\(_, units) -> units >= 0 && (not equal || units <= 1)) changes
+    && dedup (map fst changes) == map fst changes

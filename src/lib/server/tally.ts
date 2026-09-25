@@ -1,4 +1,5 @@
-import { Main } from '@daml.js/model';
+import { Templates } from '$lib/templates';
+import * as markers from './markers';
 import { submitAsProvider } from './participant';
 import * as ledger from './ledger';
 import * as billing from './billing';
@@ -134,7 +135,7 @@ async function count(id: string) {
 					[
 						{
 							ExerciseCommand: {
-								templateId: Main.Proposal.templateId,
+								templateId: Templates.Proposal.templateId,
 								contractId: p.contractId,
 								choice: 'Proposal_Tally',
 								choiceArgument: { ballots: batch.map((b) => b.contractId), final }
@@ -204,22 +205,31 @@ async function execute(p: ledger.Proposal) {
 				break;
 			}
 		}
+		// The change's marker is recorded once, with the batch that completes it.
+		const size = p.effect.kind === 'shares' ? p.effect.changes.length : 1;
+		const right = upTo === size ? await markers.right() : null;
 		const updateId = await submitAsProvider(
 			[
 				{
 					ExerciseCommand: {
-						templateId: Main.DAO.templateId,
+						templateId: Templates.DAO.templateId,
 						contractId: dao.contractId,
 						choice: 'DAO_Execute',
-						choiceArgument: { proposal: p.contractId, current, upTo: String(upTo) }
+						choiceArgument: {
+							proposal: p.contractId,
+							current,
+							upTo: String(upTo),
+							featuredAppRight: right?.contractId ?? null
+						}
 					}
 				}
 			],
-			`execute-${p.id}-${dao.contractId.slice(0, 12)}-${upTo}-${Date.now()}`
+			`execute-${p.id}-${dao.contractId.slice(0, 12)}-${upTo}-${Date.now()}`,
+			right ? [right] : []
 		);
 		consumedDao.set(p.daoId, dao.contractId);
 		ok = await ledger.applied(updateId);
-		void billing.settle(payer(p), updateId);
+		void billing.settle(payer(p), updateId, undefined, !!right);
 		succeeded(p.id);
 		waitFor(p.id, null);
 	} catch (e) {
