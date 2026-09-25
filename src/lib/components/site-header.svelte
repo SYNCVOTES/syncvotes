@@ -6,12 +6,13 @@
 	import ThemeToggle from './theme-toggle.svelte';
 	import NetworkPill from './network-pill.svelte';
 	import { hintOf } from '$lib/format';
+	import type { NavItem } from '$lib/site';
 
 	/**
 	 * The app's header: brand and network, nav, theme, and the way into the wallet. On a phone
-	 * it is one row plus the nav; the theme switch lives in the footer there.
+	 * it is one row plus the nav, without the `wide` items; the theme switch lives in the footer there.
 	 */
-	let { nav }: { nav: { href: string; label: string }[] } = $props();
+	let { nav }: { nav: NavItem[] } = $props();
 
 	const hint = $derived(store.who ? hintOf(store.who.party) : '');
 	const tail = $derived(store.who?.party.split('::')[1]?.slice(4, 8) ?? '');
@@ -55,6 +56,10 @@
 
 	<!-- On phones the nav gets its own row. -->
 	<nav class="flex items-center gap-1 border-t border-border px-3 py-1.5 md:hidden">
-		{#each nav as item (item.href)}<NavLink href={item.href} label={item.label} size="sm" />{/each}
+		{#each nav.filter((item) => !item.wide) as item (item.href)}<NavLink
+				href={item.href}
+				label={item.label}
+				size="sm"
+			/>{/each}
 	</nav>
 </header>

@@ -16,7 +16,12 @@
 	const KEEP = ['/', '/my-daos', '/daos', '/wallet'];
 	// On MainNet the beta tag is the environment signal; the pill stays as the way to switch.
 	const mainnet = NETWORK.toLowerCase() === 'mainnet';
-	const path = $derived(KEEP.includes(page.url.pathname) ? page.url.pathname : '/my-daos');
+	// The docs are the same on every network, so a docs page stays where it is.
+	const path = $derived(
+		KEEP.includes(page.url.pathname) || page.url.pathname.startsWith('/docs')
+			? page.url.pathname
+			: '/my-daos'
+	);
 	let open = $state(false);
 	let root: HTMLElement | undefined = $state();
 </script>

@@ -413,3 +413,122 @@
 	margin-right: 0.4em;
 	accent-color: var(--accent);
 }
+
+/*
+ * The documentation's article: the page's own type at reading size, headings in the display
+ * face, tables and code as .markdown sets them, a little more air between blocks.
+ */
+.doc {
+	font-size: 0.96875rem;
+	line-height: 1.7;
+	color: var(--text-mid);
+	overflow-wrap: break-word;
+}
+.doc > :first-child {
+	margin-top: 0;
+}
+.doc p,
+.doc ul,
+.doc ol,
+.doc table,
+.doc pre,
+.doc blockquote {
+	margin: 0.9em 0;
+}
+.doc strong {
+	color: var(--text);
+	font-weight: 600;
+}
+.doc h2,
+.doc h3 {
+	color: var(--text);
+	font-family: var(--font-display);
+	font-weight: 700;
+	letter-spacing: -0.01em;
+	line-height: 1.25;
+	scroll-margin-top: 7.5rem;
+}
+.doc h2 {
+	font-size: 1.375rem;
+	margin: 2.4em 0 0.6em;
+	padding-top: 1.2em;
+	border-top: 1px solid var(--border);
+}
+.doc h3 {
+	font-size: 1.0625rem;
+	margin: 1.8em 0 0.4em;
+}
+.doc a {
+	color: var(--accent);
+	text-decoration: underline;
+	text-decoration-color: rgba(var(--accent-rgb), 0.4);
+	text-underline-offset: 3px;
+}
+.doc a:hover {
+	text-decoration-color: var(--accent);
+}
+.doc ul {
+	list-style: disc;
+	padding-left: 1.3em;
+}
+.doc ol {
+	list-style: decimal;
+	padding-left: 1.5em;
+}
+.doc li + li {
+	margin-top: 0.35em;
+}
+.doc li::marker {
+	color: var(--text-dim);
+}
+.doc code {
+	font-family: var(--font-mono);
+	font-size: 0.8125em;
+	color: var(--text);
+	background: var(--bg-active);
+	padding: 0.1em 0.35em;
+	overflow-wrap: anywhere;
+}
+.doc table {
+	border-collapse: collapse;
+	font-size: 0.875rem;
+	display: block;
+	overflow-x: auto;
+	max-width: 100%;
+}
+.doc th,
+.doc td {
+	border: 1px solid var(--border);
+	padding: 0.45em 0.75em;
+	text-align: left;
+	vertical-align: top;
+}
+.doc th {
+	font-family: var(--font-mono);
+	font-size: 0.6875rem;
+	font-weight: 500;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--text-dim);
+}
+.doc td:first-child {
+	color: var(--text);
+}
+.doc dl {
+	margin: 0.9em 0;
+}
+.doc dt {
+	color: var(--text);
+	font-weight: 600;
+	margin-top: 1em;
+}
+.doc dd {
+	margin: 0.2em 0 0;
+}
+.doc aside p {
+	margin: 0.4em 0;
+}
+.doc > h2:first-child {
+	border-top: 0;
+	padding-top: 0;
+}

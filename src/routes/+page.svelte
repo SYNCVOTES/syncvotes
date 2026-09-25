@@ -140,6 +140,7 @@
 		{ href: '#moves', label: 'Protocol' },
 		{ href: '#privacy', label: 'Privacy' },
 		{ href: '/my-daos', label: 'DAOs' },
+		{ href: '/docs', label: 'Docs' },
 		{ href: 'https://docs.canton.network', label: 'Canton', external: true }
 	];
 
