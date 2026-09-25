@@ -273,7 +273,10 @@
 					{/if}
 				{/await}
 				<Problem message={store.problem} />
-				<Button type="submit" disabled={store.busy || !hintInput.trim() || hintIssue !== null}>
+				<Button
+					type="submit"
+					disabled={store.busy || !setup.current || !hintInput.trim() || hintIssue !== null}
+				>
 					{store.busy ? 'Checking…' : 'Continue'}
 				</Button>
 			</Panel>

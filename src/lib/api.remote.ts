@@ -7,7 +7,6 @@ import * as participant from './server/participant';
 import * as ledger from './server/ledger';
 import * as session from './server/session';
 import * as billing from './server/billing';
-import * as splice from './server/splice';
 import * as tally from './server/tally';
 import { fingerprintOf } from './verify';
 import { INVITE_CODES } from '$app/env/private';
@@ -85,10 +84,9 @@ const matches = (needle: string) => (party: string) => {
 	);
 };
 
-/** The parties and prices the browser shows and checks against. Public, nothing secret. */
+/** What the browser needs to know of this deployment. Public, nothing secret. */
 export const config = query(async () => ({
 	provider: participant.providerParty(),
-	prices: await splice.prices(),
 	batch: schemas.BATCH,
 	maxChanges: schemas.MAX_CHANGES,
 	/** A new party needs an invite code while any are set. */
