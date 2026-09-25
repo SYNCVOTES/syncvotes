@@ -17,6 +17,8 @@ type ScanContract = {
 
 async function scan<T>(path: string, body?: unknown): Promise<T> {
 	const r = await fetch(scanUrl() + path, {
+		// A Scan that hangs must not hang every prepare waiting on a price.
+		signal: AbortSignal.timeout(15_000),
 		method: body === undefined ? 'GET' : 'POST',
 		headers: { 'content-type': 'application/json' },
 		body: body === undefined ? undefined : JSON.stringify(body)
@@ -38,6 +40,35 @@ const cached = <T>(ttl: number, load: () => Promise<T>) => {
 		return value.promise;
 	};
 };
+
+/**
+ * The AmuletRules configuration in force now: the schedule's initial value, or the latest of its
+ * future values whose time has come.
+ */
+type Schedule<T> = { initialValue: T; futureValues?: { _1: string; _2: T }[] };
+export function configNow<T>(schedule: Schedule<T>, now = Date.now()): T {
+	let current = schedule.initialValue;
+	let since = -Infinity;
+	for (const { _1: at, _2: value } of schedule.futureValues ?? []) {
+		const t = Date.parse(at);
+		if (t <= now && t > since) {
+			since = t;
+			current = value;
+		}
+	}
+	return current;
+}
+
+/** The parts of the AmuletRules configuration this app reads, as in force now. */
+type AmuletConfig = {
+	rewardConfig?: { mintingVersion?: string; appRewardCouponThreshold?: string };
+	featuredAppActivityMarkerAmount?: string;
+	decentralizedSynchronizer: { fees: { extraTrafficPrice: string } };
+};
+const amuletConfig = async () =>
+	configNow(
+		((await amuletRules()).payload as { configSchedule: Schedule<AmuletConfig> }).configSchedule
+	);
 
 export type Disclosed = DisclosedContract & { payload: Record<string, unknown>; dso: string };
 
@@ -108,22 +139,9 @@ export const rewards = cached(10 * 60_000, async () => {
 	const latest = Object.values(r.issuing_mining_rounds)
 		.map((x) => x.contract.payload as { round: { number: string } } & Record<string, string>)
 		.sort((a, b) => Number(b.round.number) - Number(a.round.number))[0];
-	const config = (
-		(await amuletRules()).payload as {
-			configSchedule: {
-				initialValue: {
-					rewardConfig?: { mintingVersion?: string; appRewardCouponThreshold?: string };
-				};
-			};
-		}
-	).configSchedule.initialValue.rewardConfig;
-	const markerAmount = Number(
-		(
-			(await amuletRules()).payload as {
-				configSchedule: { initialValue: { featuredAppActivityMarkerAmount?: string } };
-			}
-		).configSchedule.initialValue.featuredAppActivityMarkerAmount ?? 0
-	);
+	const now = await amuletConfig();
+	const config = now.rewardConfig;
+	const markerAmount = Number(now.featuredAppActivityMarkerAmount ?? 0);
 	const featured = await scan<{ featured_app_right: unknown }>(
 		`/api/scan/v0/featured-apps/${encodeURIComponent(providerParty())}`
 	).then((x) => x.featured_app_right !== null);
@@ -143,16 +161,10 @@ export const rewards = cached(10 * 60_000, async () => {
 
 /** What the network charges for traffic, in USD per megabyte, and what a coin is worth in USD. */
 export const prices = cached(60_000, async () => {
-	const rules = (await amuletRules()).payload as {
-		configSchedule: {
-			initialValue: { decentralizedSynchronizer: { fees: { extraTrafficPrice: string } } };
-		};
-	};
+	const config = await amuletConfig();
 	const round = (await openRound()).payload as unknown as { amuletPrice: string };
 	return {
-		usdPerMb: Number(
-			rules.configSchedule.initialValue.decentralizedSynchronizer.fees.extraTrafficPrice
-		),
+		usdPerMb: Number(config.decentralizedSynchronizer.fees.extraTrafficPrice),
 		usdPerCoin: Number(round.amuletPrice)
 	};
 });

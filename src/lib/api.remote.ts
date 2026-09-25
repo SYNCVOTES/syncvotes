@@ -8,7 +8,7 @@ import * as ledger from './server/ledger';
 import * as session from './server/session';
 import * as billing from './server/billing';
 import * as tally from './server/tally';
-import { fingerprintOf } from './verify';
+import { fingerprintOf } from './fingerprint';
 import { BILLING_FACTOR, BILLING_FLOOR, INVITE_CODES } from '$app/env/private';
 import { normaliseHint, hintProblem } from './hint';
 import * as schemas from './schemas';
@@ -123,12 +123,29 @@ const accountOf = (party: string): ledger.Account => {
 	return account;
 };
 
+/** Accounts being created, by party: a second unlock while one is on its way waits for it. */
+const registering = new Map<
+	string,
+	Promise<{ account: ledger.Account; updateId: string | null }>
+>();
+
 /** The party's Account, created by the provider if it has none: its door to the app. */
-async function ensureAccount(
+function ensureAccount(
 	party: string
 ): Promise<{ account: ledger.Account; updateId: string | null }> {
 	const known = ledger.accounts.get(party);
-	if (known) return { account: known, updateId: null };
+	if (known) return Promise.resolve({ account: known, updateId: null });
+	let pending = registering.get(party);
+	if (!pending) {
+		pending = createAccount(party).finally(() => registering.delete(party));
+		registering.set(party, pending);
+	}
+	return pending;
+}
+
+async function createAccount(
+	party: string
+): Promise<{ account: ledger.Account; updateId: string | null }> {
 	const updateId = await participant.submitAsProvider(
 		[
 			{

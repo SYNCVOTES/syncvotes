@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { picture } from '$lib/picture';
 	import ArrowRight from '@lucide/svelte/icons/arrow-right';
 	import Lock from '@lucide/svelte/icons/lock';
 	import Globe from '@lucide/svelte/icons/globe';
@@ -62,7 +63,7 @@
 		{#if image}
 			<img
 				referrerpolicy="no-referrer"
-				src={image}
+				src={picture(image)}
 				alt=""
 				class="size-[46px] shrink-0 border border-border object-cover"
 			/>

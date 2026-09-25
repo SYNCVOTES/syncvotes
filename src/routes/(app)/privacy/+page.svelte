@@ -113,10 +113,9 @@
 				integrate third-party analytics trackers, advertising networks or external data processors.
 			</p>
 			<p>
-				Pictures that users add to DAOs, profiles and descriptions are links: your browser loads
-				each one from wherever its author put it. That server sees your address and when the picture
-				was loaded, though not the page it was shown on. Anyone who adds a picture can therefore
-				learn when it was viewed.
+				Pictures that users add to DAOs, profiles and descriptions are links. The app fetches each
+				one itself and hands it to your browser, so the server a picture lives on sees the app
+				asking, never who is looking or when.
 			</p>
 		</Clause>
 

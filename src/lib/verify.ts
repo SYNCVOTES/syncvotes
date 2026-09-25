@@ -9,6 +9,9 @@ import type { Value } from '@canton-network/core-ledger-proto';
 import { packageId } from '@daml.js/model';
 import { Templates } from './templates';
 import { fromBase64, toBase64 } from './wallet';
+import { fingerprintOf } from './fingerprint';
+
+export { fingerprintOf };
 
 /**
  * What the key is about to sign, checked against what the user meant.
@@ -25,7 +28,6 @@ import { fromBase64, toBase64 } from './wallet';
 // and `keys.fingerprint`.
 const TOPOLOGY_TRANSACTION = 11;
 const TOPOLOGY_MULTI_HASH = 55;
-const PUBLIC_KEY_FINGERPRINT = 12;
 
 // Wire values from the topology proto: TOPOLOGY_CHANGE_OP_ADD_REPLACE, PARTICIPANT_PERMISSION_*,
 // SIGNING_KEY_SPEC_EC_CURVE25519.
@@ -49,15 +51,6 @@ const CHOICES: Record<string, Home> = {
 };
 
 // ---- Sign-up: the party topology --------------------------------------------------------
-
-/** Canton's fingerprint of a public key: a multihash of a purpose-prefixed SHA-256. */
-export async function fingerprintOf(publicKey: Uint8Array): Promise<string> {
-	const input = new Uint8Array(4 + publicKey.length);
-	input[3] = PUBLIC_KEY_FINGERPRINT;
-	input.set(publicKey, 4);
-	const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', input));
-	return '1220' + [...hash].map((b) => b.toString(16).padStart(2, '0')).join('');
-}
 
 /**
  * A protobuf message as its raw fields, in wire order. The proto packages available do not know
@@ -205,9 +198,9 @@ function plain(value: Value | undefined): Plain {
 }
 
 /**
- * Whether `actual` says everything `expected` says. Records may carry more than the page
- * asked about (a coin transfer names the participant's choice of inputs and its timestamps);
- * lists must match exactly.
+ * Whether `actual` says exactly what `expected` says: the same lists, and records with the same
+ * fields. A field the page did not name may only be empty (None), so the server cannot slip in
+ * an argument the user never saw.
  */
 function covers(expected: Plain, actual: Plain): boolean {
 	if (Array.isArray(expected) || Array.isArray(actual)) {
@@ -224,9 +217,11 @@ function covers(expected: Plain, actual: Plain): boolean {
 		typeof expected === 'object' &&
 		typeof actual === 'object'
 	) {
-		// A field that is None may be left out of the record altogether.
-		return Object.keys(expected).every((k) =>
-			k in actual ? covers(expected[k], actual[k]) : expected[k] === null
+		// A field that is None may be left out of the record altogether, on either side.
+		return (
+			Object.keys(expected).every((k) =>
+				k in actual ? covers(expected[k], actual[k]) : expected[k] === null
+			) && Object.keys(actual).every((k) => k in expected || actual[k] === null)
 		);
 	}
 	// Timestamps come as ISO text from two writers (the ledger drops trailing zeros); the

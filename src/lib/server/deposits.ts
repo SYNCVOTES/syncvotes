@@ -167,6 +167,8 @@ export type Deposit = {
 	amount: number;
 	from: string;
 	updateId: string;
+	/** Which of the transaction's events: one transaction may carry several deposits. */
+	event: number;
 	offset: number;
 	recordTime: string;
 };
@@ -208,11 +210,12 @@ async function depositsOf(
 	}
 	const found: Deposit[] = [];
 	let oldest: string | null = null;
-	const since = depositsSince();
+	// Compared as instants: "…:39.5Z" sorts before "…:39Z" as text.
+	const since = depositsSince() ? Date.parse(depositsSince()) : 0;
 	for (const tx of page.transactions) {
 		if (!oldest || tx.recordTime < oldest) oldest = tx.recordTime;
-		if (since && tx.recordTime < since) continue;
-		for (const e of tx.events) {
+		if (Date.parse(tx.recordTime) < since) continue;
+		for (const [event, e] of tx.events.entries()) {
 			if (e.label.type !== 'TransferIn' && e.label.type !== 'MergeSplit') continue;
 			const m = e.label.reason?.match(MEMO);
 			if (!m) continue;
@@ -245,6 +248,7 @@ async function depositsOf(
 					amount,
 					from,
 					updateId: tx.updateId,
+					event,
 					offset: tx.offset,
 					recordTime: tx.recordTime
 				});

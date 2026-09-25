@@ -156,6 +156,8 @@ template Member
     signatory provider, creator
     observer party
 
+    ensure share > 0
+
     choice Member_Remove : ()
       controller provider, creator
       do pure ()
@@ -415,6 +417,8 @@ template Ballot
   where
     signatory voter, provider, creator
 
+    ensure weight > 0
+
     choice Ballot_Count : (Vote, Int)
       with
         proposal : Proposal
@@ -479,6 +483,8 @@ template BallotV2
     counted : Bool
   where
     signatory voter, provider
+
+    ensure weight > 0
 
     choice BallotV2_Count : (Vote, Int)
       with

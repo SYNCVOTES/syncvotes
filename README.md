@@ -184,6 +184,10 @@ the provider, and never `CanActAs` a user party: the only way a user's transacti
 is with the user's own signature. `CanReadAsAnyParty` is not optional: the participant refuses
 to prepare for a party the caller cannot read as.
 
+Only the canton realm's login and keys are public: Caddy answers 404 for `/auth/admin`, the
+master realm and the account console, which are reached over an SSH tunnel to `keycloak:8080`
+as `KC_ADMIN_NAME`. Both realms lock an account out after ten failed logins.
+
 The validator bundle's `.env` points at the same realm (`AUTH_URL`, `AUTH_JWKS_URL`,
 `AUTH_WELLKNOWN_URL`, the audiences and client ids) and is restarted with `start.sh … -a`;
 pin `PARTICIPANT_DB_NAME` there before any recreate.
@@ -253,7 +257,12 @@ it works the visitor's address out from Cloudflare's ranges, and the app reads o
 `CADDY_HTTPS_BIND` put Caddy on loopback, `CADDY_SITE` names the plain-HTTP site,
 `CADDY_TRUSTED_EXTRA` trusts that proxy, and either traefik routes by the labels compose sets
 (`TRAEFIK=true`, `PROXY_NETWORK`) or an nginx site forwards. Caddy's config is inline, so a
-change to it needs `compose up -d --force-recreate caddy`. A deploy takes nothing down: Caddy
+change to it needs `compose up -d --force-recreate caddy`. Only Cloudflare's edges reach the
+sites: traefik's `syncvotes-cloudflare` allow-list on DevNet, `CADDY_ALLOWED_PEERS` where Caddy
+faces the internet (TestNet), and on MainNet the host nginx's own `geo` on the connection's peer
+(`/etc/nginx/sites-available/syncvotes`, outside this repo). Pictures users link to are fetched
+by the app (`/img`: https, public addresses, raster types, 5 MB) and served from its own origin,
+so `img-src` is `'self'` and no picture's host learns who looks at it. A deploy takes nothing down: Caddy
 holds a request until the new app container answers.
 
 The DAR is built inside the image and uploaded by the app at startup, which then checks the

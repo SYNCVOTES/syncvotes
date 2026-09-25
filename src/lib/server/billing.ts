@@ -334,15 +334,16 @@ export async function openPurse(
 
 /** Coin paid in so far, by account, as summed from the provider's transactions. */
 const deposited = new Map<Account, number>();
-/** The transactions summed, so no window counts one twice. */
+/** The deposits summed, by transaction and event, so no window counts one twice. */
 const summed = new Set<string>();
 let seenOffset: number | undefined;
 let watching = false;
 
 function take(found: deposits.Deposit[]) {
 	for (const d of found) {
-		if (summed.has(d.updateId)) continue;
-		summed.add(d.updateId);
+		const key = `${d.updateId}:${d.event}`;
+		if (summed.has(key)) continue;
+		summed.add(key);
 		deposited.set(d.account, (deposited.get(d.account) ?? 0) + d.amount);
 		notify(d.account);
 	}

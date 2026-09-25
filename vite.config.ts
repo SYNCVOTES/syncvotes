@@ -26,8 +26,8 @@ export default defineConfig({
 					'script-src': ['self'],
 					'style-src': ['self', 'unsafe-inline', 'https://fonts.googleapis.com'],
 					'font-src': ['self', 'https://fonts.gstatic.com'],
-					// Pictures are links: a DAO's cover, a face, whatever a description embeds.
-					'img-src': ['self', 'data:', 'https:'],
+					// Pictures users link to come through this app (/img), never from their host.
+					'img-src': ['self', 'data:'],
 					'connect-src': ['self'],
 					'frame-ancestors': ['none'],
 					'object-src': ['none'],

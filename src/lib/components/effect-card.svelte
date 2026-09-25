@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { picture } from '$lib/picture';
 	import Panel from './panel.svelte';
 	import PartyId from './party-id.svelte';
 	import Markdown from './markdown.svelte';
@@ -120,7 +121,7 @@
 			<dd class="text-ink-mid">
 				{#if effect.image}<img
 						referrerpolicy="no-referrer"
-						src={effect.image}
+						src={picture(effect.image)}
 						alt=""
 						class="h-32 w-full border border-border object-cover"
 					/>{:else}None{/if}

@@ -1,6 +1,10 @@
 import * as remote from './api.remote';
 import { toBase64, type Signer } from './wallet';
-import { verifyPrepared, verifyTopology, type Expected } from './verify';
+import type { Expected } from './verify';
+
+// The checks before signing carry the Canton SDK's decoder: loaded when something is signed, not
+// with every page.
+const verifier = () => import('./verify');
 import { working } from './wallet-store.svelte';
 
 /**
@@ -35,7 +39,7 @@ export async function enrol(
 	invite = ''
 ): Promise<Identity> {
 	working('Verifying party');
-	await verifyTopology(topology, s.publicKey, hint);
+	await (await verifier()).verifyTopology(topology, s.publicKey, hint);
 	working('Creating party');
 	return remote.enrol({
 		publicKey: toBase64(s.publicKey),
@@ -60,7 +64,7 @@ export const closeSession = () => remote.sessionEnd().catch(() => {});
 /** Signs a prepared transaction, once it is verified to do exactly what `intent` says. */
 export async function sign(s: Signer, who: Identity, intent: Intent, prepared: Prepared) {
 	working('Verifying transaction');
-	await verifyPrepared(prepared, { party: who.party, ...intent });
+	await (await verifier()).verifyPrepared(prepared, { party: who.party, ...intent });
 	working('Signing');
 	const signature = s.sign(prepared.preparedTransactionHash);
 	working('Waiting for confirmation');

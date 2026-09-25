@@ -2,7 +2,7 @@ import * as wallet from './wallet';
 import * as actions from './actions';
 import * as remote from './api.remote';
 import * as autoLock from './auto-lock';
-import { fingerprintOf } from './verify';
+import { fingerprintOf } from './fingerprint';
 
 /**
  * The page's wallet, as one rune store: which screen the onboarding is on, the signer while a
