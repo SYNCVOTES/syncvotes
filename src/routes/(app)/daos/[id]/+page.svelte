@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { picture } from '$lib/picture';
 	import { page } from '$app/state';
 	import * as remote from '$lib/api.remote';
 	// Where traffic is free, no DAO is ever out of balance.
@@ -98,12 +97,7 @@
 
 		{#if d.image}
 			<div class="-mt-2 mb-6 h-40 w-full overflow-hidden border border-border md:h-52">
-				<img
-					referrerpolicy="no-referrer"
-					src={picture(d.image)}
-					alt=""
-					class="size-full object-cover"
-				/>
+				<img referrerpolicy="no-referrer" src={d.image} alt="" class="size-full object-cover" />
 			</div>
 		{/if}
 

@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { picture } from '$lib/picture';
 	import { Input } from '$lib/components/ui/input';
 	import Image from '@lucide/svelte/icons/image';
 	import X from '@lucide/svelte/icons/x';
@@ -39,7 +38,7 @@
 		{#if value.trim() && !failed}
 			<img
 				referrerpolicy="no-referrer"
-				src={picture(value.trim())}
+				src={value}
 				alt=""
 				class="size-full object-cover"
 				onerror={() => (failed = true)}

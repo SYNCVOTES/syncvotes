@@ -260,9 +260,7 @@ it works the visitor's address out from Cloudflare's ranges, and the app reads o
 change to it needs `compose up -d --force-recreate caddy`. Only Cloudflare's edges reach the
 sites: traefik's `syncvotes-cloudflare` allow-list on DevNet, `CADDY_ALLOWED_PEERS` where Caddy
 faces the internet (TestNet), and on MainNet the host nginx's own `geo` on the connection's peer
-(`/etc/nginx/sites-available/syncvotes`, outside this repo). Pictures users link to are fetched
-by the app (`/img`: https, public addresses, raster types, 5 MB) and served from its own origin,
-so `img-src` is `'self'` and no picture's host learns who looks at it. A deploy takes nothing down: Caddy
+(`/etc/nginx/sites-available/syncvotes`, outside this repo). A deploy takes nothing down: Caddy
 holds a request until the new app container answers.
 
 The DAR is built inside the image and uploaded by the app at startup, which then checks the

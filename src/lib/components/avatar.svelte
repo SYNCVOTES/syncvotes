@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { picture } from '$lib/picture';
 	import { hintOf } from '$lib/format';
 
 	/** A party's face: its picture, or the first letters of its name in a square. */
@@ -33,7 +32,7 @@
 {#if who.avatar}
 	<img
 		referrerpolicy="no-referrer"
-		src={picture(who.avatar)}
+		src={who.avatar}
 		alt=""
 		class="shrink-0 border border-border object-cover {sizes[size]} {className}"
 	/>

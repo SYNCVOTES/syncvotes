@@ -1,6 +1,5 @@
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
-import { picture } from './picture';
 
 /**
  * Markdown as the app renders it: GitHub's flavour (tables, task lists, strikethrough, line
@@ -20,7 +19,6 @@ function hook() {
 			node.setAttribute('rel', 'noopener noreferrer');
 		}
 		if (node.tagName === 'IMG') {
-			node.setAttribute('src', picture(node.getAttribute('src')));
 			node.setAttribute('loading', 'lazy');
 			// The picture's host learns nothing of the page it was shown on.
 			node.setAttribute('referrerpolicy', 'no-referrer');
