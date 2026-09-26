@@ -96,7 +96,8 @@ already holds those ports:
 
 - **nginx on the host:** `CADDY_HTTP_BIND=127.0.0.1:8085`, `CADDY_SITE=http://<domain>`,
   `CADDY_TRUSTED_EXTRA=127.0.0.0/8`, and an nginx site that terminates TLS and forwards to
-  `127.0.0.1:8085`.
+  `127.0.0.1:8085`. Give it `proxy_buffer_size 32k` (and `proxy_buffers 8 32k`): the app's
+  headers pass nginx's default 4 KB on some pages, and nginx answers 502.
 - **traefik:** the same binds, plus `TRAEFIK=true`, `PROXY_NETWORK=<traefik's network>`,
   `PROXY_NETWORK_EXTERNAL=true`, `CADDY_TRUSTED_EXTRA=private_ranges`. Compose sets the router
   labels, including an allow-list of Cloudflare's ranges.
