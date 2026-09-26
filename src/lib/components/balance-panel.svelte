@@ -13,7 +13,7 @@
 	 * words as a party's own balance on the Wallet page.
 	 */
 	let { dao }: { dao: string } = $props();
-	const billing = $derived(store.who ? remote.daoBilling(dao) : null);
+	const billing = $derived(store.who ? remote.daoBilling({ id: dao, me: store.who.party }) : null);
 </script>
 
 <section id="balance" class="scroll-mt-24 space-y-3">

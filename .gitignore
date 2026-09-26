@@ -27,3 +27,5 @@ vite.config.ts.timestamp-*
 # Daml
 daml/.daml
 daml.js
+# Working files that are not the app: forms, drafts, recordings.
+context/

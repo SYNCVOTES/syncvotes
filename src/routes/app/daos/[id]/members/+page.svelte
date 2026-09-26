@@ -20,11 +20,11 @@
 
 	const id = $derived(page.params.id!);
 	const me = $derived(store.who?.party ?? null);
-	const dao = $derived(me ? remote.dao(id) : null);
+	const dao = $derived(me ? remote.dao({ id, me }) : null);
 
 	let q = $state('');
 	let limit = $state(50);
-	const members = $derived(me ? remote.daoMembers({ id, offset: 0, limit, q }) : null);
+	const members = $derived(me ? remote.daoMembers({ id, offset: 0, limit, q, me }) : null);
 	const pct = (units: number, of: number) => (of > 0 ? Math.round((units / of) * 1000) / 10 : 0);
 	// Sorting is offered once the whole list is here, so it never sorts a page as if it were all.
 	let sort = $state<'share' | 'newest' | 'oldest'>('share');

@@ -41,7 +41,7 @@
 
 	const id = $derived(page.params.id!);
 	const me = $derived(store.who?.party ?? null);
-	const dao = $derived(me ? remote.dao(id) : null);
+	const dao = $derived(me ? remote.dao({ id, me }) : null);
 
 	// The proposal list is paged and filtered on the server; more pages append below.
 	let status = $state<'open' | 'closed' | 'unvoted' | undefined>(undefined);
@@ -55,18 +55,20 @@
 	}) => p.yes + p.no + p.abstain + (p.picked ?? p.tallies.reduce((s, t) => s + t, 0));
 	let limit = $state(20);
 	let q = $state('');
-	const proposals = $derived(me ? remote.daoProposals({ id, offset: 0, limit, status, q }) : null);
+	const proposals = $derived(
+		me ? remote.daoProposals({ id, offset: 0, limit, status, q, me }) : null
+	);
 	// What waits on the viewer's vote: the strip over the list, and a Vote chip on its rows.
 	const unvoted = $derived(
 		me && dao?.current?.me.membership
-			? remote.daoProposals({ id, offset: 0, limit: 100, status: 'unvoted', q: '' })
+			? remote.daoProposals({ id, offset: 0, limit: 100, status: 'unvoted', q: '', me })
 			: null
 	);
 	const waiting = $derived(new Set(unvoted?.current?.items.map((p) => p.id) ?? []));
-	const preview = $derived(me ? remote.daoMembers({ id, offset: 0, limit: 8, q: '' }) : null);
+	const preview = $derived(me ? remote.daoMembers({ id, offset: 0, limit: 8, q: '', me }) : null);
 	// One balance, from one source: the figure in the header is the one the Balance section shows.
 	const billing = $derived(
-		me && dao?.current && !dao.current.actorPays ? remote.daoBilling(id) : null
+		me && dao?.current && !dao.current.actorPays ? remote.daoBilling({ id, me }) : null
 	);
 
 	const pct = (units: number, of: number) => (of > 0 ? Math.round((units / of) * 1000) / 10 : 0);

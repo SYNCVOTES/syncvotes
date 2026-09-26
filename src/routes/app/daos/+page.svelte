@@ -22,7 +22,9 @@
 	let q = $state('');
 	let sort = $state<'members' | 'newest'>('members');
 	let limit = $state(30);
-	const daos = $derived(who ? remote.publicDaos({ offset: 0, limit, q, sort }) : null);
+	const daos = $derived(
+		who ? remote.publicDaos({ offset: 0, limit, q, sort, me: who.party }) : null
+	);
 </script>
 
 <svelte:head><title>Public DAOs — SyncVotes</title></svelte:head>

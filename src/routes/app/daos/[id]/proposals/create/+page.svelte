@@ -51,7 +51,7 @@
 	import * as v from 'valibot';
 
 	const id = $derived(page.params.id!);
-	const dao = $derived(store.who ? remote.dao(id) : null);
+	const dao = $derived(store.who ? remote.dao({ id, me: store.who.party }) : null);
 	const d = $derived(dao?.current ?? null);
 
 	/**
@@ -178,7 +178,9 @@
 	const applies = $derived(d ? (own ? newRoutine : d.sensitive) : null);
 
 	// The share editor starts as today's table, read once; the rest is the proposer's.
-	const today = $derived(store.who && kind === 'shares' ? remote.daoShares(id) : null);
+	const today = $derived(
+		store.who && kind === 'shares' ? remote.daoShares({ id, me: store.who.party }) : null
+	);
 	let rows = $state<Row[]>([]);
 	let baseline = $state<Row[]>([]);
 	let rowsSeeded = $state(false);

@@ -366,8 +366,17 @@ export const myDaos = query.live(partyId, (party) =>
 );
 
 /** A DAO with its counts and the caller's standing in it. The lists are paged separately. */
-export const dao = query.live(contractId, (id) =>
+/**
+ * Every read that depends on who is asking names that party in its arguments as `me`, and the
+ * server checks it is the session's: a live query is cached by its arguments, so without it a
+ * page would keep the stream it opened under the previous key after the wallet switched to
+ * another.
+ */
+const asMe = { me: partyId };
+
+export const dao = query.live(v.object({ id: contractId, ...asMe }), ({ id, me }) =>
 	live(ledger.keys.dao(id), async () => {
+		session.required(me);
 		const membership = readerOf(id);
 		const d = daoOf(id);
 		return {
@@ -393,11 +402,12 @@ export const publicDaos = query.live(
 	v.object({
 		...paging,
 		q: filter,
-		sort: v.optional(v.picklist(['members', 'newest']), 'members')
+		sort: v.optional(v.picklist(['members', 'newest']), 'members'),
+		...asMe
 	}),
-	({ offset, limit, q, sort }) =>
+	({ offset, limit, q, sort, me }) =>
 		live(ledger.keys.all, () => {
-			session.required();
+			session.required(me);
 			const needle = q.trim().toLowerCase();
 			const all = [...ledger.daos.values()]
 				.filter(
@@ -420,9 +430,10 @@ export const publicDaos = query.live(
 
 /** Members, by name or party id, filtered by a substring of either; biggest share first. */
 export const daoMembers = query.live(
-	v.object({ id: contractId, ...paging, q: filter }),
-	({ id, offset, limit, q }) =>
+	v.object({ id: contractId, ...paging, q: filter, ...asMe }),
+	({ id, offset, limit, q, me }) =>
 		live(ledger.keys.dao(id), () => {
+			session.required(me);
 			readerOf(id);
 			const all = membersOf(id)
 				.filter((m) => matches(q)(m.party))
@@ -441,8 +452,9 @@ export const daoMembers = query.live(
 );
 
 /** The whole share table, for the editor: every member with their units. */
-export const daoShares = query.live(contractId, (id) =>
+export const daoShares = query.live(v.object({ id: contractId, ...asMe }), ({ id, me }) =>
 	live(ledger.keys.dao(id), () => {
+		session.required(me);
 		memberOnly(id);
 		return membersOf(id)
 			.sort((a, b) => b.share - a.share || a.party.localeCompare(b.party))
@@ -457,10 +469,12 @@ export const daoProposals = query.live(
 		...paging,
 		/** `unvoted`: open, and still waiting on the caller's own vote. */
 		status: v.optional(v.picklist(['open', 'closed', 'unvoted'])),
-		q: filter
+		q: filter,
+		...asMe
 	}),
-	({ id, offset, limit, status, q }) =>
+	({ id, offset, limit, status, q, me }) =>
 		live(ledger.keys.dao(id), () => {
+			session.required(me);
 			readerOf(id);
 			const party = session.required();
 			const needle = q.trim().toLowerCase();
@@ -600,8 +614,9 @@ const voteWire = (vote: ledger.Vote) => {
 };
 
 /** A proposal with its tally and the caller's standing: a ballot cast, a vote to cast, or neither. */
-export const proposal = query.live(contractId, (id) =>
+export const proposal = query.live(v.object({ id: contractId, ...asMe }), ({ id, me: asking }) =>
 	live(ledger.keys.proposal(id), () => {
+		session.required(asking);
 		const p = proposalOf(id);
 		const me = proposalReader(p);
 		const dao = ledger.daos.get(p.daoId);
@@ -639,16 +654,14 @@ export const proposal = query.live(contractId, (id) =>
 
 /** Ballots, newest first, filtered by a substring of the voter's party id or name. */
 export const proposalBallots = query.live(
-	v.object({ id: contractId, ...paging, q: filter }),
-	({ id, offset, limit, q }) =>
+	v.object({ id: contractId, ...paging, q: filter, ...asMe }),
+	({ id, offset, limit, q, me }) =>
 		live(ledger.keys.proposal(id), () => {
+			session.required(me);
 			const p = proposalOf(id);
 			// Who voted how is the members' business, public DAO or not.
-			if (!proposalReader(p) && p.proposer !== session.required()) {
-				error(403, 'Only members see the ballots');
-			}
+			if (!proposalReader(p) && p.proposer !== me) error(403, 'Only members see the ballots');
 			// A secret ballot: nobody is shown anyone's vote but their own.
-			const me = session.required();
 			const all = [...(ledger.ballots.get(id)?.values() ?? [])]
 				.filter((b) => b.daoId === p.daoId && matches(q)(b.voter) && (!p.secret || b.voter === me))
 				.sort((a, b) => b.castAt.localeCompare(a.castAt))
@@ -659,9 +672,10 @@ export const proposalBallots = query.live(
 
 /** The last `limit` comments, oldest first, with who wrote them; earlier ones on request. */
 export const proposalComments = query.live(
-	v.object({ id: contractId, limit: paging.limit }),
-	({ id, limit }) =>
+	v.object({ id: contractId, limit: paging.limit, ...asMe }),
+	({ id, limit, me: asking }) =>
 		live(ledger.keys.proposal(id), () => {
+			session.required(asking);
 			const p = proposalOf(id);
 			const me = proposalReader(p);
 			const all = [...(ledger.comments.get(id)?.values() ?? [])]
@@ -677,8 +691,9 @@ export const proposalComments = query.live(
 );
 
 /** The DAO's account: paid in, charged, what a byte costs it, and where to pay in. */
-export const daoBilling = query.live(contractId, (id) =>
+export const daoBilling = query.live(v.object({ id: contractId, ...asMe }), ({ id, me }) =>
 	live(ledger.keys.dao(id), () => {
+		session.required(me);
 		readerOf(id);
 		return billing.statement(billing.daoAccount(id));
 	})

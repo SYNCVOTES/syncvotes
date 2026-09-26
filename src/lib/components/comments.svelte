@@ -34,7 +34,9 @@
 	} = $props();
 	let writing = $state(false);
 	let limit = $state(20);
-	const comments = $derived(store.who ? remote.proposalComments({ id: proposal, limit }) : null);
+	const comments = $derived(
+		store.who ? remote.proposalComments({ id: proposal, limit, me: store.who.party }) : null
+	);
 
 	let body = $state('');
 	const f = remote.commentForm;

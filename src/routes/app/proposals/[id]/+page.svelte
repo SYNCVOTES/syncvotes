@@ -28,19 +28,22 @@
 
 	const id = $derived(page.params.id!);
 	const me = $derived(store.who?.party ?? null);
-	const proposal = $derived(me ? remote.proposal(id) : null);
+	const proposal = $derived(me ? remote.proposal({ id, me }) : null);
 
 	let q = $state('');
 	let limit = $state(20);
 	// Who voted how is the members' business: a reader of a public DAO gets the totals only.
 	const ballots = $derived(
 		me && proposal?.current?.me.membership
-			? remote.proposalBallots({ id, offset: 0, limit, q })
+			? remote.proposalBallots({ id, offset: 0, limit, q, me })
 			: null
 	);
 	const holders = $derived(
-		proposal?.current && proposal.current.effect.kind === 'shares' && !proposal.current.executedAt
-			? remote.daoShares(proposal.current.daoId)
+		me &&
+			proposal?.current &&
+			proposal.current.effect.kind === 'shares' &&
+			!proposal.current.executedAt
+			? remote.daoShares({ id: proposal.current.daoId, me })
 			: null
 	);
 
