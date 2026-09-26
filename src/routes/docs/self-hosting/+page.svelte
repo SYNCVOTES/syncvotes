@@ -21,7 +21,7 @@
 		>
 		<tr
 			><td>Traffic cost</td><td
-				>Lower where SyncVotes is a featured app: its app rewards pay back part of the traffic</td
+				>Lower: SyncVotes is a featured app, and its app rewards pay back part of the traffic</td
 			><td>The full network price, unless your deployment earns app rewards of its own</td></tr
 		>
 		<tr

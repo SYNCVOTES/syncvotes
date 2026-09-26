@@ -121,8 +121,8 @@
 		data.
 	</li>
 	<li>
-		<strong>App rewards by traffic.</strong> Where SyncVotes is a featured app, the network pays app rewards
-		by traffic, and the app's traffic is large enough to earn them, those rewards are subtracted too.
+		<strong>App rewards by traffic.</strong> SyncVotes is a featured app. Where the network pays app rewards
+		by traffic and the app's traffic is large enough to earn them, those rewards are subtracted too.
 	</li>
 </ul>
 <p>

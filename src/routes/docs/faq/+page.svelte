@@ -120,7 +120,8 @@
 <h2 id="own-validator">Can I keep my DAO off your validator?</h2>
 <p>
 	Yes. SyncVotes is open source: run it on a validator of your own, and your DAOs and ballots stay
-	there. Our site needs no upkeep, and costs less where SyncVotes earns app rewards. See
+	there. Our site needs no upkeep and costs less: SyncVotes is a featured app, and its rewards pay
+	back part of the traffic. See
 	<a href="/docs/self-hosting">Self-Hosting</a>.
 </p>
 
