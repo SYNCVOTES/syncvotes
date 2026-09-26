@@ -503,11 +503,12 @@ export type PartyCheck = 'addable' | 'already' | 'unknown';
 export const checkParties = query(
 	v.object({
 		dao: v.optional(contractId),
-		parties: v.pipe(v.array(partyId), v.maxLength(schemas.MAX_CHANGES))
+		parties: v.pipe(v.array(partyId), v.maxLength(schemas.MAX_CHANGES)),
+		...asMe
 	}),
-	({ dao, parties }): Record<string, PartyCheck> => {
+	({ dao, parties, me }): Record<string, PartyCheck> => {
+		session.required(me);
 		if (dao) memberOnly(dao);
-		else session.required();
 		const check = (p: string): PartyCheck =>
 			dao && ledger.members.get(dao)?.has(p)
 				? 'already'

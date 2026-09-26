@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { store } from '$lib/wallet-store.svelte';
 	/* eslint-disable no-useless-assignment -- `checking` is bound out and written by an effect */
 	import * as remote from '$lib/api.remote';
 	import { Input } from '$lib/components/ui/input';
@@ -73,7 +74,7 @@
 		const batch = pending.splice(0);
 		for (let i = 0; i < batch.length; i += CHUNK) {
 			const chunk = batch.slice(i, i + CHUNK);
-			remote.checkParties({ dao, parties: chunk }).then(
+			remote.checkParties({ dao, parties: chunk, me: store.who!.party }).then(
 				(checked) => Object.assign(status, checked),
 				() => chunk.forEach((t) => (status[t] = 'unknown'))
 			);

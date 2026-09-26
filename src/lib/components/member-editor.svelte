@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { store } from '$lib/wallet-store.svelte';
 	import * as remote from '$lib/api.remote';
 	import { Input } from '$lib/components/ui/input';
 	import { Button } from '$lib/components/ui/button';
@@ -150,7 +151,7 @@
 		try {
 			for (let i = 0; i < parsed.length; i += 100) {
 				const chunk = parsed.slice(i, i + 100).map((r) => r.party);
-				const found = await remote.checkParties({ dao, parties: chunk });
+				const found = await remote.checkParties({ dao, parties: chunk, me: store.who!.party });
 				for (const p of chunk) if (found[p] === 'unknown') unknown.push(p);
 			}
 		} catch {
