@@ -18,6 +18,9 @@ export default defineConfig({
 				experimental: { async: true }
 			},
 			adapter: adapter(),
+			// A tab left open across a deploy keeps running the old client. The app asks every minute
+			// whether a new build is out and, once it is, says so with a Reload button.
+			version: { pollInterval: 60_000 },
 			// The whole custody model assumes no script but ours runs on these pages.
 			csp: {
 				mode: 'auto',

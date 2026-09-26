@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { afterNavigate } from '$app/navigation';
+	import { updated } from '$app/state';
 	import { store } from '$lib/wallet-store.svelte';
 	import SiteHeader from '$lib/components/site-header.svelte';
 	import SiteFooter from '$lib/components/site-footer.svelte';
@@ -14,6 +15,17 @@
 
 <div class="flex min-h-screen flex-col">
 	<SiteHeader nav={NAV} />
+	{#if updated.current}
+		<div
+			class="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 border-b border-orange/30 bg-orange-dim px-4 py-2 text-center font-mono text-xs text-ink"
+		>
+			A new version of SyncVotes is out; this page is running the old one.
+			<button type="button" class="underline hover:text-orange" onclick={() => location.reload()}
+				>Reload</button
+			>
+			<span class="text-ink-dim">(the key locks; unlock it again)</span>
+		</div>
+	{/if}
 	<main class="flex-1">
 		{@render children()}
 	</main>
