@@ -253,6 +253,12 @@
 							</label>
 						{/each}
 					</div>
+					<p class="mt-3 text-xs leading-relaxed text-ink-dim">
+						Either way, the app's validator holds the DAO: private hides it from other users, not
+						from whoever runs this site. To keep it on a validator of your own,
+						<a href="/docs/self-hosting" class="underline hover:text-ink">run SyncVotes yourself</a
+						>.
+					</p>
 				</FormSection>
 
 				<FormSection variant="plain" number="04" title="Who pays" fixed>

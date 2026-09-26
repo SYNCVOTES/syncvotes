@@ -121,6 +121,12 @@ export const SECTIONS: DocSection[] = [
 				description: 'What the app can and cannot do with your party, your ballots and your DAO.'
 			},
 			{
+				slug: 'self-hosting',
+				title: 'Self-Hosting',
+				description:
+					'Run SyncVotes on your own validator, so no one else’s validator holds your DAOs.'
+			},
+			{
 				slug: 'faq',
 				title: 'FAQ',
 				description: 'Answers to the questions people ask most.'

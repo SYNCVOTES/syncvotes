@@ -123,7 +123,8 @@
 <DocNote>
 	<p>
 		The app's operator can read every DAO, public or private, including its ballots. See
-		<a href="/docs/trust-model">Trust Model</a>.
+		<a href="/docs/trust-model">Trust Model</a>. If no outside operator may read your DAO, run
+		SyncVotes on a validator of your own: <a href="/docs/self-hosting">Self-Hosting</a>.
 	</p>
 </DocNote>
 

@@ -74,8 +74,9 @@
 <h2 id="what-the-app-can-do">What the App Can Do</h2>
 <ul>
 	<li>
-		<strong>See everything.</strong> It reads every DAO, public or private, and every ballot, including
-		secret ones.
+		<strong>See everything.</strong> It reads every DAO, public or private, and every ballot,
+		including secret ones. To keep your DAOs from us, host SyncVotes on your own validator:
+		<a href="/docs/self-hosting">Self-Hosting</a>.
 	</li>
 	<li>
 		<strong>Delay.</strong> It chooses when to count and when to execute. It can hold a result back, or

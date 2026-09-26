@@ -84,7 +84,9 @@
 	the server. The server prepares each transaction, your browser checks it and signs it, and the server
 	submits it with your signature. On the ledger you are a <Ui kind="term">party</Ui>, hosted on the
 	app's validator, that only your key can sign for. See
-	<a href="/docs/keys-and-parties">Keys and Parties</a>.
+	<a href="/docs/keys-and-parties">Keys and Parties</a>. That validator also holds every DAO it
+	runs, private ones included; a community that wants its DAOs on its own validator can run
+	SyncVotes there: <a href="/docs/self-hosting">Self-Hosting</a>.
 </p>
 
 <h2 id="what-it-costs">What It Costs</h2>

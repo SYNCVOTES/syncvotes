@@ -62,6 +62,11 @@
 				DAO to its members on the way to a browser is the app: a DAO is shown only to members who
 				have proved they hold their key.
 			</p>
+			<p>
+				If you would rather no outside operator could read your DAOs, you do not have to use this
+				site: SyncVotes is open source and runs on any Canton validator. See
+				<a href="/docs/self-hosting">Self-Hosting</a>.
+			</p>
 		</Clause>
 
 		<Clause title="What we don't collect">

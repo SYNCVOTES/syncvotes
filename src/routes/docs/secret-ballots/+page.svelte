@@ -72,7 +72,8 @@
 <DocNote>
 	<p>
 		Use a secret ballot to keep members from seeing each other's votes. Do not rely on it to hide
-		votes from whoever runs the app. See <a href="/docs/trust-model">Trust Model</a>.
+		votes from whoever runs the app. See <a href="/docs/trust-model">Trust Model</a>, and
+		<a href="/docs/self-hosting">Self-Hosting</a> to be the one who runs it.
 	</p>
 </DocNote>
 

@@ -140,6 +140,11 @@ payee's transactions (and the provider's, which took payments before) from `DEPO
 recomputed on a restart; the ledger's figure is the only figure. What is paid in is spent on traffic and is not
 paid back: the DAO holds no coin, and nothing leaves the payee on a DAO's behalf.
 
+Everything a DAO holds, private or not, is on the validator that runs the app, and its operator
+can read it. A community that must keep its DAOs from any outside operator runs SyncVotes on a
+validator of its own; the docs page `/docs/self-hosting` walks through it, and the app points
+there wherever privacy comes up (the visibility choice, the Private tag, Privacy, the Trust Model).
+
 What the provider cannot do: forge a ballot or a proposal, count a ballot the ledger refuses,
 or pass anything measured against the whole vote by leaving ballots out. What it can: delay;
 make any proposal fail by leaving yes ballots out of the count; where a rule is measured

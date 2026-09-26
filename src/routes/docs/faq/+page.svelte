@@ -117,6 +117,13 @@
 </ul>
 <p>See <a href="/docs/secret-ballots">Secret Ballots</a>.</p>
 
+<h2 id="own-validator">Can I keep my DAO off your validator?</h2>
+<p>
+	Yes. SyncVotes is open source: run it on a validator of your own, and your DAOs and ballots stay
+	there. Our site needs no upkeep, and costs less where SyncVotes earns app rewards. See
+	<a href="/docs/self-hosting">Self-Hosting</a>.
+</p>
+
 <h2 id="cost">What does it cost?</h2>
 <p>
 	On TestNet and DevNet, nothing for now. On MainNet, every transaction is charged at the network's

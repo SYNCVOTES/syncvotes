@@ -114,7 +114,9 @@
 					>
 				{:else}
 					<Tag icon={Lock} class="overflow-visible pr-1.5"
-						>Private <Hint text="Only members can see this DAO." /></Tag
+						>Private <Hint
+							text="Only members can see this DAO in the app. The app's validator holds it too; see Docs, Self-Hosting."
+						/></Tag
 					>
 				{/if}
 				<Tag>{d.equal ? 'By membership' : 'By shares'}</Tag>
