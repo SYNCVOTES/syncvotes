@@ -96,7 +96,7 @@
 </ol>
 <p>
 	The details of every setting, the proxy options and how updates work are in the repository’s
-	README, under Authentication and Deployment.
+	README, under Run Your Own.
 </p>
 
 <h2 id="after">After It Runs</h2>

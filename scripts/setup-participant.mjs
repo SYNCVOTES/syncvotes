@@ -10,7 +10,7 @@
 //
 // As the validator's ledger admin it allocates the app's own provider party
 // (syncvotes-app-provider, not the validator's party: rewards and the coin paid in by memo belong
-// to the app), makes the app's ledger user and grants it what README "Authentication" lists. It
+// to the app), makes the app's ledger user and grants it what README "Run your own" lists. It
 // prints the provider party id for the env file. Every step is idempotent. The provider then
 // needs some coin, sent from any wallet, for its transfer pre-approval.
 const env = process.env;

@@ -1,299 +1,171 @@
-# syncvotes
+# SyncVotes
 
-On-chain governance for the Canton Network: DAOs, proposals and votes, signed by a key only the
-member holds. One image runs on three networks, each against its own validator:
-<https://syncvotes.com> (MainNet), <https://test.syncvotes.com> (TestNet),
-<https://dev.syncvotes.com> (DevNet).
+DAOs, proposals and votes on the Canton Network, signed by keys only their members hold. Live on
+<https://syncvotes.com> (MainNet), <https://test.syncvotes.com> (TestNet) and
+<https://dev.syncvotes.com> (DevNet). How to use it, the voting rules and the trust model are in
+the docs at [syncvotes.com/docs](https://syncvotes.com/docs).
 
-A DAO is run by nobody: who is in it and with what share of the vote, what it is called, its
-settings, whether it is public, whether it goes on — all decided by vote and carried out by the
-ledger. The creator is just that. A DAO votes by membership (one member, one vote) or by shares
-(whole units, like shares of a company). A proposal is a yes-or-no question, a choice among
-options, or one of the changes above. It holds no coin: everything costs network traffic, paid
-from a balance topped up by sending Canton Coin to the app with a memo. Proposals and
-descriptions are Markdown; every proposal has a comment thread; a member may keep a profile.
+## How it works
 
-## Architecture
+- **Keys and parties.** Each user is an
+  [external party](https://docs.canton.network/overview/reference/external-party) hosted on the
+  app's validator. The key comes from a 12-word phrase and never leaves the browser. The server
+  prepares each transaction; the browser decodes it, checks it is what the page asked for, and
+  signs.
+- **The model.** A Daml package, `syncvotes`, in `daml/src/SyncVotes/`. The app's own party, the
+  provider, co-signs every contract, counts the ballots and carries out what passed. The ledger
+  checks every ballot and every change it is handed.
+- **Money.** Everything costs network traffic. Users and DAOs pay in by sending Canton Coin to the
+  validator's party with a memo (`syncvotes:<dao id>` or `syncvotes:<key fingerprint>`); each
+  transaction is charged its traffic, net of the rewards it earns back. SyncVotes is a featured
+  app, and its activity markers and app rewards pay back part of that traffic.
+- **Privacy.** Whoever runs the validator can read every DAO it hosts, private ones and secret
+  ballots included. A community that must keep its DAOs to itself runs SyncVotes on its own
+  validator, as below.
 
-Every user is an [external party](https://docs.canton.network/overview/reference/external-party)
-hosted on the app's own validator: hosting is what makes the app's Daml package available to the
-party, signing stays with a key only the user holds. The server prepares each transaction, the
-browser signs the hash, the server executes. The browser does not take the server's word for
-what it is signing: `src/lib/verify.ts` decodes the prepared transaction, recomputes the hash the
-way the SDK does for offline signing, and refuses anything but the choice the page asked for, on
-the contract the page shows, with the arguments the page built, acting as the user alone. The
-same goes for the party topology at sign-up.
+## Run your own
 
-The server talks to the participant through `@canton-network/wallet-sdk` (topology, allocation,
-interactive submission, the ACS). The key side is the app's own (`src/lib/wallet.ts`): a
-twelve-word phrase (BIP-39, SLIP-0010 at `m/44'/6767'/0'/0'/0'`) gives an ed25519 key; Canton
-derives the party id from the key's fingerprint, so the phrase alone brings the same party back
-on any device. Between visits the key rests in `localStorage` encrypted with AES-GCM, unlocked by
-a passkey (WebAuthn PRF) or a password (PBKDF2); a passkey cannot sign a Canton transaction
-itself, so it guards the key instead of replacing it.
+### What you need
 
-Why not a third-party wallet: measured, not assumed. A dApp with its own Daml templates cannot
-serve a party hosted on another wallet's participant — the package has to be on the hosting
-participant, CIP-0103 has no method to upload one or re-host a party, and `signMessage` signs
-text, not a transaction hash. Coin is different: the token standard is on every validator, so a
-balance can be paid in from any wallet.
+- A [Splice validator](https://docs.canton.network) on the network you want, onboarded, with coin
+  to buy traffic, run by its own `start.sh` on a Linux server with Docker.
+- A domain for the site, pointed at that server. Cloudflare in front is supported and advised.
+- On your machine: this repository, Docker, and a Docker context for the server:
 
-### The model
+  ```sh
+  docker context create syncvotes-mainnet --docker host=ssh://<user>@<server>
+  ```
 
-`daml/src/SyncVotes/`, package `syncvotes`, in modules: `Types` (votes, effects, rules), `Rules`
-(what a valid rule or share change is), `Tally` (counting), `Markers`, `Governance` (DAO,
-member, proposal, ballot, comment), `Account` (account, profile), `Billing` (meter, purse). Every contract a user acts on carries the
-provider's signature, so the provider confirms every transaction (what CIP-0104 pays traffic
-rewards for) while only the user's key ever signs a submission. A DAO is signed by its creator
-and the provider, and every member, proposal, ballot and comment carries both, cross-checked, so
-neither can invent one alone. Nothing lists and nothing grows with history: a DAO may have
-thousands of members, and one member's vote touches no contract another's does.
+  The image is built on the server; nothing but Docker and the validator lives there.
 
-- `Account` — one per party, made by the provider; creates DAOs and keeps a `Profile`. A party
-  is its hint plus its key's fingerprint (`alice::1220…`).
-- `DAO` — name, description, picture, stable `id`, `equal` (by membership) or units of the
-  vote, `public`, `actorPays`, `Settings` (the rule anything that changes the DAO passes by,
-  and the voting period; the `routine` settings are only the founding default a proposer
-  starts from). `DAO_Execute` carries out what a vote decided, in batches; nobody changes
-  a DAO by hand. Founded with a share table: the first two hundred members at once, the rest as
-  a proposal already passed.
-- `Member` — one per party per DAO, with its share and when that share last changed. The
-  member's door to proposing (`Member_Propose` fixes the DAO's units as the electorate; a
-  change to the DAO runs under the DAO's rule, a decision or a choice under the rule and
-  period the proposer sets), commenting and voting
-  (`Member_Vote` remembers the proposal, so a second ballot is impossible unless votes may
-  change, in which case the old one is withdrawn).
-- `Proposal` — counters, not lists: `yes`, `no`, `abstain`, `tallies` per option, `eligible`,
-  `outcome`, how far its effect is carried out. Effects: `Signal`, `Choose` (two to ten
-  options; the leader wins if it reaches what a yes would need, a tie decides nothing — or,
-  with `several`, each member picks any number and every option that reaches the rule is
-  chosen, measured against the ballots that picked anything where the rule counts the votes
-  cast), `SetShares`, `SetInfo`, `SetSettings`, `SetPublic`, `Dissolve`. A rule is yes against
-  the whole vote or the votes cast, a majority, a fraction or a percentage, a quorum, whether
-  it settles as soon as the outcome cannot change, whether votes may change until the deadline
-  (the last two exclude each other). Nobody cancels a proposal. A rule may make the ballot
-  `secret`: the app shows nobody a vote but their own; the ballots are on the ledger all the
-  same, and the provider, which counts them, sees them.
-- `BallotV2` — one vote weighing the voter's units, cast with `Member_Cast` and signed by the
-  voter and the provider only, so the DAO creator's validator never holds it (`Ballot`, which
-  the creator signed too, is what `Member_Vote` cast before 1.0.1; both still count). While a
-  proposal on a secret ballot is open the app shows no totals and no turnout, and hands out no
-  member's contract id, which changes as they vote. The provider counts in batches
-  (`Proposal_Tally`; a final count three minutes after the deadline) and the count checks
-  each ballot: right DAO and proposal, cast in time, under the same rule, by a member of the
-  time whose share has not changed since. The provider cannot forge a ballot; what it can do by
-  leaving ballots out is under the trust model below.
-- `Comment` — said once and kept as said; nobody edits or removes it. Comments and proposals
-  are paced by the app (thirty writes an hour per party). The ledger itself holds texts to the
-  app's lengths (a name 60 characters, a title 120, a description 10 000 or 20 000, a comment
-  5000, a bio 2000, pictures as https links of 2000) and, once a dissolution has passed
-  (`DAO_BeginDissolving` sets `dissolving`), refuses new proposals in that DAO. What stays the
-  app's alone: pacing, and one open membership change per party.
-- `Meter` and `Purse` — the provider's statement of a DAO's and a party's account: paid in,
-  charged.
+### Steps
 
-### Invites and visibility
+1. **Settings.** Copy `.env.example` to `<network>.env` (`mainnet.env`, `testnet.env` or
+   `devnet.env`) and fill it in; every setting is in the table below. Use long random values
+   for every secret. The env files are ignored by git and never leave your machine. Compose
+   insists on `PROVIDER_PARTY`, which step 3 prints: until then set it to `pending`.
 
-Sign-up is by invitation while `INVITE_CODES` names any codes (comma-separated); a code is
-asked for before anyone pays for a party and checked again when the party is made. Empty, the
-door is open. A DAO is private unless founded public or made so by a `SetPublic` vote under
-its voting rules: public DAOs are listed at `/daos` for anyone signed in to read (proposals,
-outcomes, members, comments), while only members act and who voted how stays with the members.
-Nothing is public on the Canton network itself; "public" is the app reading as provider for
-whoever asks.
+2. **Sign-in for the ledger.** The app, its backend and the validator trust one Keycloak realm,
+   `canton`, which this compose project runs and serves under `/auth` on your domain. Start it
+   first:
 
-### The balances
+   ```sh
+   docker --context syncvotes-<network> compose --env-file <network>.env up -d keycloak caddy
+   ```
 
-The validator pays the network for every byte of traffic. The participant reports what each
-transaction cost, and the payer is charged what does not come back of it: the network mints the
-validator 0.2 coin per coin it burns on traffic (the latest issuing round's rate, read from Scan),
-and a featured app's provider its share per coin of its transactions' traffic where the network
-mints app rewards by traffic (CIP-0104; not yet on MainNet) and the app's traffic per round clears
-the reward threshold. That net cost is multiplied by `BILLING_FACTOR` (one; below one subsidises
-from the validator's wallet), and never charged below `BILLING_FLOOR` of the price (none by default),
-for when rewards come to the whole cost or more. App rewards arrive at the provider; every hour the app moves the
-provider's coin beyond a small float to the payee, whose wallet buys the traffic. Two kinds of
-account, paid in the same way: a DAO's (`Meter`) and a party's own (`Purse`, by fingerprint).
-A DAO founded with "the DAO pays" pays for everything done in it; one founded with "each
-member pays" has no balance, and a proposal, a vote or a comment costs the member who signs
-it, the counting of a proposal its proposer. A party pays for itself in any case: its
-allocation, its profile, the DAOs it founds. Nothing is spent for a new party before its owner
-has paid: the wallet page shows the memo of the key and what a party costs today, and the party
-is made once that much has arrived. Before signing anything, the participant's own estimate is
-checked against the payer's balance.
+   Then point the validator's own `.env` at it (`AUTH_URL`, `AUTH_JWKS_URL`,
+   `AUTH_WELLKNOWN_URL` = `https://<domain>/auth/realms/canton…`, the audiences and client ids
+   from your env file), pin `PARTICIPANT_DB_NAME` there, and restart the validator with
+   `start.sh … -a`.
 
-Where the provider is a featured app and `MARKERS=true`, creating a DAO, proposing, a member's first
-vote on a proposal (a changed vote records none) and a change's last batch each also create a
-featured-app activity marker for the provider, in the
-same transaction (`SyncVotes.Markers`, the `splice-api-featured-app-v1` interface, weight one;
-the right is read from Scan and passed disclosed). Where the network mints by markers, each is
-worth `featuredAppActivityMarkerAmount` in coin at the round's rate, and that is taken off the
-charge of the transaction that made it before `BILLING_FACTOR` applies, so the factor still sets
-what the payer covers. Comments and profiles make none (CIP-47 asks for markers on economically
-meaningful activity only). Where the provider is not featured, nothing changes.
+3. **The app's party and ledger user.** Once per validator:
 
-A balance is paid in by sending Canton Coin from any wallet to the payee (`PAYEE_PARTY`: the
-validator operator's own party, whose wallet buys the traffic the transactions use) with the memo
-as the transfer's reason (`syncvotes:<dao id>` or `syncvotes:<fingerprint>`). The payee has its
-own transfer pre-approval, so coin lands in one step. What arrived with a memo is read off the
-payee's transactions (and the provider's, which took payments before) from `DEPOSITS_SINCE` on and
-recomputed on a restart; the ledger's figure is the only figure. What is paid in is spent on traffic and is not
-paid back: the DAO holds no coin, and nothing leaves the payee on a DAO's behalf.
+   ```sh
+   VALIDATOR_CLIENT_SECRET=$(grep ^KC_VALIDATOR_SECRET= <network>.env | cut -d= -f2-) \
+     docker --context syncvotes-<network> compose --env-file <network>.env run --rm --no-deps \
+     -e VALIDATOR_CLIENT_SECRET app node scripts/setup-participant.mjs
+   ```
 
-Everything a DAO holds, private or not, is on the validator that runs the app, and its operator
-can read it. A community that must keep its DAOs from any outside operator runs SyncVotes on a
-validator of its own; the docs page `/docs/self-hosting` walks through it, and the app points
-there wherever privacy comes up (the visibility choice, the Private tag, Privacy, the Trust Model).
+   It allocates the provider party `syncvotes-app-provider` and gives the app's ledger user
+   `ParticipantAdmin`, `CanReadAsAnyParty`, `CanExecuteAsAnyParty` and `CanActAs` the provider,
+   and never the right to act as a user. Put the party it prints in `PROVIDER_PARTY`, and the
+   validator's own party in `PAYEE_PARTY`.
 
-What the provider cannot do: forge a ballot or a proposal, count a ballot the ledger refuses,
-or pass anything measured against the whole vote by leaving ballots out. What it can: delay;
-make any proposal fail by leaving yes ballots out of the count; where a rule is measured
-against the votes cast or has a quorum, flip a result either way by omitting ballots; and, when
-it carries out a share change, leave a member's contract out of the batch, so that a removal is
-skipped or a member ends up with a second membership and a second vote. The ledger cannot tell
-a missing membership from a withheld one (Canton has no contract keys), but either shows on the
-ledger as two `Member` contracts for one party, or one that should be gone.
+4. **Start.**
 
-## Setup
+   ```sh
+   pnpm deploy:<network>
+   ```
 
-There is no local run: the only ledger the app talks to is a validator, so what runs locally is
-the type-checker, the linter and the build. `daml.js/` is generated and gitignored, so a fresh
-clone produces it before pnpm can resolve `@daml.js/model` (building the DAR needs Rosetta on
-Apple silicon, `dpm` is x86_64):
+   That is `compose build` and `up -d` against the context, from a clean git tree only; the
+   commit is baked in. At startup the app uploads its Daml package and reads the ledger.
+   `https://<domain>/version` then answers with the commit and the package id.
+
+5. **Check.** The app log says `Daml package … is on the participant`. Make sure the participant
+   has also vetted it: `POST /v2/package-vetting` on the ledger API lists `syncvotes` with the
+   version you deployed. An upload can succeed and still not be vetted, for example next to an
+   older, incompatible package of the same name.
+
+6. **Who pays.** For a community of your own, `BILLING_FACTOR=0` makes every transaction free to
+   members and lets the validator pay. `INVITE_CODES` keeps sign-up to your people.
+
+### Proxies
+
+By default Caddy binds `PUBLIC_IP:80/443` and gets its own certificates. Where another proxy
+already holds those ports:
+
+- **nginx on the host:** `CADDY_HTTP_BIND=127.0.0.1:8085`, `CADDY_SITE=http://<domain>`,
+  `CADDY_TRUSTED_EXTRA=127.0.0.0/8`, and an nginx site that terminates TLS and forwards to
+  `127.0.0.1:8085`.
+- **traefik:** the same binds, plus `TRAEFIK=true`, `PROXY_NETWORK=<traefik's network>`,
+  `PROXY_NETWORK_EXTERNAL=true`, `CADDY_TRUSTED_EXTRA=private_ranges`. Compose sets the router
+  labels, including an allow-list of Cloudflare's ranges.
+
+Behind Cloudflare, let only Cloudflare reach the server: `CADDY_ALLOWED_PEERS` where Caddy faces
+the internet, the traefik allow-list above, or a `geo` on `$realip_remote_addr` in nginx. Caddy
+reads the visitor's address from Cloudflare's headers and passes the app `X-Client-Ip`, which
+rate limits use.
+
+Caddy's config is inline in `compose.yaml`; after changing it, run
+`compose up -d --force-recreate caddy`. Keycloak's admin console, its master realm and the
+account console are not served publicly: reach them over an SSH tunnel to `keycloak:8080`, as
+`KC_ADMIN_NAME`.
+
+### Settings
+
+| Setting                                                                    | What it is                                                                                                                |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `APP_DOMAIN`                                                               | The site's domain.                                                                                                        |
+| `PUBLIC_IP`                                                                | The address Caddy binds to when it has ports 80 and 443 itself.                                                           |
+| `NETWORK`                                                                  | `MainNet`, `TestNet` or `DevNet`: shown to users.                                                                         |
+| `NETWORKS`                                                                 | The sites the network switcher offers: `Name=https://url,…`, this one included.                                           |
+| `SCAN_URL`                                                                 | The network's public Scan: coin rules, rounds, prices, featured apps.                                                     |
+| `VALIDATOR_NETWORK`                                                        | The validator's Docker network, which the app joins. Default `splice-validator_default`.                                  |
+| `WALLET_USER_NAME`                                                         | The validator operator's wallet login; equals the validator's `PARTY_HINT`.                                               |
+| `PROVIDER_PARTY`                                                           | The app's party, printed by `setup-participant.mjs`.                                                                      |
+| `PAYEE_PARTY`                                                              | Where users pay in: the validator's own party, whose wallet buys traffic. Empty means the provider.                       |
+| `DEPOSITS_SINCE`                                                           | ISO time from which memo payments count. Set it when accounts start afresh.                                               |
+| `BILLING_FACTOR`                                                           | What users pay, as a multiple of the traffic's net cost: `1` covers it, below 1 the validator subsidises, `0` is free.    |
+| `BILLING_FLOOR`                                                            | The least charged, as a fraction of the network's traffic price, even when rewards cover everything. `0` is no floor.     |
+| `MARKERS`                                                                  | `true` records featured-app activity markers, when the provider holds a featured app right.                               |
+| `INVITE_CODES`                                                             | Comma-separated codes needed to sign up. Empty is open sign-up.                                                           |
+| `LEDGER_API_AUDIENCE`, `VALIDATOR_AUDIENCE`                                | Token audiences of the participant's ledger API and the validator's API.                                                  |
+| `WALLET_UI_URL`, `CNS_UI_URL`                                              | Where the validator's own wallet and name-service UIs live, for their login clients.                                      |
+| `KC_ADMIN_NAME`, `KC_ADMIN_PASSWORD`                                       | Keycloak's administrator.                                                                                                 |
+| `KC_DB_PASSWORD`                                                           | Keycloak's database.                                                                                                      |
+| `KC_APP_SECRET`, `KC_VALIDATOR_SECRET`                                     | Client secrets of the app and of the validator backend.                                                                   |
+| `KC_APP_USER_ID`, `KC_VALIDATOR_USER_ID`, `KC_WALLET_USER_ID`              | Fixed ids of the realm's users, which become ledger user names.                                                           |
+| `KC_WALLET_USER_PASSWORD`                                                  | The validator operator's wallet login password.                                                                           |
+| `CADDY_HTTP_BIND`, `CADDY_HTTPS_BIND`, `CADDY_SITE`, `CADDY_TRUSTED_EXTRA` | Behind another proxy (see Proxies).                                                                                       |
+| `TRAEFIK`, `PROXY_NETWORK`, `PROXY_NETWORK_EXTERNAL`                       | Behind traefik.                                                                                                           |
+| `CADDY_ALLOWED_PEERS`                                                      | Where Caddy faces the internet: the only peers it serves, e.g. `private_ranges` and Cloudflare's ranges. Empty is anyone. |
+
+## Updating
+
+`pnpm deploy:<network>` again. Nothing goes down: Caddy holds requests until the new app answers.
+
+The Daml package keeps its name, `syncvotes`, for good: renaming it would hide every existing DAO.
+Each release is a Smart Contract Upgrade of the one before, checked by the compiler:
+
+1. Bump `version` in `daml/daml.yaml`.
+2. Point `upgrades:` at the previous DAR and keep that DAR in `daml/upgrades/`.
+3. Update the `@daml.js/model` alias in `package.json` to the new version.
+
+An upgrade may change a choice's body, add templates and choices, and add `Optional` fields at the
+end. It may not remove or retype fields or choices, move a template to another module, or change
+signatories and observers. After deploying, check the vetting on every network (step 5).
+
+## Development
+
+There is no local ledger; what runs locally is the type-checker, the linter and the build.
+Building the DAR needs `dpm`, which is x86-64 only (Rosetta on Apple silicon).
 
 ```sh
-pnpm daml:codegen      # builds the DAR and writes daml.js/
+pnpm daml:codegen   # builds the DAR and writes the bindings to daml.js/
 pnpm i
 pnpm check
 pnpm lint
-pnpm exec vite build   # what the image build runs
+pnpm exec vite build
 ```
 
-Re-run codegen and `pnpm i` after every change to the Daml side. Codegen names its package
-`@daml.js/<name>-<version>` from `daml/daml.yaml`; package.json aliases it once as
-`@daml.js/model`, so a version bump is `daml/daml.yaml` and that one line. Template ids are
-package-name-scoped (`#syncvotes:SyncVotes.Governance:Proposal`), which is what keeps an upgrade from
-breaking submissions.
-
-## Authentication
-
-Every ledger call is authenticated: the participant, the validator backend and this app trust
-one Keycloak realm (`keycloak/realm.json`, served under `/auth` on `APP_DOMAIN` by the same
-Caddy, values substituted from the env file at import). Tokens are RS256, checked against the
-realm's JWKS; the app reaches the realm over the compose network, the browser over the domain.
-
-Clients: `validator-app-backend` and `syncvotes-app` (client credentials, each a service account
-whose `sub` is its ledger user name), `wallet-web-ui` / `cns-ui` (public, PKCE) for the
-validator's own UIs. The app's ledger user holds `ParticipantAdmin` (DAR upload, party
-allocation), `CanReadAsAnyParty`, `CanExecuteAsAnyParty` and `CanActAs`
-the provider, and never `CanActAs` a user party: the only way a user's transaction is submitted
-is with the user's own signature. `CanReadAsAnyParty` is not optional: the participant refuses
-to prepare for a party the caller cannot read as.
-
-Only the canton realm's login and keys are public: Caddy answers 404 for `/auth/admin`, the
-master realm and the account console, which are reached over an SSH tunnel to `keycloak:8080`
-as `KC_ADMIN_NAME`. Both realms lock an account out after ten failed logins.
-
-The validator bundle's `.env` points at the same realm (`AUTH_URL`, `AUTH_JWKS_URL`,
-`AUTH_WELLKNOWN_URL`, the audiences and client ids) and is restarted with `start.sh … -a`;
-pin `PARTICIPANT_DB_NAME` there before any recreate.
-
-## How the app runs
-
-The private key exists only inside a closure (`Signer`): the page can ask it to sign, to encrypt
-itself for storage, or to dispose, never to reveal itself. The key is kept on the device before
-the party is paid for, so a reload during the pay-in resumes it. A key that comes back without
-an `Account` is looked up in an index of the parties this participant hosts, read once in the
-background at startup (the participant's own list is the whole network's, over a million parties
-on MainNet); a lookup during that first read waits up to a minute and then says try again.
-
-Reads need a session: once per unlock the browser signs a challenge with the party's key, and
-the server keeps a session in memory behind an HttpOnly cookie (`src/lib/server/session.ts`).
-Every read and prepare takes its party from it; DAO reads require membership or a public DAO.
-A restart forgets sessions; the browser, still holding the key, signs again.
-
-Reads are live and never touch the participant. The server keeps an in-memory copy of every
-contract the provider signs (`ledger.ts`), built from the streaming active-contracts endpoint at
-startup and kept current from the update stream; a transaction wakes the live queries waiting on
-the DAO, proposal or party it touched. Lists are paged and filtered on the server. A write's
-`execute` returns once the copy holds its transaction, so the page that signed is already up to
-date.
-
-| Path                             | What it is                                                                  |
-| -------------------------------- | --------------------------------------------------------------------------- |
-| `daml/src/SyncVotes/`            | The model, one module per concern                                           |
-| `daml.js/`                       | Generated bindings, never edited                                            |
-| `src/lib/wallet.ts`              | Phrase → signer closure; keys encrypted at rest per device                  |
-| `src/lib/wallet-store.svelte.ts` | The wallet as one rune store: onboarding screens, signer, identity          |
-| `src/lib/verify.ts`              | Recomputes hashes and inspects transactions before anything is signed       |
-| `src/lib/schemas.ts`             | One valibot schema per field; browser and server check the same             |
-| `src/lib/actions.ts`, `forms.ts` | What the browser does: call the API, verify, sign, call again               |
-| `src/lib/api.remote.ts`          | The server API as remote functions: live reads, forms, prepares             |
-| `src/lib/server/participant.ts`  | The participant: topology, allocation, prepare and execute, the party index |
-| `src/lib/server/ledger.ts`       | The provider's copy of the ledger, with wake-ups                            |
-| `src/lib/server/tally.ts`        | The provider's jobs: counts in batches, `DAO_Execute` for what passed       |
-| `src/lib/server/deposits.ts`     | Coin at the provider: pre-approval, transfers, deposits by memo             |
-| `src/lib/server/billing.ts`      | Traffic charged to the account that caused it; the funds gate               |
-| `src/lib/server/splice.ts`       | Canton Coin rules, round and prices, from Scan                              |
-| `src/routes/(app)/`              | My DAOs, Public DAOs, DAO, members, proposals, people, wallet, terms        |
-| `src/routes/+page.svelte`        | The landing, `landing-*` components                                         |
-| `src/lib/components/`            | Everything built on the shadcn primitives in `ui/`                          |
-| `compose.yaml`                   | The compose project for the servers, Caddy config inline                    |
-| `scripts/setup-participant.mjs`  | Once per validator: the app's ledger user and its rights                    |
-
-## Deployment
-
-```sh
-pnpm deploy:testnet   # each refuses an uncommitted tree: what runs is always a commit
-pnpm deploy:devnet
-pnpm deploy:mainnet
-```
-
-Each is `docker compose build && up -d` against a Docker context named `syncvotes-<network>`
-(`docker context create syncvotes-testnet --docker host=ssh://<user>@<server>`): the build
-context travels over SSH and the server's daemon builds the image. Nothing lives on a server but
-Docker and the validator. Compose reads `<network>.env` locally (template in `.env.example`,
-the files never in git): the participant, the parties, the realm's secrets, `SCAN_URL`,
-`NETWORK`, `BILLING_FACTOR`, `INVITE_CODES`, the proxy knobs. The commit is baked in as `GIT_SHA`; `/version` answers with it and with the id of the Daml package the app uploaded, the id the participant knows the code by.
-
-`compose.yaml` joins the Splice validator's network and must never recreate its containers
-(the validator has its own `start.sh`). Caddy serves the domain and the realm; behind Cloudflare
-it works the visitor's address out from Cloudflare's ranges, and the app reads only the
-`X-Client-Ip` it sets. Where a host's 80/443 belong to another proxy, `CADDY_HTTP_BIND` /
-`CADDY_HTTPS_BIND` put Caddy on loopback, `CADDY_SITE` names the plain-HTTP site,
-`CADDY_TRUSTED_EXTRA` trusts that proxy, and either traefik routes by the labels compose sets
-(`TRAEFIK=true`, `PROXY_NETWORK`) or an nginx site forwards. Caddy's config is inline, so a
-change to it needs `compose up -d --force-recreate caddy`. Only Cloudflare's edges reach the
-sites: traefik's `syncvotes-cloudflare` allow-list on DevNet, `CADDY_ALLOWED_PEERS` where Caddy
-faces the internet (TestNet), and on MainNet the host nginx's own `geo` on the connection's peer
-(`/etc/nginx/sites-available/syncvotes`, outside this repo). A deploy takes nothing down: Caddy
-holds a request until the new app container answers.
-
-The DAR is built inside the image and uploaded by the app at startup, which then checks the
-package is on the participant. The package is a lineage, `syncvotes` (1.0.1 is an upgrade of
-1.0.0, whose DAR is in `daml/upgrades/`; 1.0.0 replaced
-`syncvotes-options`, whose contracts the app no longer sees), and its name never changes again:
-every release is a Canton Smart Contract Upgrade of the one before, checked by the compiler
-against the previous DAR (`upgrades:` in `daml/daml.yaml`), so live contracts carry over.
-Allowed: a choice's body, a new template or choice, an `Optional` field appended last. Not
-allowed: removing or retyping a field or choice, moving a template to another module, changing
-signatories or observers, tightening `ensure`. Release: bump the version, point `upgrades:` at
-the release before, keep that DAR in `daml/upgrades/`.
-
-## Notes
-
-- Canton 3.5 names the ed25519 key spec `SIGNING_KEY_SPEC_EC_CURVE25519`; the signature
-  algorithm is still `SIGNING_ALGORITHM_SPEC_ED25519`.
-- The SDK submits through `interactive-submission/executeAndWait` and hardcodes
-  `HASHING_SCHEME_VERSION_V2`. Its token providers log whole token responses at info level;
-  `participant.ts` gives it a log adapter that passes only warnings and errors.
-- `@canton-network/core-tx-visualizer` is what `verify.ts` builds on; its authority check only
-  understands create nodes, so the check for exercises is written by hand.
-- A prepared transaction times out about two minutes after it was prepared, whatever
-  `maxRecordTime` says. An interactive submission cannot act as a local party alongside the
-  external one; delegation goes through Daml.
-- The JSON API wants an `Int` as text and a `Decimal` with its full scale; a variant with a
-  payload arrives as `{tag, value}`. The list endpoints stop at two hundred elements.
-- A `.remote.ts` module may export nothing but remote functions, which is why shared constants
-  live in `schemas.ts`. `dpm codegen-js` emits CommonJS; `optimizeDeps.include` in
-  `vite.config.ts` keeps the browser from receiving it raw.
+Run codegen and `pnpm i` again after every change to the Daml side.
