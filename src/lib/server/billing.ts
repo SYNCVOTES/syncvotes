@@ -4,7 +4,14 @@ import { BILLING_FACTOR, BILLING_FLOOR } from '$app/env/private';
 import * as ledger from './ledger';
 import * as splice from './splice';
 import * as deposits from './deposits';
-import { paidTraffic, payeeParty, providerParty, sdk, submitAsProvider } from './participant';
+import {
+	depositsSince,
+	paidTraffic,
+	payeeParty,
+	providerParty,
+	sdk,
+	submitAsProvider
+} from './participant';
 
 /**
  * Who pays for what. Every transaction costs this validator traffic — bytes the network
@@ -349,21 +356,28 @@ function take(found: deposits.Deposit[]) {
 	}
 }
 
+type Seen = { oldest: string | null; end: boolean };
+
 /**
  * Reads a window of the provider's history, splitting it while the participant says it holds
- * more than it will list. Returns the oldest record time seen, or null for an empty window.
+ * more than it will list. Returns the oldest record time seen (null for an empty window) and
+ * whether the window reached history the participant will not serve — pruned, or of a package
+ * since removed — in which case the readable newer part was taken and nothing older will be.
  */
-async function window(after: number, before: number): Promise<string | null> {
+async function window(after: number, before: number): Promise<Seen> {
 	const got = await deposits.deposits(after, before);
-	if (got) {
+	if (got && got !== deposits.UNREADABLE) {
 		take(got.found);
-		return got.oldest;
+		return { oldest: got.oldest, end: false };
 	}
 	const mid = Math.floor((after + before) / 2);
-	if (mid <= after) return null;
+	if (mid <= after) return { oldest: null, end: got === deposits.UNREADABLE };
 	const a = await window(mid, before);
+	// The unreadable part lies at the old end: once the newer half cannot be read, the older
+	// half cannot be either, and is not asked for.
+	if (a.end) return a;
 	const b = await window(after, mid);
-	return b ?? a;
+	return { oldest: b.oldest ?? a.oldest, end: b.end };
 }
 
 /**
@@ -390,13 +404,23 @@ export async function watchDeposits(): Promise<void> {
 				...[...ledger.purses.values()].map((p) => p.updatedAt)
 			].sort()[0];
 			const week = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
-			const floor = oldest && oldest < week ? oldest : week;
+			let floor = oldest && oldest < week ? oldest : week;
+			// Nothing before DEPOSITS_SINCE counts, so nothing before it is read.
+			if (depositsSince() && Date.parse(depositsSince()) > Date.parse(floor)) {
+				floor = new Date(Date.parse(depositsSince())).toISOString();
+			}
 			let to = end;
 			let step = 20_000;
 			while (to > 0) {
 				const from = Math.max(0, to - step);
 				const seen = await window(from, to);
-				if (seen && seen < floor) break;
+				if (seen.end) {
+					console.log(
+						`Deposits read back to offset ${from}; the participant serves no history before`
+					);
+					break;
+				}
+				if (seen.oldest && Date.parse(seen.oldest) < Date.parse(floor)) break;
 				to = from;
 				step = Math.min(step * 2, 200_000);
 			}

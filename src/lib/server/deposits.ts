@@ -173,22 +173,27 @@ export type Deposit = {
 	recordTime: string;
 };
 
+/** History the participant will not serve: pruned, or with a package it no longer holds. */
+export const UNREADABLE = 'unreadable';
+
 /**
  * Coin that arrived for the app in this window of offsets, carrying an account's memo: the
  * token standard's view of each receiving party's transactions, filtered to transfers in.
  * Everything else that lands (fees, rewards, unmarked coin) is that party's own. The
  * participant lists at most two hundred transactions per call, so a window that holds more
- * comes back as `null` for the caller to split.
+ * comes back as `null` for the caller to split; a window it cannot render at all, because it
+ * reaches into pruned history or a transaction of a package since removed, is `UNREADABLE`.
  */
 export async function deposits(
 	afterOffset: number,
 	beforeOffset: number
-): Promise<{ found: Deposit[]; oldest: string | null } | null> {
+): Promise<{ found: Deposit[]; oldest: string | null } | null | typeof UNREADABLE> {
 	const found: Deposit[] = [];
 	let oldest: string | null = null;
 	for (const party of receivingParties()) {
 		const window = await depositsOf(party, afterOffset, beforeOffset);
 		if (!window) return null;
+		if (window === UNREADABLE) return UNREADABLE;
 		found.push(...window.found);
 		if (window.oldest && (!oldest || window.oldest < oldest)) oldest = window.oldest;
 	}
@@ -199,13 +204,18 @@ async function depositsOf(
 	party: string,
 	afterOffset: number,
 	beforeOffset: number
-): Promise<{ found: Deposit[]; oldest: string | null } | null> {
+): Promise<{ found: Deposit[]; oldest: string | null } | null | typeof UNREADABLE> {
 	let page;
 	try {
 		page = await (await sdk()).token.holdings({ partyId: party, afterOffset, beforeOffset });
 	} catch (e) {
-		const text = e instanceof Error ? e.message : JSON.stringify(e);
+		const text = [e, (e as { cause?: unknown }).cause]
+			.map((x) => (x instanceof Error ? x.message : JSON.stringify(x)))
+			.join(' ');
 		if (/MAXIMUM_LIST_ELEMENTS/.test(text)) return null;
+		if (/Templates do not exist|PARTICIPANT_PRUNED_DATA_ACCESSED|PACKAGE_NOT_FOUND/.test(text)) {
+			return UNREADABLE;
+		}
 		throw e;
 	}
 	const found: Deposit[] = [];
