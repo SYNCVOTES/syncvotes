@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import type LockIcon from '@lucide/svelte/icons/lock';
+	import { cn } from '$lib/utils.js';
 
 	/**
 	 * A small pill for a fact about a thing: private, by shares, creator. Neutral unless the
@@ -27,9 +28,11 @@
 </script>
 
 <span
-	class="inline-flex w-fit shrink-0 items-center gap-1 rounded-full border px-2.5 py-0.5 font-mono text-label tracking-[0.12em] whitespace-nowrap uppercase {tones[
-		tone
-	]} {className}"
+	class={cn(
+		'inline-flex w-fit shrink-0 items-center gap-1 rounded-full border px-2.5 py-0.5 font-mono text-label tracking-[0.12em] whitespace-nowrap uppercase',
+		tones[tone],
+		className
+	)}
 >
 	{#if icon}
 		{@const Icon = icon}

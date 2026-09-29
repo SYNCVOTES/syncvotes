@@ -99,7 +99,7 @@
 
 		<EntityHeader title={p.title}>
 			{#snippet above()}
-				<div class="mb-3 flex items-center gap-3">
+				<div class="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
 					<StatusBadge outcome={p.outcome} closesAt={p.closesAt} executedAt={p.executedAt} />
 					{#if p.customRule}
 						<Tag tone="warn" class="overflow-visible pr-1.5"

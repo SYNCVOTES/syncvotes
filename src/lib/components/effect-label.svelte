@@ -55,6 +55,10 @@
 	);
 </script>
 
-<span class="inline-flex items-center gap-1 {effect.kind === 'dissolve' ? 'text-red' : ''}">
+<span
+	class="inline-flex max-w-full min-w-0 items-center gap-1 {effect.kind === 'dissolve'
+		? 'text-red'
+		: ''}"
+>
 	<Icon size={12} aria-hidden="true" /><span class="truncate">{text}</span>
 </span>

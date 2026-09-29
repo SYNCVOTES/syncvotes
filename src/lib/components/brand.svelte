@@ -20,7 +20,7 @@
 	<span>SYNCVOTES</span>
 	{#if beta && mainnet}
 		<span
-			class="border border-amber/30 bg-amber/[0.07] px-1.5 py-0.5 font-mono text-label leading-none font-semibold tracking-[0.08em] text-amber uppercase"
+			class="hidden border border-amber/30 bg-amber/[0.07] px-1.5 py-0.5 font-mono text-label leading-none font-semibold tracking-[0.08em] text-amber uppercase sm:inline"
 		>
 			beta
 		</span>

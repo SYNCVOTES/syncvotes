@@ -56,7 +56,7 @@
 			onclick={() => others.length && (open = !open)}
 		>
 			<span class="size-1.5 rounded-full {mainnet ? 'bg-green' : 'bg-amber'}"></span>
-			{NETWORK}
+			<span class="hidden sm:inline">{NETWORK}</span>
 			{#if others.length}<ChevronDown size={12} aria-hidden="true" />{/if}
 		</button>
 		{#if open}
