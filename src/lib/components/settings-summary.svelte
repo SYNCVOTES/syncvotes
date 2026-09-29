@@ -6,22 +6,26 @@
 	/**
 	 * A DAO's voting rules, read at a glance: for changes to the DAO, the ballot, the rule they
 	 * pass by and how long a vote is open, with this DAO's numbers; for decisions and choices,
-	 * that their proposer sets all that. `compact` gives each one line, the sentence behind a Hint.
+	 * the rule their proposer starts from. `compact` gives each one line, the sentence behind a
+	 * Hint.
 	 */
 	let {
 		sensitive,
+		routine,
 		eligible = 0,
 		equal = false,
 		compact = false
 	}: {
 		/** The rule everything that changes the DAO passes by. */
 		sensitive: Settings;
+		/** The rule a decision's or a choice's proposer starts from; `null` where it stays as it is. */
+		routine: Settings | null;
 		eligible?: number;
 		equal?: boolean;
 		compact?: boolean;
 	} = $props();
 	const category = CATEGORIES.find((c) => c.value === 'sensitive')!;
-	const routine = CATEGORIES.find((c) => c.value === 'routine')!;
+	const decisions = CATEGORIES.find((c) => c.value === 'routine')!;
 	const unit = (n: number) => (equal ? (n === 1 ? 'member' : 'members') : 'units');
 	function here(s: Settings): string {
 		if (eligible <= 0) return '';
@@ -96,9 +100,25 @@
 		<dt
 			class="flex items-center gap-1.5 font-mono text-label tracking-[0.14em] text-ink-dim uppercase"
 		>
-			{routine.title}
-			<Hint text={routine.covers} />
+			{decisions.title}
+			<Hint
+				text={routine && compact ? `${decisions.covers} ${sentence(routine)}` : decisions.covers}
+			/>
 		</dt>
-		<dd class="text-body-sm leading-relaxed text-ink-mid">{routine.text}</dd>
+		{#if !routine}
+			<dd class="text-body-sm leading-relaxed text-ink-mid">Unchanged.</dd>
+		{:else if compact}
+			<dd class="font-mono text-xs text-ink">{oneLine(routine)}</dd>
+		{:else}
+			<dd class="text-body-sm leading-relaxed text-ink">
+				<span class="text-ink-mid">{decisions.text}</span><br />
+				{ballot(routine)}. Passes when {describe(routine.rule)}; {timing(routine)}. Open for {days(
+					routine.votingDays
+				)}.
+				{#if here(routine)}<span class="block font-mono text-xs text-ink-mid"
+						>In this DAO: {here(routine)}.</span
+					>{/if}
+			</dd>
+		{/if}
 	</div>
 </dl>

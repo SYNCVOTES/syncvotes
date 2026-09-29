@@ -183,8 +183,8 @@ export type Category = 'routine' | 'sensitive';
 
 /**
  * What a proposal does decides its category: routine (a decision or a choice, which change
- * nothing on the ledger and run under a rule their proposer sets) or sensitive (anything that
- * changes the DAO, which runs under the DAO's own rule).
+ * nothing on the ledger and run under a rule their proposer starts from the DAO's default and
+ * may change) or sensitive (anything that changes the DAO, which runs under the DAO's own rule).
  */
 export const categoryOf = (kind: string): Category =>
 	kind === 'signal' || kind === 'choose' ? 'routine' : 'sensitive';
@@ -193,8 +193,9 @@ export const CATEGORIES: { value: Category; title: string; text: string; covers:
 	{
 		value: 'routine',
 		title: 'Decisions and choices',
-		text: 'The proposer sets the ballot and rule.',
-		covers: 'Decisions and choices change nothing on the ledger, so the proposer sets the rule.'
+		text: 'The rule a proposer starts from; they may set another, and the proposal says so.',
+		covers:
+			'Decisions and choices change nothing on the ledger. Their proposer starts from this rule and may set another for their proposal, which then says so.'
 	},
 	{
 		value: 'sensitive',

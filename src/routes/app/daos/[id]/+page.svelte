@@ -341,7 +341,13 @@
 
 				<div>
 					<h2 class="eyebrow">Voting rules</h2>
-					<SettingsSummary sensitive={d.sensitive} eligible={d.units} equal={d.equal} compact />
+					<SettingsSummary
+						sensitive={d.sensitive}
+						routine={d.routine}
+						eligible={d.units}
+						equal={d.equal}
+						compact
+					/>
 				</div>
 
 				{#if d.actorPays}

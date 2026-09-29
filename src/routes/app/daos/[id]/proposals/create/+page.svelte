@@ -32,7 +32,6 @@
 		categoryOf,
 		copySettings,
 		describe,
-		settingsFields,
 		settingsOf,
 		settingsToLedger,
 		validRule,
@@ -246,7 +245,7 @@
 			case 'dissolve':
 				return 'The DAO closes permanently once every other open proposal is decided. Nothing more can be proposed or voted on. The remaining balance is lost.';
 			case 'settings':
-				return `From then on, a change to the DAO is voted on by ${newSensitive.rule.secret ? 'secret' : 'open'} ballot, votes ${newSensitive.rule.changeable ? 'may change until the deadline' : 'final once cast'}, and passes when ${describe(newSensitive.rule)}, open ${newSensitive.votingDays} days.`;
+				return `From then on, a change to the DAO is voted on by ${newSensitive.rule.secret ? 'secret' : 'open'} ballot, votes ${newSensitive.rule.changeable ? 'may change until the deadline' : 'final once cast'}, and passes when ${describe(newSensitive.rule)}, open ${newSensitive.votingDays} days. A decision or a choice starts from ${describe(newRoutine.rule)}, open ${newRoutine.votingDays} days.`;
 			default:
 				return 'Recorded on the ledger. Nothing else changes.';
 		}
@@ -314,8 +313,11 @@
 									? { tag: 'Dissolve', value: {} }
 									: fields.kind === 'settings'
 										? {
-												tag: 'SetRules',
-												value: { rules: settingsToLedger(settingsOf(fields, 'newSensitive')) }
+												tag: 'SetSettings',
+												value: {
+													rules: settingsToLedger(settingsOf(fields, 'newSensitive')),
+													decisions: settingsToLedger(settingsOf(fields, 'newRoutine'))
+												}
 											}
 										: { tag: 'Signal', value: {} };
 			return {
@@ -348,7 +350,7 @@
 			case 'signal':
 				return validRule(newRoutine.rule);
 			case 'settings':
-				return validRule(newSensitive.rule);
+				return validRule(newSensitive.rule) && validRule(newRoutine.rule);
 			default:
 				return true;
 		}
@@ -555,24 +557,53 @@
 							/>
 						</Field>
 					{:else if kind === 'settings'}
-						{#each settingsFields('newRoutine', newRoutine) as [name, value] (name)}
-							<input type="hidden" {name} {value} />
-						{/each}
-						<h3 class="eyebrow">Ballot</h3>
-						<RuleSettings
-							bind:settings={newSensitive}
-							prefix="newSensitive"
-							part="ballot"
-							eligible={d.units}
-							equal={d.equal}
-						/>
-						<h3 class="eyebrow">How it passes</h3>
+						<h3 class="eyebrow">Changes to the DAO</h3>
+						<p class="text-body-sm leading-relaxed text-ink-mid">
+							Members and shares, name and description, these rules, visibility, dissolution.
+						</p>
 						<RuleSettings
 							bind:settings={newSensitive}
 							prefix="newSensitive"
 							eligible={d.units}
 							equal={d.equal}
-						/>
+							collapsed
+						>
+							{#snippet ballot()}
+								<RuleSettings
+									bind:settings={newSensitive}
+									prefix="newSensitive"
+									part="ballot"
+									bare
+									eligible={d.units}
+									equal={d.equal}
+								/>
+							{/snippet}
+						</RuleSettings>
+						<h3 class="eyebrow">Decisions and choices</h3>
+						<p class="text-body-sm leading-relaxed text-ink-mid">
+							The rule a proposer starts from. They may set another for their proposal, which then
+							says so.
+						</p>
+						<RuleSettings
+							bind:settings={newRoutine}
+							prefix="newRoutine"
+							whose="Decisions"
+							eligible={d.units}
+							equal={d.equal}
+							collapsed
+						>
+							{#snippet ballot()}
+								<RuleSettings
+									bind:settings={newRoutine}
+									prefix="newRoutine"
+									whose="Decisions"
+									part="ballot"
+									bare
+									eligible={d.units}
+									equal={d.equal}
+								/>
+							{/snippet}
+						</RuleSettings>
 					{/if}
 				</FormSection>
 			{/if}
@@ -583,7 +614,10 @@
 				title="Voting"
 			>
 				{#if own}
-					<p class="text-body-sm text-ink-mid">Set by you for this proposal.</p>
+					<p class="text-body-sm text-ink-mid">
+						The DAO's rule for decisions, which you may change for this proposal; if you do, the
+						proposal says so.
+					</p>
 					<RuleSettings
 						bind:settings={newRoutine}
 						prefix="newRoutine"

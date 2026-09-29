@@ -108,9 +108,10 @@
 
 <h2 id="voting-rules">05 Voting Rules</h2>
 <p>
-	The voting rules apply to every change to the DAO: members and shares, name, description and
-	picture, the rules themselves, visibility and dissolving. Decisions and choices use a rule their
-	proposer sets.
+	Two rules. The first applies to every change to the DAO: members and shares, name, description and
+	picture, the rules themselves, visibility and dissolving. The second is where a decision's or a
+	choice's proposer starts from; they may set another for their proposal, and the proposal then
+	carries a <Ui>Custom rule</Ui> tag.
 </p>
 <p>
 	<Ui>Preset</Ui> starts on <Ui>Two thirds of the vote</Ui>: open ballot, votes final once cast,

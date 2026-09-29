@@ -29,6 +29,7 @@
 		part = 'passing',
 		collapsed = false,
 		bare = false,
+		whose: given,
 		extra,
 		ballot
 	}: {
@@ -36,6 +37,8 @@
 		prefix: string;
 		eligible?: number;
 		equal?: boolean;
+		/** What screen readers hear before each control; by default, taken from the prefix. */
+		whose?: string;
 		/**
 		 * `passing`: what it takes and for how long (and the form's fields, all of them);
 		 * `ballot`: how members vote, secret or not, changeable or not. Both bind the same settings.
@@ -55,7 +58,7 @@
 	} = $props();
 
 	// What screen readers hear before each control: whose rule this is.
-	const whose = $derived(/ensitive$/.test(prefix) ? 'Voting rules' : 'This proposal');
+	const whose = $derived(given ?? (/ensitive$/.test(prefix) ? 'Voting rules' : 'This proposal'));
 	const arithmetic = (r: Rule) => ({ ...r, early: true, changeable: false });
 	const rule = $derived(settings.rule);
 	// The preset the dials stand at, or custom; a dial moved by hand changes it accordingly.

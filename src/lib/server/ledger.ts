@@ -44,7 +44,7 @@ export type Effect =
 	| { kind: 'shares'; changes: { party: string; share: number }[] }
 	| { kind: 'info'; name: string; description: string; image: string | null }
 	| { kind: 'dissolve' }
-	| { kind: 'settings'; routine: Settings; sensitive: Settings }
+	| { kind: 'settings'; routine: Settings | null; sensitive: Settings }
 	| { kind: 'visibility'; public: boolean };
 
 export type Account = { contractId: string; party: string };
@@ -354,9 +354,16 @@ const effect = (v: unknown): Effect => {
 		case 'SetPublic':
 			return { kind: 'visibility', public: (t.value as { public?: unknown }).public === true };
 		case 'SetRules':
+			// Before 1.0.4 a rules proposal set the rule for changes alone.
 			return {
 				kind: 'settings',
-				routine: settings(t.value.rules),
+				routine: null,
+				sensitive: settings(t.value.rules)
+			};
+		case 'SetSettings':
+			return {
+				kind: 'settings',
+				routine: settings(t.value.decisions),
 				sensitive: settings(t.value.rules)
 			};
 		default:

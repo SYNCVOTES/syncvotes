@@ -42,7 +42,8 @@ template DAO
     equal : Bool
     -- The voting rules for anything that changes the DAO; changed only under themselves.
     rules : Settings
-    -- Where a proposer's form for a decision or a choice starts from; the proposer sets their own.
+    -- The DAO's rule for a decision or a choice, where its proposer's form starts from; the
+    -- proposer may set another for their proposal, and the proposal says so.
     decisions : Settings
     createdAt : Time
     members : Int
@@ -100,6 +101,7 @@ template DAO
           SetInfo daoName description image -> once >> Some <$> create this with name = daoName; description; image
           SetRules rules -> once >> Some <$> create this with rules
           SetPublic public -> once >> Some <$> create this with public
+          SetSettings rules decisions -> once >> Some <$> create this with rules; decisions
           Dissolve -> once >> pure None
           SetShares changes -> do
             let from = p.executed
@@ -204,6 +206,9 @@ template Member
             assertMsg "Two to ten distinct options, eighty characters each at most" (validOptions options)
           SetRules rules ->
             assertMsg "The voting rules' numbers are out of range" (validSettings rules)
+          SetSettings rules decisions ->
+            assertMsg "The voting rules' numbers are out of range"
+              (validSettings rules && validSettings decisions)
           SetInfo newName newDescription newImage ->
             assertMsg "A name of one to 60 characters, a description of at most 10 000, an https picture"
               (validInfo newName newDescription newImage)

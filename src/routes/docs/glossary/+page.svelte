@@ -1,3 +1,7 @@
+<script lang="ts">
+	import Ui from '$lib/components/doc-ui.svelte';
+</script>
+
 <dl>
 	<dt>Abstain</dt>
 	<dd>
@@ -158,7 +162,10 @@
 	<dd>A question put to a DAO's members, with a rule, a deadline and an effect if it passes.</dd>
 
 	<dt>Proposer's rule</dt>
-	<dd>The rule the proposer sets for a decision or a choice.</dd>
+	<dd>
+		The rule a decision or a choice runs under: the DAO's rule for decisions, unless its proposer
+		set another, in which case the proposal says <Ui>Custom rule</Ui>.
+	</dd>
 
 	<dt>Provider party</dt>
 	<dd>The app's own party. It co-signs every contract, counts ballots and executes what passed.</dd>

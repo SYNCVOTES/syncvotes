@@ -76,7 +76,8 @@
 	</li>
 	<li><Ui>Name and description</Ui>: the current name, description and picture to edit.</li>
 	<li>
-		<Ui>Voting rules</Ui>: <Ui>Ballot</Ui> and <Ui>How it passes</Ui> for changes from then on.
+		<Ui>Voting rules</Ui>: <Ui>Ballot</Ui> and <Ui>How it passes</Ui> from then on, for changes to the
+		DAO and for decisions and choices.
 	</li>
 </ul>
 <p>A Decision, a Visibility proposal and a Dissolve proposal need nothing more.</p>

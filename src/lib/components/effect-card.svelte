@@ -19,7 +19,7 @@
 		| { kind: 'info'; name: string; description: string; image: string | null }
 		| { kind: 'dissolve' }
 		| { kind: 'visibility'; public: boolean }
-		| { kind: 'settings'; routine: Settings; sensitive: Settings };
+		| { kind: 'settings'; routine: Settings | null; sensitive: Settings };
 	let {
 		effect,
 		executed,
@@ -148,7 +148,7 @@
 		</p>
 	{:else if effect.kind === 'settings'}
 		<p class="text-body-sm text-ink-mid">From then on:</p>
-		<SettingsSummary sensitive={effect.sensitive} />
+		<SettingsSummary sensitive={effect.sensitive} routine={effect.routine} />
 	{:else}
 		<p class="text-body-sm text-ink-mid">Records a decision only.</p>
 	{/if}

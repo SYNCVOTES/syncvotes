@@ -14,8 +14,9 @@
 
 <p>
 	A proposal says what it does, and the ledger does exactly that if it passes. There are seven
-	types. Two are <Ui>Decisions and choices</Ui>, which run under a rule their proposer sets. The
-	other five are <Ui>Changes to the DAO</Ui>, which run under the DAO's voting rules.
+	types. Two are <Ui>Decisions and choices</Ui>, which run under the DAO's rule for decisions or one
+	their proposer set instead. The other five are <Ui>Changes to the DAO</Ui>, which run under the
+	DAO's voting rules.
 </p>
 <Shot
 	light={typeLight}

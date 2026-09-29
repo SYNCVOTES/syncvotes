@@ -862,8 +862,11 @@ export const createProposalForm = form(schemas.createProposalForm, async (f) => 
 			break;
 		case 'settings':
 			action = {
-				tag: 'SetRules',
-				value: { rules: settingsToLedger(settingsOf(f, 'newSensitive')) }
+				tag: 'SetSettings',
+				value: {
+					rules: settingsToLedger(settingsOf(f, 'newSensitive')),
+					decisions: settingsToLedger(settingsOf(f, 'newRoutine'))
+				}
 			};
 			break;
 		case 'shares': {

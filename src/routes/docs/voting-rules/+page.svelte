@@ -34,8 +34,9 @@
 </table>
 <p>
 	A decision or a choice changes nothing on the ledger beyond its own record, so its proposer may
-	choose how it passes. A change to the DAO always runs under the DAO's voting rules. A proposer
-	cannot make one easier to pass.
+	choose how it passes: their form starts from the DAO's rule for decisions, and a proposal whose
+	rule differs from it says <Ui>Custom rule</Ui> on its page and in the list. A change to the DAO always
+	runs under the DAO's voting rules. A proposer cannot make one easier to pass.
 </p>
 
 <h2 id="the-settings">The Settings</h2>

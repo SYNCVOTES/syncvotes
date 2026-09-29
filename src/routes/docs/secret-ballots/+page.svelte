@@ -10,8 +10,8 @@
 
 <p>
 	A <Ui kind="term">secret ballot</Ui> hides who voted how from the other members. It is part of a proposal's
-	rule: the DAO's voting rules set it for changes to the DAO, and a proposer sets it for a decision or
-	a choice.
+	rule: the DAO's voting rules set it for changes to the DAO, and for a decision or a choice the proposer
+	starts from the DAO's rule for decisions and may change it.
 </p>
 
 <h2 id="what-members-see">What Members See</h2>

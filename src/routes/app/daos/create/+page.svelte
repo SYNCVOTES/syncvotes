@@ -24,7 +24,6 @@
 		CATEGORIES,
 		DEFAULTS,
 		copySettings,
-		settingsFields,
 		settingsOf,
 		settingsToLedger,
 		validRule,
@@ -109,14 +108,13 @@
 	const purse = $derived(store.who ? remote.myPurse(store.who.party) : null);
 	const covers = CATEGORIES.find((c) => c.value === 'sensitive')!.covers;
 	let image = $state('');
-	// The rule everything that changes the DAO passes by, starting from the founding default. A
-	// decision or a choice runs under a rule its proposer sets, so the DAO's routine settings go
-	// along unchanged, as the founding default a proposer's form starts from.
-	const routine = copySettings(DEFAULTS.routine);
+	// The rule everything that changes the DAO passes by, and the one a decision's or a choice's
+	// proposer starts from, both from the founding defaults.
+	let routine = $state<Settings>(copySettings(DEFAULTS.routine));
 	let sensitive = $state<Settings>(copySettings(DEFAULTS.sensitive));
-	/** "2/3 of the whole vote · 14 days": the rule in a line, for the summary. */
-	const ruleLine = $derived.by(() => {
-		const r = sensitive.rule;
+	/** "2/3 of the whole vote · 14 days": a rule in a line, for the summary. */
+	const line = (s: Settings) => {
+		const r = s.rule;
 		const t = r.threshold;
 		const amount =
 			t.kind === 'majority'
@@ -124,8 +122,8 @@
 				: t.kind === 'percent'
 					? `${t.percent}%`
 					: `${t.num}/${t.den}`;
-		return `${amount} ${r.basis === 'all' ? 'of the whole vote' : 'of votes cast'}${r.quorum ? ` · ${r.quorum}% quorum` : ''} · ${sensitive.votingDays} ${sensitive.votingDays === 1 ? 'day' : 'days'}`;
-	});
+		return `${amount} ${r.basis === 'all' ? 'of the whole vote' : 'of votes cast'}${r.quorum ? ` · ${r.quorum}% quorum` : ''} · ${s.votingDays} ${s.votingDays === 1 ? 'day' : 'days'}`;
+	};
 
 	// The intent is the founding table as the ledger reads it: the first batch of rows, and the
 	// rest as a proposal already passed. The server orders the creator first; so does this.
@@ -285,13 +283,10 @@
 				</FormSection>
 
 				<FormSection variant="plain" number="05" title="Voting rules" hint={covers}>
+					<h3 class="eyebrow">Changes to the DAO</h3>
 					<p class="text-body-sm leading-relaxed text-ink-mid">
-						Apply to changes to the DAO itself. Decisions and choices use a rule their proposer
-						sets.
+						Members and shares, name and description, these rules, visibility, dissolution.
 					</p>
-					{#each settingsFields('routine', routine) as [name, value] (name)}
-						<input type="hidden" {name} {value} />
-					{/each}
 					<RuleSettings
 						bind:settings={sensitive}
 						prefix="sensitive"
@@ -303,6 +298,31 @@
 							<RuleSettings
 								bind:settings={sensitive}
 								prefix="sensitive"
+								part="ballot"
+								bare
+								eligible={summary.units}
+								equal={mode === 'equal'}
+							/>
+						{/snippet}
+					</RuleSettings>
+					<h3 class="eyebrow">Decisions and choices</h3>
+					<p class="text-body-sm leading-relaxed text-ink-mid">
+						The rule a proposer starts from. They may set another for their proposal, which then
+						says so.
+					</p>
+					<RuleSettings
+						bind:settings={routine}
+						prefix="routine"
+						whose="Decisions"
+						eligible={summary.units}
+						equal={mode === 'equal'}
+						collapsed
+					>
+						{#snippet ballot()}
+							<RuleSettings
+								bind:settings={routine}
+								prefix="routine"
+								whose="Decisions"
 								part="ballot"
 								bare
 								eligible={summary.units}
@@ -354,7 +374,8 @@
 								: 'Private'}
 						</li>
 						<li>{payer === 'dao' ? 'The DAO pays' : 'Each member pays'}</li>
-						<li>Changes pass: {ruleLine}</li>
+						<li>Changes pass: {line(sensitive)}</li>
+						<li>Decisions pass: {line(routine)}</li>
 						<li>
 							{fmt(summary.members)} founding {summary.members === 1
 								? 'member'

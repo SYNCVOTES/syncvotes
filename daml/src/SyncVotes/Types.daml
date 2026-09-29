@@ -32,6 +32,11 @@ data Effect
   | SetPublic with
       public : Bool
   | Dissolve
+  -- Both rules at once: for changes to the DAO, and the default a decision's or a choice's
+  -- proposer starts from. Supersedes SetRules, which set the first alone.
+  | SetSettings with
+      rules : Settings
+      decisions : Settings
   deriving (Eq, Show)
 
 -- | Yes is measured against the whole vote, or against the votes cast (yes and no; an
