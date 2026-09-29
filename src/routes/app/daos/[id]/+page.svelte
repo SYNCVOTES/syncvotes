@@ -274,6 +274,7 @@
 													: `${pct(castOf(p), p.eligible)}% voted`}</span
 										>
 										<span>· by {hintOf(p.proposer)}</span>
+										{#if p.customRule}<span class="text-amber">· custom rule</span>{/if}
 									</div>
 								</div>
 								{#if due}

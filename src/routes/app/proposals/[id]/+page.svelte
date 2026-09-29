@@ -11,6 +11,8 @@
 	import Avatar from '$lib/components/avatar.svelte';
 	import Note from '$lib/components/note.svelte';
 	import Hint from '$lib/components/hint.svelte';
+	import Tag from '$lib/components/tag.svelte';
+	import { short } from '$lib/rules';
 	import Tally from '$lib/components/tally.svelte';
 	import ChoiceTally from '$lib/components/choice-tally.svelte';
 	import EffectCard from '$lib/components/effect-card.svelte';
@@ -99,6 +101,14 @@
 			{#snippet above()}
 				<div class="mb-3 flex items-center gap-3">
 					<StatusBadge outcome={p.outcome} closesAt={p.closesAt} executedAt={p.executedAt} />
+					{#if p.customRule}
+						<Tag tone="warn" class="overflow-visible pr-1.5"
+							>Custom rule · {short(p.rule)}
+							<Hint
+								text="The proposer set this rule instead of the DAO's default for decisions. The result is measured against it, so read it before reading the outcome."
+							/></Tag
+						>
+					{/if}
 					{#if !p.outcome}
 						<span class="font-mono text-xs text-ink-dim"
 							>{ended ? `closed ${relative(p.closesAt)}` : `closes ${relative(p.closesAt)}`}</span

@@ -293,8 +293,11 @@ export async function lockWithPasskey(s: Signer, party: string): Promise<string>
 		publicKey: {
 			challenge: crypto.getRandomValues(new Uint8Array(32)),
 			rp: { name: 'SyncVotes' },
+			// A user id of this credential's own: an authenticator replaces a passkey made with the
+			// same rp and user id, so one derived from the party would let a second device's
+			// passkey (or a synced keychain) silently retire the first device's.
 			user: {
-				id: new Uint8Array(s.publicKey.subarray(0, 16)),
+				id: crypto.getRandomValues(new Uint8Array(16)),
 				name: label(party),
 				displayName: label(party)
 			},

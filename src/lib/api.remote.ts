@@ -14,7 +14,7 @@ import { normaliseHint, hintProblem } from './hint';
 import * as schemas from './schemas';
 import * as markers from './server/markers';
 import type * as splice from './server/splice';
-import { categoryOf, settingsOf, settingsToLedger } from './rules';
+import { categoryOf, sameRule, settingsOf, settingsToLedger } from './rules';
 
 /**
  * The server's API as remote functions: pages call these like local functions and SvelteKit
@@ -490,7 +490,10 @@ export const daoProposals = query.live(
 					(!needle || p.title.toLowerCase().includes(needle) || matches(q)(p.proposer))
 			);
 			const shown = page(all, offset, limit);
-			return { ...shown, items: shown.items.map((p) => ({ ...p, ...tallyOf(p) })) };
+			return {
+				...shown,
+				items: shown.items.map((p) => ({ ...p, ...tallyOf(p), customRule: customRule(p) }))
+			};
 		})
 );
 
@@ -570,6 +573,16 @@ const summed = (p: ledger.Proposal) => {
 	return sum;
 };
 
+/**
+ * A decision or a choice whose proposer set a rule other than the DAO's default for them: the
+ * pages say so, since a rule can be picked to suit a result.
+ */
+const customRule = (p: ledger.Proposal) => {
+	const dao = ledger.daos.get(p.daoId);
+	const decision = p.effect.kind === 'signal' || p.effect.kind === 'choose';
+	return decision && !!dao && !sameRule(p.rule, dao.routine.rule);
+};
+
 /** A secret ballot still open: its totals and turnout are not shown. */
 const sealed = (p: ledger.Proposal) => p.secret && !p.outcome;
 
@@ -633,6 +646,7 @@ export const proposal = query.live(v.object({ id: contractId, ...asMe }), ({ id,
 			daoName: dao?.name ?? null,
 			daoEqual: dao?.equal ?? false,
 			daoActorPays: dao?.actorPays ?? false,
+			customRule: customRule(p),
 			members: ledger.members.get(p.daoId)?.size ?? 0,
 			cast: shown.sealed ? 0 : (ledger.ballots.get(id)?.size ?? 0),
 			comments: ledger.comments.get(id)?.size ?? 0,

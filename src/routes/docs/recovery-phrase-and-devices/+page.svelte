@@ -73,7 +73,8 @@
 </ul>
 <p>
 	Either way the phrase stays the real backup. A passkey or password only opens the copy on the
-	device where you set it.
+	device where you set it. Each device keeps a passkey of its own, so restoring the same party on a
+	second device does not disturb the first one's.
 </p>
 
 <h2 id="locking">Locking</h2>

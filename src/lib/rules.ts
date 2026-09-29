@@ -119,6 +119,15 @@ export function describe(r: Rule): string {
 	return `${amount} ${of} say yes${quorum}`;
 }
 
+/** Whether two rules say the same thing. */
+export const sameRule = (a: Rule, b: Rule) =>
+	a.basis === b.basis &&
+	a.quorum === b.quorum &&
+	a.early === b.early &&
+	a.changeable === b.changeable &&
+	!!a.secret === !!b.secret &&
+	JSON.stringify(a.threshold) === JSON.stringify(b.threshold);
+
 /** "majority of all", "≥67% of cast · quorum 25%" — the rule in a few characters, for lists. */
 export function short(r: Rule): string {
 	const t = r.threshold;
