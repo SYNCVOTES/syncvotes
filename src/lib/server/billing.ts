@@ -50,6 +50,25 @@ const bytesPerRound = () => {
 	while (recent.length && recent[0].at < since) recent.shift();
 	return recent.reduce((s, r) => s + r.bytes, 0) / 6;
 };
+/**
+ * The synchronizer gives every validator a free allowance of traffic, 200 KB per twenty-minute
+ * window, spent before any bought traffic. The app's own writes wait for a quiet window: what
+ * went out in the last twenty minutes, by this process's count, has to leave room for one.
+ */
+const WINDOW = 20 * 60_000;
+const WINDOW_BYTES = 200_000;
+const WRITE_BYTES = 3_000;
+const windowHasRoom = () => {
+	const since = Date.now() - WINDOW;
+	return (
+		recent.filter((r) => r.at >= since).reduce((s, r) => s + r.bytes, 0) + WRITE_BYTES <
+		WINDOW_BYTES * 0.75
+	);
+};
+/** A charge below this waits for the scheduled write; a write is a transaction of its own. */
+const WRITE_THRESHOLD = 5;
+/** The charges that have waited long enough are written regardless of the window. */
+const WRITE_URGENT = 50;
 
 /**
  * What a byte is charged at, as a fraction of what it costs: what does not come back as rewards
@@ -201,8 +220,8 @@ export async function charge(a: Account, bytes: number, marked = false): Promise
 	pending.set(a, (pending.get(a) ?? 0) + coin);
 	dirty.add(a);
 	notify(a);
-	// Charges reach the ledger once they add up to something, or with the hourly write.
-	if ((pending.get(a) ?? 0) > 0.5) void flush();
+	// Charges reach the ledger once they add up to something, or with the scheduled write.
+	if ((pending.get(a) ?? 0) > WRITE_THRESHOLD) void flush();
 }
 
 const notify = (a: Account) => {
@@ -285,6 +304,9 @@ export async function flush(): Promise<void> {
 				pending.delete(a);
 				continue;
 			}
+			// Not urgent and the free traffic window is busy with users' transactions: next time.
+			if (coin < WRITE_URGENT && !windowHasRoom()) continue;
+			recent.push({ at: Date.now(), bytes: WRITE_BYTES });
 			const f = figures(a);
 			// An account not on the ledger yet holds what arrived for it so far; the contract that
 			// is written for it starts from that, not from nothing.
@@ -467,7 +489,7 @@ export function start(): void {
 	setInterval(() => void preapprove(), 24 * 3600 * 1000);
 	void watchDeposits();
 	setInterval(() => void watchDeposits(), 20_000);
-	setInterval(() => void flush(), 60 * 60_000);
+	setInterval(() => void flush(), 6 * 60 * 60_000);
 	// The provider's rewards go to the wallet that buys the traffic, hourly.
 	const sweep = () =>
 		deposits
