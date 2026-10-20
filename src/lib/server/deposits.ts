@@ -122,6 +122,8 @@ export async function acceptIncoming(): Promise<number> {
 
 /** What the provider keeps of its own coin: enough for its fees and a pre-approval. */
 const PROVIDER_FLOAT = 20;
+/** The least moved at once: a transfer is a transaction of its own, so rewards pile up first. */
+const SWEEP_MIN = 2000;
 
 /**
  * The provider's coin beyond its float, moved to the payee: its app rewards arrive at the
@@ -142,7 +144,7 @@ export async function sweepToPayee(): Promise<number> {
 		0
 	);
 	const amount = Math.floor((held - PROVIDER_FLOAT) * 100) / 100;
-	if (amount < 5) return 0;
+	if (amount < SWEEP_MIN) return 0;
 	const token = (await sdk()).token;
 	const [command, disclosed] = await token.transfer.create({
 		sender: providerParty(),
