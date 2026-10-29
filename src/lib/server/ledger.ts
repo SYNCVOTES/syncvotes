@@ -1,5 +1,11 @@
 import { Templates } from '$lib/templates';
-import { providerParty, sdk, streamActiveContracts, type Created } from './participant';
+import {
+	providerParty,
+	sdk,
+	streamActiveContracts,
+	streamUpdates,
+	type Created
+} from './participant';
 import type { Rule, Settings } from '$lib/rules';
 
 /**
@@ -587,13 +593,7 @@ let appliedAt: number | undefined;
 
 async function followUpdates(from: number): Promise<void> {
 	appliedAt = from;
-	const ledger = await sdk();
-	for await (const update of ledger.events.updates({
-		partyId: providerParty(),
-		templateIds: TEMPLATES,
-		beginOffset: from,
-		verbose: false
-	})) {
+	for await (const update of streamUpdates(providerParty(), TEMPLATES, from)) {
 		const tx = (update as Update).update?.Transaction?.value;
 		if (!tx) continue;
 		for (const e of tx.events ?? []) {
