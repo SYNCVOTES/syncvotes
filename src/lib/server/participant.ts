@@ -75,42 +75,67 @@ async function create() {
 	const full = await events.extend({
 		token: { auth: auth(), registries: [scanUrl()], registryAuth: 'none' }
 	});
-	offFlats(full);
+	offDeprecated(full);
 	return full;
 }
 
 /**
- * The token standard's holdings listing (what the deposit scan reads) posts to
- * `/v2/updates/flats`, which Canton 3.6 disables and 3.7 removes; its body is already the
- * `updateFormat` that `/v2/updates` takes, and the answer has the same shape. Until the SDK
- * moves, its ledger provider is pointed there. Found by shape, not by type: if the SDK
- * changes its insides, this does nothing and the scan fails loudly with the participant's own
- * error.
+ * Requests in the Canton 3.4 forms that Canton 3.6 disables and 3.7 removes, rewritten into
+ * the current ones, for the token standard's parts of the SDK that still send them:
+ * - the holdings listing (what the deposit scan reads) posts to `/v2/updates/flats`; its body
+ *   is already the `updateFormat` that `/v2/updates` takes, and the answer has the same shape;
+ * - the holdings lookup behind a transfer sends `filter`/`verbose` at the top of an
+ *   active-contracts or updates request, which now go inside an `eventFormat`.
+ * Until the SDK moves, its ledger provider is wrapped. Found by shape, not by type: if the SDK
+ * changes its insides, nothing is wrapped and the participant's own error says what failed.
  */
-function offFlats(full: unknown) {
-	type Request = { method: string; params?: { resource?: string } };
+type LedgerRequest = {
+	method: string;
+	params?: { resource?: string; body?: Record<string, unknown> } & Record<string, unknown>;
+};
+
+export function current(r: LedgerRequest): LedgerRequest {
+	const params = r.params;
+	if (!params) return r;
+	let resource = params.resource;
+	let body = params.body;
+	if (resource === '/v2/updates/flats') resource = '/v2/updates';
+	if (body && 'filter' in body && !('eventFormat' in body) && !('updateFormat' in body)) {
+		const { filter, verbose, ...rest } = body;
+		const eventFormat = { ...(filter as object), verbose: verbose === true };
+		body =
+			resource === '/v2/updates'
+				? {
+						...rest,
+						updateFormat: {
+							includeTransactions: { eventFormat, transactionShape: 'TRANSACTION_SHAPE_ACS_DELTA' }
+						}
+					}
+				: { ...rest, eventFormat };
+	}
+	return resource === params.resource && body === params.body
+		? r
+		: { ...r, params: { ...params, resource, body } };
+}
+
+function offDeprecated(full: unknown) {
 	const provider = (
 		full as {
 			token?: {
 				tokenContext?: {
 					tokenStandardService?: {
-						ledgerProvider?: { request: (r: Request) => Promise<unknown> };
+						ledgerProvider?: { request: (r: LedgerRequest) => Promise<unknown> };
 					};
 				};
 			};
 		}
 	).token?.tokenContext?.tokenStandardService?.ledgerProvider;
 	if (!provider || typeof provider.request !== 'function') {
-		console.warn('SDK: no token-standard ledger provider found; holdings read /v2/updates/flats');
+		console.warn('SDK: no token-standard ledger provider found; its requests go out as they are');
 		return;
 	}
 	const request = provider.request.bind(provider);
-	provider.request = (r: Request) =>
-		request(
-			r.params?.resource === '/v2/updates/flats'
-				? { ...r, params: { ...r.params, resource: '/v2/updates' } }
-				: r
-		);
+	provider.request = (r: LedgerRequest) => request(current(r));
 }
 
 type Sdk = Awaited<ReturnType<typeof create>>;
