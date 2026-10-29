@@ -124,8 +124,35 @@ export type Created = {
 };
 
 /**
+ * A failure the ledger API reports inside a websocket stream: a Canton error (`code`, `cause`)
+ * in place of an entry, after which the socket closes normally (1000).
+ */
+function streamError(entry: {
+	error?: unknown;
+	code?: unknown;
+	cause?: unknown;
+}): Error | undefined {
+	if (entry.error) return new Error(JSON.stringify(entry.error).slice(0, 300));
+	if (typeof entry.code === 'string')
+		return new Error(`${entry.code}: ${String(entry.cause)}`.slice(0, 300));
+}
+
+/** The filter for these templates as `party` sees them, in the ledger API's `eventFormat`. */
+const filtersFor = (party: string, templateIds: string[], includeBlob: boolean) => ({
+	[party]: {
+		cumulative: templateIds.map((templateId) => ({
+			identifierFilter: {
+				TemplateFilter: { value: { templateId, includeCreatedEventBlob: includeBlob } }
+			}
+		}))
+	}
+});
+
+/**
  * Every active contract of these templates as `party` sees them at `offset`. The JSON API's
- * list endpoint stops at a couple of hundred contracts; its websocket streams them all.
+ * list endpoint stops at a couple of hundred contracts; its websocket streams them all. The
+ * filter goes in `eventFormat`: Canton 3.6 disables, and 3.7 removes, the `filter`/`verbose`
+ * request fields.
  */
 export async function streamActiveContracts(
 	party: string,
@@ -136,33 +163,26 @@ export async function streamActiveContracts(
 ): Promise<void> {
 	const jwt = await token();
 	const url = ledgerUrl().replace(/^http/, 'ws') + '/v2/state/active-contracts';
-	const filtersByParty = {
-		[party]: {
-			cumulative: templateIds.map((templateId) => ({
-				identifierFilter: {
-					TemplateFilter: { value: { templateId, includeCreatedEventBlob: includeBlob } }
-				}
-			}))
-		}
-	};
+	const filtersByParty = filtersFor(party, templateIds, includeBlob);
 
 	await new Promise<void>((resolve, reject) => {
 		const ws = new WebSocket(url, [`jwt.token.${jwt}`, 'daml.ws.auth']);
 		let failed: Error | undefined;
 		ws.onopen = () =>
 			ws.send(
-				JSON.stringify({ filter: { filtersByParty }, verbose: false, activeAtOffset: offset })
+				JSON.stringify({ eventFormat: { filtersByParty, verbose: false }, activeAtOffset: offset })
 			);
 		ws.onmessage = (m) => {
 			const entry = JSON.parse(String(m.data)) as {
 				contractEntry?: { JsActiveContract?: { createdEvent?: Created } };
 				error?: unknown;
+				code?: unknown;
 			};
 			const created = entry.contractEntry?.JsActiveContract?.createdEvent;
 			if (created) onContract(created);
-			else if (entry.error) failed = new Error(JSON.stringify(entry.error).slice(0, 300));
+			else failed ??= streamError(entry);
 		};
-		ws.onerror = () => (failed = new Error('The active-contracts stream failed'));
+		ws.onerror = () => (failed ??= new Error('The active-contracts stream failed'));
 		ws.onclose = (e) =>
 			failed
 				? reject(failed)
@@ -170,6 +190,73 @@ export async function streamActiveContracts(
 					? resolve()
 					: reject(new Error(`The active-contracts stream closed: ${e.code} ${e.reason}`));
 	});
+}
+
+/**
+ * Every transaction touching these templates for `party` after `beginExclusive`, as it
+ * happens: the websocket `/v2/updates` with an `updateFormat` (the SDK's `events.updates`
+ * reads `/v2/updates/flats`, which Canton 3.6 disables and 3.7 removes). Ends when the socket
+ * closes; the caller resumes from the last offset it applied.
+ */
+export async function* streamUpdates(
+	party: string,
+	templateIds: string[],
+	beginExclusive: number
+): AsyncGenerator<unknown> {
+	const jwt = await token();
+	const url = ledgerUrl().replace(/^http/, 'ws') + '/v2/updates';
+	const queue: unknown[] = [];
+	let failed: Error | undefined;
+	let closed = false;
+	let wake: (() => void) | undefined;
+	const ws = new WebSocket(url, [`jwt.token.${jwt}`, 'daml.ws.auth']);
+	ws.onopen = () =>
+		ws.send(
+			JSON.stringify({
+				beginExclusive,
+				updateFormat: {
+					includeTransactions: {
+						eventFormat: { filtersByParty: filtersFor(party, templateIds, false), verbose: false },
+						transactionShape: 'TRANSACTION_SHAPE_ACS_DELTA'
+					}
+				}
+			})
+		);
+	ws.onmessage = (m) => {
+		try {
+			const entry = JSON.parse(String(m.data));
+			const error = streamError(entry ?? {});
+			if (error) failed ??= error;
+			else queue.push(entry);
+		} catch (e) {
+			failed ??= e instanceof Error ? e : new Error(String(e));
+			ws.close();
+		}
+		wake?.();
+	};
+	ws.onerror = () => {
+		failed ??= new Error('The updates stream failed');
+		wake?.();
+	};
+	ws.onclose = (e) => {
+		if (e.code !== 1000) failed ??= new Error(`The updates stream closed: ${e.code} ${e.reason}`);
+		closed = true;
+		wake?.();
+	};
+	try {
+		for (;;) {
+			while (queue.length) yield queue.shift();
+			if (failed) throw failed;
+			if (closed) return;
+			await new Promise<void>((resolve) => {
+				wake = resolve;
+				if (queue.length || failed || closed) resolve();
+			});
+			wake = undefined;
+		}
+	} finally {
+		if (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN) ws.close();
+	}
 }
 
 /** What `party` holds of these templates right now. */
