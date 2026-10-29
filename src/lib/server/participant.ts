@@ -255,70 +255,133 @@ export async function streamActiveContracts(
 	});
 }
 
+/** When a token stops being accepted, in milliseconds since the epoch; null if it does not say. */
+function expiresAt(jwt: string): number | null {
+	try {
+		const exp = JSON.parse(Buffer.from(jwt.split('.')[1], 'base64url').toString()).exp;
+		return typeof exp === 'number' ? exp * 1000 : null;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * How long after its token expires a stream is reopened. The SDK hands out its cached token
+ * until that has expired, so a fresh one is only to be had from then on.
+ */
+const RENEW_AFTER_MS = 500;
+
 /**
  * Every transaction touching these templates for `party` after `beginExclusive`, as it
  * happens: the websocket `/v2/updates` with an `updateFormat` (the SDK's `events.updates`
- * reads `/v2/updates/flats`, which Canton 3.6 disables and 3.7 removes). Ends when the socket
- * closes; the caller resumes from the last offset it applied.
+ * reads `/v2/updates/flats`, which Canton 3.6 disables and 3.7 removes).
+ *
+ * The participant drops a stream some seconds after its access token expires, with
+ * ACCESS_TOKEN_EXPIRED. So the moment the token expires, or when that message comes first,
+ * the socket is closed and reopened with a fresh token, from the last offset handed to the
+ * caller: nothing is skipped or repeated, nothing waits, and nothing is logged. Ends when the
+ * socket closes for any other reason; the caller resumes from the last offset it applied.
  */
 export async function* streamUpdates(
 	party: string,
 	templateIds: string[],
 	beginExclusive: number
 ): AsyncGenerator<unknown> {
-	const jwt = await token();
 	const url = ledgerUrl().replace(/^http/, 'ws') + '/v2/updates';
-	const queue: unknown[] = [];
-	let failed: Error | undefined;
-	let closed = false;
-	let wake: (() => void) | undefined;
-	const ws = new WebSocket(url, [`jwt.token.${jwt}`, 'daml.ws.auth']);
-	ws.onopen = () =>
-		ws.send(
-			JSON.stringify({
-				beginExclusive,
-				updateFormat: {
-					includeTransactions: {
-						eventFormat: { filtersByParty: filtersFor(party, templateIds, false), verbose: false },
-						transactionShape: 'TRANSACTION_SHAPE_ACS_DELTA'
+	let from = beginExclusive;
+	let renewedAt = 0;
+	for (;;) {
+		// Renewals back to back mean the token came back no fresher: wait a moment.
+		if (Date.now() - renewedAt < 2_000) await new Promise((r) => setTimeout(r, 1_000));
+		const jwt = await token();
+		const queue: unknown[] = [];
+		let failed: Error | undefined;
+		let closed = false;
+		let renewing = false;
+		let wake: (() => void) | undefined;
+		const ws = new WebSocket(url, [`jwt.token.${jwt}`, 'daml.ws.auth']);
+		const expiry = expiresAt(jwt);
+		const renew =
+			expiry === null
+				? undefined
+				: setTimeout(
+						() => {
+							renewing = true;
+							ws.close(1000, 'token renewal');
+						},
+						Math.max(1_000, expiry - Date.now() + RENEW_AFTER_MS)
+					);
+		ws.onopen = () =>
+			ws.send(
+				JSON.stringify({
+					beginExclusive: from,
+					updateFormat: {
+						includeTransactions: {
+							eventFormat: {
+								filtersByParty: filtersFor(party, templateIds, false),
+								verbose: false
+							},
+							transactionShape: 'TRANSACTION_SHAPE_ACS_DELTA'
+						}
 					}
-				}
-			})
-		);
-	ws.onmessage = (m) => {
+				})
+			);
+		ws.onmessage = (m) => {
+			if (renewing) return;
+			try {
+				const entry = JSON.parse(String(m.data));
+				const error = streamError(entry ?? {});
+				if (error && /ACCESS_TOKEN_EXPIRED/.test(error.message)) {
+					renewing = true;
+					ws.close(1000, 'token renewal');
+				} else if (error) failed ??= error;
+				else queue.push(entry);
+			} catch (e) {
+				failed ??= e instanceof Error ? e : new Error(String(e));
+				ws.close();
+			}
+			wake?.();
+		};
+		ws.onerror = () => {
+			if (!renewing) failed ??= new Error('The updates stream failed');
+			wake?.();
+		};
+		ws.onclose = (e) => {
+			if (e.code !== 1000 && !renewing)
+				failed ??= new Error(`The updates stream closed: ${e.code} ${e.reason}`);
+			closed = true;
+			wake?.();
+		};
 		try {
-			const entry = JSON.parse(String(m.data));
-			const error = streamError(entry ?? {});
-			if (error) failed ??= error;
-			else queue.push(entry);
-		} catch (e) {
-			failed ??= e instanceof Error ? e : new Error(String(e));
-			ws.close();
+			for (;;) {
+				while (queue.length) {
+					const entry = queue.shift() as {
+						update?: {
+							Transaction?: { value?: { offset?: number } };
+							OffsetCheckpoint?: { value?: { offset?: number } };
+						};
+					};
+					const offset =
+						entry.update?.Transaction?.value?.offset ??
+						entry.update?.OffsetCheckpoint?.value?.offset;
+					yield entry;
+					// The caller asks for the next entry only once it has applied this one.
+					if (typeof offset === 'number' && offset > from) from = offset;
+				}
+				if (failed) throw failed;
+				if (closed) break;
+				await new Promise<void>((resolve) => {
+					wake = resolve;
+					if (queue.length || failed || closed) resolve();
+				});
+				wake = undefined;
+			}
+		} finally {
+			clearTimeout(renew);
+			if (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN) ws.close();
 		}
-		wake?.();
-	};
-	ws.onerror = () => {
-		failed ??= new Error('The updates stream failed');
-		wake?.();
-	};
-	ws.onclose = (e) => {
-		if (e.code !== 1000) failed ??= new Error(`The updates stream closed: ${e.code} ${e.reason}`);
-		closed = true;
-		wake?.();
-	};
-	try {
-		for (;;) {
-			while (queue.length) yield queue.shift();
-			if (failed) throw failed;
-			if (closed) return;
-			await new Promise<void>((resolve) => {
-				wake = resolve;
-				if (queue.length || failed || closed) resolve();
-			});
-			wake = undefined;
-		}
-	} finally {
-		if (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN) ws.close();
+		if (!renewing) return;
+		renewedAt = Date.now();
 	}
 }
 
