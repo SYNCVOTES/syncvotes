@@ -72,7 +72,45 @@ async function create() {
 		events: { websocketURL: url.replace(/^http/, 'ws'), auth: auth() }
 	});
 	// The token standard, against the network's public Scan: holdings and transfer commands.
-	return events.extend({ token: { auth: auth(), registries: [scanUrl()], registryAuth: 'none' } });
+	const full = await events.extend({
+		token: { auth: auth(), registries: [scanUrl()], registryAuth: 'none' }
+	});
+	offFlats(full);
+	return full;
+}
+
+/**
+ * The token standard's holdings listing (what the deposit scan reads) posts to
+ * `/v2/updates/flats`, which Canton 3.6 disables and 3.7 removes; its body is already the
+ * `updateFormat` that `/v2/updates` takes, and the answer has the same shape. Until the SDK
+ * moves, its ledger provider is pointed there. Found by shape, not by type: if the SDK
+ * changes its insides, this does nothing and the scan fails loudly with the participant's own
+ * error.
+ */
+function offFlats(full: unknown) {
+	type Request = { method: string; params?: { resource?: string } };
+	const provider = (
+		full as {
+			token?: {
+				tokenContext?: {
+					tokenStandardService?: {
+						ledgerProvider?: { request: (r: Request) => Promise<unknown> };
+					};
+				};
+			};
+		}
+	).token?.tokenContext?.tokenStandardService?.ledgerProvider;
+	if (!provider || typeof provider.request !== 'function') {
+		console.warn('SDK: no token-standard ledger provider found; holdings read /v2/updates/flats');
+		return;
+	}
+	const request = provider.request.bind(provider);
+	provider.request = (r: Request) =>
+		request(
+			r.params?.resource === '/v2/updates/flats'
+				? { ...r, params: { ...r.params, resource: '/v2/updates' } }
+				: r
+		);
 }
 
 type Sdk = Awaited<ReturnType<typeof create>>;
