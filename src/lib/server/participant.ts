@@ -308,6 +308,10 @@ export async function* streamUpdates(
 						() => {
 							renewing = true;
 							ws.close(1000, 'token renewal');
+							// The participant does not answer the close handshake, so the close event
+							// may never come: the old socket is left to it, and a new one opens now.
+							closed = true;
+							wake?.();
 						},
 						Math.max(1_000, expiry - Date.now() + RENEW_AFTER_MS)
 					);
@@ -333,6 +337,7 @@ export async function* streamUpdates(
 				const error = streamError(entry ?? {});
 				if (error && /ACCESS_TOKEN_EXPIRED/.test(error.message)) {
 					renewing = true;
+					closed = true;
 					ws.close(1000, 'token renewal');
 				} else if (error) failed ??= error;
 				else queue.push(entry);
