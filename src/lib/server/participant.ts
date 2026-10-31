@@ -272,6 +272,13 @@ function expiresAt(jwt: string): number | null {
 const RENEW_AFTER_MS = 500;
 
 /**
+ * How long a stream may stay silent before it is taken for dead and reopened. An idle stream
+ * still gets an offset checkpoint every thirty to fifty seconds (measured on DevNet and
+ * MainNet), so two minutes of nothing means the connection is gone without having closed.
+ */
+const SILENT_MS = 120_000;
+
+/**
  * Every transaction touching these templates for `party` after `beginExclusive`, as it
  * happens: the websocket `/v2/updates` with an `updateFormat` (the SDK's `events.updates`
  * reads `/v2/updates/flats`, which Canton 3.6 disables and 3.7 removes).
@@ -279,8 +286,9 @@ const RENEW_AFTER_MS = 500;
  * The participant drops a stream some seconds after its access token expires, with
  * ACCESS_TOKEN_EXPIRED. So the moment the token expires, or when that message comes first,
  * the socket is closed and reopened with a fresh token, from the last offset handed to the
- * caller: nothing is skipped or repeated, nothing waits, and nothing is logged. Ends when the
- * socket closes for any other reason; the caller resumes from the last offset it applied.
+ * caller: nothing is skipped or repeated, nothing waits, and nothing is logged. A stream that
+ * has received nothing for two minutes is reopened the same way. Ends when the socket closes
+ * for any other reason; the caller resumes from the last offset it applied.
  */
 export async function* streamUpdates(
 	party: string,
@@ -300,21 +308,25 @@ export async function* streamUpdates(
 		let renewing = false;
 		let wake: (() => void) | undefined;
 		const ws = new WebSocket(url, [`jwt.token.${jwt}`, 'daml.ws.auth']);
+		let heardAt = Date.now();
+		const reopen = () => {
+			renewing = true;
+			ws.close(1000, 'reopening');
+			// The participant does not answer the close handshake, so the close event may never
+			// come: the old socket is left to it, and a new one opens now.
+			closed = true;
+			wake?.();
+		};
+		const watchdog = setInterval(() => {
+			if (renewing || Date.now() - heardAt < SILENT_MS) return;
+			console.warn(`Ledger update stream silent for ${SILENT_MS / 1000} s; reopening`);
+			reopen();
+		}, 15_000);
 		const expiry = expiresAt(jwt);
 		const renew =
 			expiry === null
 				? undefined
-				: setTimeout(
-						() => {
-							renewing = true;
-							ws.close(1000, 'token renewal');
-							// The participant does not answer the close handshake, so the close event
-							// may never come: the old socket is left to it, and a new one opens now.
-							closed = true;
-							wake?.();
-						},
-						Math.max(1_000, expiry - Date.now() + RENEW_AFTER_MS)
-					);
+				: setTimeout(reopen, Math.max(1_000, expiry - Date.now() + RENEW_AFTER_MS));
 		ws.onopen = () =>
 			ws.send(
 				JSON.stringify({
@@ -332,14 +344,12 @@ export async function* streamUpdates(
 			);
 		ws.onmessage = (m) => {
 			if (renewing) return;
+			heardAt = Date.now();
 			try {
 				const entry = JSON.parse(String(m.data));
 				const error = streamError(entry ?? {});
-				if (error && /ACCESS_TOKEN_EXPIRED/.test(error.message)) {
-					renewing = true;
-					closed = true;
-					ws.close(1000, 'token renewal');
-				} else if (error) failed ??= error;
+				if (error && /ACCESS_TOKEN_EXPIRED/.test(error.message)) reopen();
+				else if (error) failed ??= error;
 				else queue.push(entry);
 			} catch (e) {
 				failed ??= e instanceof Error ? e : new Error(String(e));
@@ -383,6 +393,7 @@ export async function* streamUpdates(
 			}
 		} finally {
 			clearTimeout(renew);
+			clearInterval(watchdog);
 			if (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN) ws.close();
 		}
 		if (!renewing) return;
