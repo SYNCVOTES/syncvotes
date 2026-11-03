@@ -54,7 +54,8 @@ export const variables = defineEnvVars({
 		schema: v.optional(v.string(), 'daml_ledger_api')
 	},
 	SCAN_URL: {
-		description: "The network's public Scan: Canton Coin rules, rounds and prices, no token needed",
+		description:
+			"The network's public Scan: Canton Coin rules, rounds and prices, no token needed. Several SVs' Scans, comma-separated, are read in turn when one is down",
 		schema: required
 	},
 	BILLING_FACTOR: {
