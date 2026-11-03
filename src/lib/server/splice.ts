@@ -20,7 +20,9 @@ let preferred = 0;
 
 /**
  * A Scan read, from the Scans in turn starting with the one that answered last: one that is
- * down, hangs or answers 5xx is skipped; a 4xx is the request's fault and is not retried.
+ * down, hangs, answers 5xx or turns this host away (401, 403, 429) is skipped; any other 4xx
+ * is the request's fault and is not retried. Some SVs' Scans answer 403 to hosts they do not
+ * know (TestNet sync.global does), which is about that Scan, not the request.
  */
 async function scan<T>(path: string, body?: unknown): Promise<T> {
 	const urls = scanUrls();
@@ -45,7 +47,7 @@ async function scan<T>(path: string, body?: unknown): Promise<T> {
 			return r.json() as Promise<T>;
 		}
 		failure = new Error(`Scan ${path}: ${r.status} ${(await r.text()).slice(0, 200)}`);
-		if (r.status < 500) throw failure;
+		if (r.status < 500 && ![401, 403, 429].includes(r.status)) throw failure;
 	}
 	throw failure ?? new Error('SCAN_URL lists no Scan');
 }

@@ -51,7 +51,11 @@ export const scanUrls = () =>
 		.split(',')
 		.map((u) => u.trim().replace(/\/$/, ''))
 		.filter(Boolean);
-/** The first Scan: for the token standard's registry, which takes a single URL. */
+/**
+ * The first Scan: for the token standard's registry, which takes a single URL. The transfers
+ * the app makes (moving rewards to the payee, taking in pay-ins) depend on it alone, so the
+ * most reliable Scan goes first in `SCAN_URL`.
+ */
 export const scanUrl = () => scanUrls()[0];
 
 export const auth = () =>
