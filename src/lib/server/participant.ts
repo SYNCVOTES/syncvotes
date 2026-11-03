@@ -41,7 +41,22 @@ export const depositsSince = () => DEPOSITS_SINCE || '';
 /** Whose history holds deposits: the payee's, and the provider's, which was the payee before. */
 export const receivingParties = () => [...new Set([payeeParty(), providerParty()])];
 export const ledgerUrl = () => required('LEDGER_API_URL', LEDGER_API_URL);
-export const scanUrl = () => required('SCAN_URL', SCAN_URL).replace(/\/$/, '');
+/**
+ * The network's public Scans: `SCAN_URL` is one URL or several, comma-separated, of different
+ * SVs' Scans serving the same network. One SV's Scan being down (sv-1 sync.global answered 503
+ * on MainNet, 2026-11-03) must not stop every vote: reads go to the next one.
+ */
+export const scanUrls = () =>
+	required('SCAN_URL', SCAN_URL)
+		.split(',')
+		.map((u) => u.trim().replace(/\/$/, ''))
+		.filter(Boolean);
+/**
+ * The first Scan: for the token standard's registry, which takes a single URL. The transfers
+ * the app makes (moving rewards to the payee, taking in pay-ins) depend on it alone, so the
+ * most reliable Scan goes first in `SCAN_URL`.
+ */
+export const scanUrl = () => scanUrls()[0];
 
 export const auth = () =>
 	({

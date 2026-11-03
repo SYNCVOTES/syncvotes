@@ -1,4 +1,4 @@
-import { providerParty, scanUrl, type DisclosedContract } from './participant';
+import { providerParty, scanUrl, scanUrls, type DisclosedContract } from './participant';
 
 export { scanUrl };
 
@@ -15,16 +15,41 @@ type ScanContract = {
 	created_event_blob: string;
 };
 
+/** Which of the Scans answered last: asked first next time, so a dead one costs one miss. */
+let preferred = 0;
+
+/**
+ * A Scan read, from the Scans in turn starting with the one that answered last: one that is
+ * down, hangs, answers 5xx or turns this host away (401, 403, 429) is skipped; any other 4xx
+ * is the request's fault and is not retried. Some SVs' Scans answer 403 to hosts they do not
+ * know (TestNet sync.global does), which is about that Scan, not the request.
+ */
 async function scan<T>(path: string, body?: unknown): Promise<T> {
-	const r = await fetch(scanUrl() + path, {
-		// A Scan that hangs must not hang every prepare waiting on a price.
-		signal: AbortSignal.timeout(15_000),
-		method: body === undefined ? 'GET' : 'POST',
-		headers: { 'content-type': 'application/json' },
-		body: body === undefined ? undefined : JSON.stringify(body)
-	});
-	if (!r.ok) throw new Error(`Scan ${path}: ${r.status} ${(await r.text()).slice(0, 200)}`);
-	return r.json() as Promise<T>;
+	const urls = scanUrls();
+	let failure: Error | undefined;
+	for (let i = 0; i < urls.length; i++) {
+		const at = (preferred + i) % urls.length;
+		let r: Response;
+		try {
+			r = await fetch(urls[at] + path, {
+				// A Scan that hangs must not hang every prepare waiting on a price.
+				signal: AbortSignal.timeout(15_000),
+				method: body === undefined ? 'GET' : 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: body === undefined ? undefined : JSON.stringify(body)
+			});
+		} catch (e) {
+			failure = new Error(`Scan ${urls[at]}${path}: ${e instanceof Error ? e.message : e}`);
+			continue;
+		}
+		if (r.ok) {
+			preferred = at;
+			return r.json() as Promise<T>;
+		}
+		failure = new Error(`Scan ${path}: ${r.status} ${(await r.text()).slice(0, 200)}`);
+		if (r.status < 500 && ![401, 403, 429].includes(r.status)) throw failure;
+	}
+	throw failure ?? new Error('SCAN_URL lists no Scan');
 }
 
 const cached = <T>(ttl: number, load: () => Promise<T>) => {
