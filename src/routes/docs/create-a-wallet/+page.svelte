@@ -2,6 +2,7 @@
 	import Ui from '$lib/components/doc-ui.svelte';
 	import Shot from '$lib/components/doc-shot.svelte';
 	import DocNote from '$lib/components/doc-note.svelte';
+	import { INVITE_EMAIL, INVITE_MAILTO } from '$lib/site';
 	import welcomeLight from '$lib/assets/docs/wallet-welcome-light.webp';
 	import welcomeDark from '$lib/assets/docs/wallet-welcome-dark.webp';
 	import phraseLight from '$lib/assets/docs/wallet-phrase-light.webp';
@@ -84,10 +85,9 @@
 	<li>The line under the field shows the party ID you will get, before you commit to it.</li>
 </ul>
 <p>
-	While sign-up is by invitation, the screen also has <Ui>Invite code</Ui>; ask a member for one.
-	Select <Ui>Continue</Ui>. A wrong code is refused here, with <Ui kind="message"
-		>Invalid invite code.</Ui
-	>, before anything is paid.
+	While sign-up is by invitation, the screen also has <Ui>Invite code</Ui>; ask a member for one, or
+	write to <a href={INVITE_MAILTO}>{INVITE_EMAIL}</a>. Select <Ui>Continue</Ui>. A wrong code is
+	refused here, with <Ui kind="message">Invalid invite code.</Ui>, before anything is paid.
 </p>
 <Shot
 	light={hintLight}

@@ -15,6 +15,7 @@
 	import Skeleton from '$lib/components/skeleton.svelte';
 	import KeyValue from '$lib/components/key-value.svelte';
 	import Hint from '$lib/components/hint.svelte';
+	import InviteLink from '$lib/components/invite-link.svelte';
 	import Avatar from '$lib/components/avatar.svelte';
 	import Phrase from '$lib/components/phrase.svelte';
 	import WalletSources from '$lib/components/wallet-sources.svelte';
@@ -159,6 +160,13 @@
 						: 'Creating a party is free on this network.'}
 				</p>
 			{/await}
+			{#await setup then c}
+				{#if c.invitesRequired}
+					<p class="font-mono text-xs text-ink-dim">
+						Sign-up is by invitation. Need a code? Write to <InviteLink />.
+					</p>
+				{/if}
+			{/await}
 		</Panel>
 	{:else if screen.at === 'create'}
 		<Panel class="space-y-5">
@@ -275,15 +283,18 @@
 				</div>
 				{#await setup then c}
 					{#if c.invitesRequired}
-						<div class="flex items-center gap-2">
+						<div class="space-y-1">
 							<Input
 								placeholder="Invite code"
 								class="font-mono"
 								maxlength={80}
 								autocomplete="off"
+								aria-label="Invite code"
 								bind:value={inviteInput}
 							/>
-							<Hint text="Invite only. Ask a member for a code." align="end" />
+							<p class="font-mono text-xs text-ink-dim">
+								Invite only. Ask a member, or write to <InviteLink />.
+							</p>
 						</div>
 					{/if}
 				{/await}

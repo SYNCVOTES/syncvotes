@@ -15,6 +15,10 @@ export const NAV: NavItem[] = [
 export const GITHUB = 'https://github.com/SYNCVOTES/syncvotes';
 export const X = 'https://x.com/syncvotes';
 
+/** Where to ask for an invite code while sign-up is by invitation; the subject is filled in. */
+export const INVITE_EMAIL = 'invite@syncvotes.com';
+export const INVITE_MAILTO = `mailto:${INVITE_EMAIL}?subject=${encodeURIComponent('SyncVotes invite')}`;
+
 export const FOOTER_LINKS: FooterLink[] = [
 	{ href: '/docs', label: 'Docs' },
 	{ href: '/terms', label: 'Terms' },
