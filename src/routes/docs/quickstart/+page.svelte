@@ -2,6 +2,7 @@
 	import Ui from '$lib/components/doc-ui.svelte';
 	import Shot from '$lib/components/doc-shot.svelte';
 	import DocNote from '$lib/components/doc-note.svelte';
+	import { INVITE_EMAIL, INVITE_MAILTO } from '$lib/site';
 	import welcomeLight from '$lib/assets/docs/wallet-welcome-light.webp';
 	import welcomeDark from '$lib/assets/docs/wallet-welcome-dark.webp';
 	import hintLight from '$lib/assets/docs/wallet-hint-light.webp';
@@ -14,8 +15,8 @@
 
 <p>
 	This page takes you from nothing to a decided proposal on TestNet in about five minutes. You need
-	a browser, somewhere to write down 12 words, and an invite code from a member: sign-up is by
-	invitation for now.
+	a browser, somewhere to write down 12 words, and an invite code: sign-up is by invitation for now.
+	Ask a member for one, or write to <a href={INVITE_MAILTO}>{INVITE_EMAIL}</a>.
 </p>
 <DocNote>
 	<p>

@@ -17,6 +17,7 @@
 	import LandingTicker from '$lib/components/landing-ticker.svelte';
 	import LandingManifesto from '$lib/components/landing-manifesto.svelte';
 	import LandingFooter from '$lib/components/landing-footer.svelte';
+	import InviteLink from '$lib/components/invite-link.svelte';
 	import { reveal, body } from '$lib/components/landing-classes';
 
 	/**
@@ -114,6 +115,9 @@
 
 	const stats = remote.stats();
 	const counts = $derived(stats.error ? null : (stats.current ?? null));
+	// Where sign-up needs a code, the finale says where to ask for one.
+	const setup = remote.config();
+	const invites = $derived(setup.current?.invitesRequired ?? false);
 	// A live counter shows only once it has something to say: zeros read as "nobody uses this".
 	const live = $derived(
 		counts
@@ -421,8 +425,13 @@
 		>
 			<span class="size-1.5 animate-pulse-soft rounded-full bg-amber motion-reduce:animate-none"
 			></span>
-			Beta · Canton {NETWORK}
+			Beta · Canton {NETWORK}{#if invites}&nbsp;· Invite only{/if}
 		</p>
+		{#if invites}
+			<p class="mt-3.5 font-mono text-[13px] tracking-[0.06em] text-ink-dim">
+				Need an invite? Write to <InviteLink />
+			</p>
+		{/if}
 	</section>
 
 	<LandingFooter github={GITHUB} />
