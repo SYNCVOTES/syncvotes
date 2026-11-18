@@ -27,8 +27,10 @@ RUN dpm install "$(grep '^sdk-version:' daml/daml.yaml | cut -d' ' -f2)"
 # stage on the server and copies both back, since damlc is x86_64-only and Macs no longer run it.
 FROM builder AS dar
 COPY daml ./daml
+# Codegen runs inside daml/ too, so it takes the SDK daml.yaml pins: run from the root, dpm
+# uses the newest SDK it has (the installer above fetches the latest), whose bindings differ.
 RUN cd daml && rm -rf .daml/dist && dpm build \
-	&& cd .. && dpm codegen-js daml/.daml/dist/*.dar -o daml.js
+	&& dpm codegen-js .daml/dist/*.dar -o ../daml.js
 
 FROM dar AS app
 # Codegen writes workspace packages, so it has to happen before install.
