@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  '@daml/types': 3.7.0
+
 importers:
 
   .:
@@ -12,11 +15,11 @@ importers:
         specifier: ^1.5.0
         version: 1.5.0
       '@daml.js/model':
-        specifier: workspace:@daml.js/syncvotes-1.0.4@*
-        version: link:daml.js/syncvotes-1.0.4
+        specifier: workspace:@daml.js/syncvotes-1.0.5@*
+        version: link:daml.js/syncvotes-1.0.5
       '@daml/types':
-        specifier: 3.5.2
-        version: 3.5.2
+        specifier: 3.7.0
+        version: 3.7.0
       dompurify:
         specifier: ^3.4.15
         version: 3.4.15
@@ -132,102 +135,153 @@ importers:
 
   daml.js/daml-prim-DA-Exception-ArithmeticError-1.0.0:
     dependencies:
+      '@daml/types':
+        specifier: 3.7.0
+        version: 3.7.0
       '@mojotech/json-type-validation':
         specifier: ^3.1.0
         version: 3.1.0
 
   daml.js/daml-prim-DA-Exception-AssertionFailed-1.0.0:
     dependencies:
+      '@daml/types':
+        specifier: 3.7.0
+        version: 3.7.0
       '@mojotech/json-type-validation':
         specifier: ^3.1.0
         version: 3.1.0
 
   daml.js/daml-prim-DA-Exception-GeneralError-1.0.0:
     dependencies:
+      '@daml/types':
+        specifier: 3.7.0
+        version: 3.7.0
       '@mojotech/json-type-validation':
         specifier: ^3.1.0
         version: 3.1.0
 
   daml.js/daml-prim-DA-Exception-PreconditionFailed-1.0.0:
     dependencies:
+      '@daml/types':
+        specifier: 3.7.0
+        version: 3.7.0
       '@mojotech/json-type-validation':
         specifier: ^3.1.0
         version: 3.1.0
 
   daml.js/daml-prim-DA-Types-1.0.0:
     dependencies:
+      '@daml/types':
+        specifier: 3.7.0
+        version: 3.7.0
       '@mojotech/json-type-validation':
         specifier: ^3.1.0
         version: 3.1.0
 
   daml.js/daml-prim-GHC-Tuple-1.0.0:
     dependencies:
+      '@daml/types':
+        specifier: 3.7.0
+        version: 3.7.0
       '@mojotech/json-type-validation':
         specifier: ^3.1.0
         version: 3.1.0
 
   daml.js/daml-prim-GHC-Types-1.0.0:
     dependencies:
+      '@daml/types':
+        specifier: 3.7.0
+        version: 3.7.0
       '@mojotech/json-type-validation':
         specifier: ^3.1.0
         version: 3.1.0
 
   daml.js/daml-stdlib-DA-Date-Types-1.0.0:
     dependencies:
+      '@daml/types':
+        specifier: 3.7.0
+        version: 3.7.0
       '@mojotech/json-type-validation':
         specifier: ^3.1.0
         version: 3.1.0
 
   daml.js/daml-stdlib-DA-Internal-Down-1.0.0:
     dependencies:
+      '@daml/types':
+        specifier: 3.7.0
+        version: 3.7.0
       '@mojotech/json-type-validation':
         specifier: ^3.1.0
         version: 3.1.0
 
   daml.js/daml-stdlib-DA-Logic-Types-1.0.0:
     dependencies:
+      '@daml/types':
+        specifier: 3.7.0
+        version: 3.7.0
       '@mojotech/json-type-validation':
         specifier: ^3.1.0
         version: 3.1.0
 
   daml.js/daml-stdlib-DA-Monoid-Types-1.0.0:
     dependencies:
+      '@daml/types':
+        specifier: 3.7.0
+        version: 3.7.0
       '@mojotech/json-type-validation':
         specifier: ^3.1.0
         version: 3.1.0
 
   daml.js/daml-stdlib-DA-NonEmpty-Types-1.0.0:
     dependencies:
+      '@daml/types':
+        specifier: 3.7.0
+        version: 3.7.0
       '@mojotech/json-type-validation':
         specifier: ^3.1.0
         version: 3.1.0
 
   daml.js/daml-stdlib-DA-Random-Types-1.0.0:
     dependencies:
+      '@daml/types':
+        specifier: 3.7.0
+        version: 3.7.0
       '@mojotech/json-type-validation':
         specifier: ^3.1.0
         version: 3.1.0
 
   daml.js/daml-stdlib-DA-Semigroup-Types-1.0.0:
     dependencies:
+      '@daml/types':
+        specifier: 3.7.0
+        version: 3.7.0
       '@mojotech/json-type-validation':
         specifier: ^3.1.0
         version: 3.1.0
 
   daml.js/daml-stdlib-DA-Set-Types-1.0.0:
     dependencies:
+      '@daml/types':
+        specifier: 3.7.0
+        version: 3.7.0
       '@mojotech/json-type-validation':
         specifier: ^3.1.0
         version: 3.1.0
 
   daml.js/daml-stdlib-DA-Stack-Types-1.0.0:
     dependencies:
+      '@daml/types':
+        specifier: 3.7.0
+        version: 3.7.0
       '@mojotech/json-type-validation':
         specifier: ^3.1.0
         version: 3.1.0
 
   daml.js/daml-stdlib-DA-Time-Types-1.0.0:
     dependencies:
+      '@daml/types':
+        specifier: 3.7.0
+        version: 3.7.0
       '@mojotech/json-type-validation':
         specifier: ^3.1.0
         version: 3.1.0
@@ -237,12 +291,18 @@ importers:
       '@daml.js/daml-stdlib-DA-NonEmpty-Types-1.0.0':
         specifier: file:../daml-stdlib-DA-NonEmpty-Types-1.0.0
         version: link:../daml-stdlib-DA-NonEmpty-Types-1.0.0
+      '@daml/types':
+        specifier: 3.7.0
+        version: 3.7.0
       '@mojotech/json-type-validation':
         specifier: ^3.1.0
         version: 3.1.0
 
   daml.js/ghc-stdlib-DA-Internal-Template-1.0.0:
     dependencies:
+      '@daml/types':
+        specifier: 3.7.0
+        version: 3.7.0
       '@mojotech/json-type-validation':
         specifier: ^3.1.0
         version: 3.1.0
@@ -252,11 +312,14 @@ importers:
       '@daml.js/ghc-stdlib-DA-Internal-Template-1.0.0':
         specifier: file:../ghc-stdlib-DA-Internal-Template-1.0.0
         version: link:../ghc-stdlib-DA-Internal-Template-1.0.0
+      '@daml/types':
+        specifier: 3.7.0
+        version: 3.7.0
       '@mojotech/json-type-validation':
         specifier: ^3.1.0
         version: 3.1.0
 
-  daml.js/syncvotes-1.0.4:
+  daml.js/syncvotes-1.0.5:
     dependencies:
       '@daml.js/daml-prim-DA-Types-1.0.0':
         specifier: file:../daml-prim-DA-Types-1.0.0
@@ -267,6 +330,9 @@ importers:
       '@daml.js/splice-api-featured-app-v1-1.0.0':
         specifier: file:../splice-api-featured-app-v1-1.0.0
         version: link:../splice-api-featured-app-v1-1.0.0
+      '@daml/types':
+        specifier: 3.7.0
+        version: 3.7.0
       '@mojotech/json-type-validation':
         specifier: ^3.1.0
         version: 3.1.0
@@ -342,8 +408,8 @@ packages:
   '@canton-network/wallet-sdk@1.5.0':
     resolution: {integrity: sha512-efmnvsZ8jB6Tp0AZtZhdFPTUgP913aR2EeH54dAbfa9F4liH3FmEkzGQP7gXvZ1kkAEIWlx4LfKmOZoktu21xQ==}
 
-  '@daml/types@3.5.2':
-    resolution: {integrity: sha512-lWAXNOl1tdzodvDDw7XTv6dUZA0MeAQZtTklh+5kegNt1asKAhreppYkD+bogYU1DnMXUTeMgGmmMBZt1gZpJg==}
+  '@daml/types@3.7.0':
+    resolution: {integrity: sha512-jg/JQaHBcEooxqytPgb2eU9KMXDL5w2A485OTulUS5fIkjdEj1h5gP7kQv+CYurfGz7ykvSPgbzoP/4TJAbFOA==}
 
   '@esbuild/aix-ppc64@0.28.2':
     resolution: {integrity: sha512-XExcO+dvLKvVtNTibSTBej1NCAbaGhWn9Ww1ZPx80qsahhPFe/8jgWP0IchNe0F3HwkU7n8ejhH8bjonqht8mQ==}
@@ -2469,7 +2535,7 @@ snapshots:
     dependencies:
       '@canton-network/core-types': 1.12.0
       '@canton-network/core-wallet-auth': 1.12.0
-      '@daml/types': 3.5.2
+      '@daml/types': 3.7.0
       '@mojotech/json-type-validation': 3.1.0
       lodash: 4.18.1
       openapi-fetch: 0.17.0
@@ -2502,7 +2568,7 @@ snapshots:
 
   '@canton-network/core-types@1.12.0':
     dependencies:
-      '@daml/types': 3.5.2
+      '@daml/types': 3.7.0
       uuid: 14.0.2
       zod: 4.5.4
 
@@ -2554,7 +2620,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@daml/types@3.5.2':
+  '@daml/types@3.7.0':
     dependencies:
       '@mojotech/json-type-validation': 3.1.0
       '@types/lodash': 4.17.25
