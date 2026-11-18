@@ -115,7 +115,15 @@ export function current(r: LedgerRequest): LedgerRequest {
 	let resource = params.resource;
 	let body = params.body;
 	if (resource === '/v2/updates/flats') resource = '/v2/updates';
-	if (body && 'filter' in body && !('eventFormat' in body) && !('updateFormat' in body)) {
+	// Only a plain JSON body: a DAR upload's bytes are a Buffer, which has a `filter` method of
+	// its own and would be taken for the old form and rewritten into garbage.
+	if (
+		body &&
+		Object.getPrototypeOf(body) === Object.prototype &&
+		Object.hasOwn(body, 'filter') &&
+		!('eventFormat' in body) &&
+		!('updateFormat' in body)
+	) {
 		const { filter, verbose, ...rest } = body;
 		const eventFormat = { ...(filter as object), verbose: verbose === true };
 		body =
